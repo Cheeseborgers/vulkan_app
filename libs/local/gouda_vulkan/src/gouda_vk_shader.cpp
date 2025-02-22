@@ -9,6 +9,8 @@
 #include "glslang/Include/glslang_c_interface.h"
 #include "glslang/Public/resource_limits_c.h"
 
+#include "logger.hpp"
+
 #include "gouda_assert.hpp"
 #include "gouda_types.hpp"
 #include "gouda_utils.hpp"
@@ -80,6 +82,7 @@ static std::size_t CompileShader(VkDevice &device, glslang_stage_t stage, const 
     // Use smart pointers for automatic cleanup
     std::unique_ptr<glslang_shader_t, GlslShaderDeleter> shader{glslang_shader_create(&input)};
     if (!glslang_shader_preprocess(shader.get(), &input)) {
+        // TODO: Use logger for these and remove PrintLog
         PrintLog("GLSL Preprocessing", glslang_shader_get_info_log(shader.get()),
                  glslang_shader_get_info_debug_log(shader.get()));
         PrintShaderSource(input.code);
@@ -87,6 +90,7 @@ static std::size_t CompileShader(VkDevice &device, glslang_stage_t stage, const 
     }
 
     if (!glslang_shader_parse(shader.get(), &input)) {
+        // TODO: Use logger for these and remove PrintLog
         PrintLog("GLSL Parsing", glslang_shader_get_info_log(shader.get()),
                  glslang_shader_get_info_debug_log(shader.get()));
         PrintShaderSource(glslang_shader_get_preprocessed_code(shader.get()));
@@ -97,6 +101,7 @@ static std::size_t CompileShader(VkDevice &device, glslang_stage_t stage, const 
     glslang_program_add_shader(program.get(), shader.get());
 
     if (!glslang_program_link(program.get(), GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT)) {
+        // TODO: Use logger for these and remove PrintLog
         PrintLog("GLSL Linking", glslang_program_get_info_log(program.get()),
                  glslang_program_get_info_debug_log(program.get()));
         return 0;
@@ -110,6 +115,7 @@ static std::size_t CompileShader(VkDevice &device, glslang_stage_t stage, const 
 
     // Print any error messages
     if (const char *spirv_messages = glslang_program_SPIRV_get_messages(program.get()); spirv_messages) {
+        // TODO: Log this better
         std::cerr << spirv_messages;
     }
 
@@ -120,42 +126,43 @@ static std::size_t CompileShader(VkDevice &device, glslang_stage_t stage, const 
     shader_create_info.codeSize = shader_module.m_SPIRV.size() * sizeof(uint);
     shader_create_info.pCode = reinterpret_cast<const u32 *>(shader_module.m_SPIRV.data());
 
-    VkResult result{vkCreateShaderModule(device, &shader_create_info, NULL, &shader_module.m_shader_module)};
+    VkResult result{vkCreateShaderModule(device, &shader_create_info, nullptr, &shader_module.m_shader_module)};
     CHECK_VK_RESULT(result, "vkCreateShaderModule\n");
+
+    ASSERT(result == VK_SUCCESS, "Could not complile shader");
 
     return shader_module.m_SPIRV.size();
 }
 
 static glslang_stage_t ShaderStageFromFilename(std::string_view file_name)
 {
-    std::string s(file_name);
-
-    if (s.ends_with(".vs") || s.ends_with(".vert")) {
+    if (file_name.ends_with(".vs") || file_name.ends_with(".vert")) {
         return GLSLANG_STAGE_VERTEX;
     }
 
-    if (s.ends_with(".fs") || s.ends_with(".frag")) {
+    if (file_name.ends_with(".fs") || file_name.ends_with(".frag")) {
         return GLSLANG_STAGE_FRAGMENT;
     }
 
-    if (s.ends_with(".gs") || s.ends_with(".geom")) {
+    if (file_name.ends_with(".gs") || file_name.ends_with(".geom")) {
         return GLSLANG_STAGE_GEOMETRY;
     }
 
-    if (s.ends_with(".cs") || s.ends_with(".comp")) {
+    if (file_name.ends_with(".cs") || file_name.ends_with(".comp")) {
         return GLSLANG_STAGE_COMPUTE;
     }
 
-    if (s.ends_with(".tcs") || s.ends_with(".tesc")) {
+    if (file_name.ends_with(".tcs") || file_name.ends_with(".tesc")) {
         return GLSLANG_STAGE_TESSCONTROL;
     }
 
-    if (s.ends_with(".tes") || s.ends_with(".tese")) {
+    if (file_name.ends_with(".tes") || file_name.ends_with(".tese")) {
         return GLSLANG_STAGE_TESSEVALUATION;
     }
 
-    // TODO: Implemement proper logging facilities
-    std::cout << "Unknown shader stage in " << file_name;
+    ENGINE_LOG_FATAL("Unknown shader stage in: {}", file_name);
+
+    // TODO: Handle this error and return better (use optional?)
     exit(1);
 
     return GLSLANG_STAGE_VERTEX;
@@ -166,7 +173,7 @@ VkShaderModule CreateShaderModuleFromText(VkDevice device_ptr, std::string_view 
     std::string shader_source;
     const std::string current_path{GoudaUtils::GetCurrentWorkingDirectory()};
 
-    std::cout << "Creating shader from text file " << current_path << file_name << '\n';
+    ENGINE_LOG_INFO("Creating shader from text file: {}", file_name);
 
     if (!GoudaUtils::ReadFile(file_name, shader_source)) {
         ASSERT(false, "Failed to read shader file");
@@ -182,12 +189,12 @@ VkShaderModule CreateShaderModuleFromText(VkDevice device_ptr, std::string_view 
     if (shader_size > 0) {
         shader_module = shader.m_shader_module;
 
+        // TODO: Check this saves in the correct place since we no longer save directly in build dir
         const std::string binary_filename{std::string(file_name) + ".spv"};
         GoudaUtils::WriteBinaryFile(binary_filename, shader.m_SPIRV);
 
-        // TODO: Implemement proper logging facilities
-        std::cout << "Created SPIRV shader from text file " << current_path << file_name << " as " << current_path
-                  << file_name << ".spv\n";
+        ENGINE_LOG_INFO("Created SPIRV shader from text file: {}{} as {}{}.spv", current_path, file_name, current_path,
+                        binary_filename);
     }
 
     glslang_finalize_process();
@@ -211,8 +218,10 @@ VkShaderModule CreateShaderModuleFromBinary(VkDevice device_ptr, std::string_vie
     VkResult result{vkCreateShaderModule(device_ptr, &shader_create_info, nullptr, &shader_module)};
     CHECK_VK_RESULT(result, "vkCreateShaderModule\n");
 
-    // TODO: Implemement proper logging facilities
-    std::cout << "Created shader from binary: " << file_name << '\n';
+    ASSERT(result == VK_SUCCESS, "Could not create shader from binary file: {}", file_name);
+
+    // TODO: Remove logging?
+    ENGINE_LOG_INFO("Created shader from binary: {}", file_name);
 
     return shader_module;
 }

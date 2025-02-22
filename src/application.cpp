@@ -1,8 +1,18 @@
 #include "application.hpp"
 
+// TODO: Move these to cpp file
+#include <glm/ext.hpp>
+#include <glm/glm.hpp>
+
 #include "logger.hpp"
 
 #include <thread>
+
+namespace {
+struct UniformData {
+    glm::mat4 WVP;
+};
+}
 
 Application::Application(WindowSize window_size)
     : p_window{nullptr},
@@ -21,8 +31,7 @@ Application::Application(WindowSize window_size)
 
 Application::~Application()
 {
-    std::cout << "-------------------------------\n";
-    std::cout << "Cleaning up Application\n";
+    APP_LOG_INFO("Cleaning up application");
 
     vkDeviceWaitIdle(p_device); // Ensure GPU is idle before cleanup
 
@@ -50,7 +59,7 @@ Application::~Application()
 
 void Application::Init(std::string_view application_title)
 {
-    APP_LOG_INFO("Initializing ");
+    APP_LOG_INFO("Initializing");
 
     p_window = GoudaVK::GLFW::vulkan_init(m_window_size, application_title, false).value_or(nullptr);
 
@@ -68,9 +77,7 @@ void Application::Init(std::string_view application_title)
     CreatePipeline();
     CreateCommandBuffers();
     RecordCommandBuffers();
-
     CreateFences();
-
     SetupCallbacks();
 }
 
@@ -132,8 +139,7 @@ void Application::CreateCommandBuffers()
 {
     m_command_buffers.resize(static_cast<u32>(m_number_of_images));
     m_vk_core.CreateCommandBuffers(static_cast<u32>(m_number_of_images), m_command_buffers.data());
-
-    std::cout << "Command buffers created\n";
+    APP_LOG_INFO("Command buffers created");
 }
 
 void Application::CreateMesh()
@@ -199,9 +205,9 @@ void Application::CreateFences()
         // Create fences for double buffering
         VkFenceCreateInfo fence_info{.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
                                      .flags = VK_FENCE_CREATE_SIGNALED_BIT};
+
         for (u32 i = 0; i < p_vk_queue->GetMaxFramesInFlight(); i++) {
-            VkResult result = vkCreateFence(p_device, &fence_info, nullptr, &m_frame_fences[i]);
-            CHECK_VK_RESULT(result, "vkCreateFence\n");
+            GoudaVK::CreateFence(p_device, &fence_info, nullptr, &m_frame_fences[i]);
         }
     }
 }
@@ -241,11 +247,10 @@ void Application::RecordCommandBuffers()
 
         vkCmdEndRenderPass(m_command_buffers[i]);
 
-        VkResult result{vkEndCommandBuffer(m_command_buffers[i])};
-        CHECK_VK_RESULT(result, "vkEndCommandBuffer\n");
+        GoudaVK::EndCommandBuffer(m_command_buffers[i]);
     }
 
-    std::cout << "Command buffers recorded\n";
+    APP_LOG_INFO("Command buffers recorded");
 }
 
 void Application::UpdateUniformBuffer(u32 ImageIndex)
@@ -299,7 +304,7 @@ void Application::OnKey(GLFWwindow *window, int key, int scancode, int action, i
     }
 
     if (action == GLFW_PRESS) {
-        std::cout << "Key Pressed: " << key << std::endl;
+        std::cout << "Key Pressed: " << key << '\n';
     }
 }
 

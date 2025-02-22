@@ -2,21 +2,14 @@
 
 #include "gouda_vk_wrapper.hpp"
 
-// TODO: Move these to cpp file
-#include <glm/ext.hpp>
-#include <glm/glm.hpp>
-
 class Application {
 public:
     Application(WindowSize window_size);
     ~Application();
 
     void Init(std::string_view application_title);
-
     void Update(f32 delta_time);
-
     void RenderScene();
-
     void Execute();
 
 private:
@@ -24,11 +17,6 @@ private:
     void CreateMesh();
     void CreateVertexBuffer();
     void LoadTexture();
-
-    struct UniformData { // TODO: Move this elsewhere
-        glm::mat4 WVP;
-    };
-
     void CreateUniformBuffers();
     void CreateShaders();
     void CreatePipeline();

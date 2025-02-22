@@ -1,7 +1,6 @@
 #include "gouda_vk_glfw.hpp"
 
-#include <format>
-#include <iostream>
+#include "logger.hpp"
 
 #include "gouda_throw.hpp"
 
@@ -14,8 +13,7 @@ namespace internal {
 // GLFW Error callback (only used inside this file)
 inline void ErrorCallback(int error, const char *description)
 {
-    // TODO: Replace with logging system
-    std::cerr << std::format("GLFW Error ({}): {}\n", error, description);
+    ENGINE_LOG_ERROR("GLFW error ({}): {}", error, description);
 }
 
 // Get platform name as string (only used internally)
@@ -37,28 +35,28 @@ inline std::string_view get_platform_as_string(Platform platform)
     }
 }
 
-void print_initialized_glfw_system_platform()
+inline void print_initialized_glfw_system_platform()
 {
     // Verify the selected platform
-    int platform = glfwGetPlatform();
+    int platform{glfwGetPlatform()};
     switch (platform) {
         case GLFW_PLATFORM_WAYLAND:
-            std::cout << "[Info] Using Wayland platform." << std::endl;
+            ENGINE_LOG_INFO("Using Wayland platform");
             break;
         case GLFW_PLATFORM_X11:
-            std::cout << "[Info] Using X11 platform." << std::endl;
+            ENGINE_LOG_INFO("Using X11 platform");
             break;
         case GLFW_PLATFORM_WIN32:
-            std::cout << "[Info] Using Windows (Win32) platform." << std::endl;
+            ENGINE_LOG_INFO("Using Windows platform");
             break;
         case GLFW_PLATFORM_COCOA:
-            std::cout << "[Info] Using macOS (Cocoa) platform." << std::endl;
+            ENGINE_LOG_INFO("Using MacOS platform");
             break;
         case GLFW_PLATFORM_NULL:
-            std::cerr << "[Warning] Running in headless mode (GLFW_PLATFORM_NULL)." << std::endl;
+            ENGINE_LOG_WARNING("Running in headless mode (GLFW_PLATFORM_NULL)");
             break;
         default:
-            std::cerr << "[Error] Unknown GLFW platform!" << std::endl;
+            ENGINE_LOG_FATAL("Unknown GLFW platform!");
             glfwTerminate();
             ENGINE_THROW("Unknown GLFW platform");
     }
@@ -113,16 +111,16 @@ std::optional<GLFWwindow *> vulkan_init(WindowSize window_size, std::string_view
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, window_resizable);
 
-    GLFWwindow *window_ptr =
-        glfwCreateWindow(window_size.width, window_size.height, application_title.data(), nullptr, nullptr);
+    GLFWwindow *window_ptr{
+        glfwCreateWindow(window_size.width, window_size.height, application_title.data(), nullptr, nullptr)};
 
     if (!window_ptr) {
-        const char *error_desc = nullptr;
-        int error_code = glfwGetError(&error_desc);
+        const char *error_description{nullptr};
+        int error_code{glfwGetError(&error_description)};
 
-        std::cerr << std::format("Failed to create GLFW window. Error code: {}\n", error_code);
-        if (error_desc) {
-            std::cerr << std::format("Error description: {}\n", error_desc);
+        ENGINE_LOG_FATAL("Failed to create GLFW window. Error code: {}", error_code);
+        if (error_description) {
+            ENGINE_LOG_FATAL("Error description: {}", error_description);
         }
 
         glfwTerminate();
@@ -174,6 +172,7 @@ void set_callbacks(GLFWwindow *window_ptr, GLFW::Callbacks *callbacks_ptr)
     });
 }
 
+// Set the GLFW window icon
 void set_window_icon(GLFWwindow *window, std::string_view file_path)
 {
     // StbiImage image = StbiImage(file_path);

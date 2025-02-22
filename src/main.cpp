@@ -8,6 +8,4 @@ int main()
     Application app{window_size};
     app.Init(application_title);
     app.Execute();
-
-    return 0;
 }

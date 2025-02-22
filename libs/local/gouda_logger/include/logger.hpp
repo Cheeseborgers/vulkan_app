@@ -1,6 +1,7 @@
 // LoggerLib/include/Logger.hpp
 #pragma once
 
+#include <assert.h>
 #include <chrono>
 #include <format>
 #include <fstream>
