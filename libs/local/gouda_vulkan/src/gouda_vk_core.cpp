@@ -227,17 +227,6 @@ void VulkanCore::DestroyFramebuffers(std::vector<VkFramebuffer> &frame_buffers)
     ENGINE_LOG_INFO("Framebuffers(s) destroyed {}", frame_buffers.size());
 }
 
-// FIXME: Testing swapchain recreation 18/2/25
-void VulkanCore::RecreateSwapChain()
-{
-    vkDestroySwapchainKHR(p_device, p_swap_chain, nullptr);
-    p_swap_chain = VK_NULL_HANDLE;
-
-    ENGINE_LOG_INFO("Swap chain destroyed for recreation");
-
-    CreateSwapChain(); // TODO: Can we pass/use the old swap chain in the swapchain create info and not destroy?
-}
-
 void VulkanCore::CreateInstance(std::string_view app_name, SemVer vulkan_api_version)
 {
     std::vector<const char *> layers{"VK_LAYER_KHRONOS_validation"};
@@ -285,19 +274,6 @@ void VulkanCore::CreateInstance(std::string_view app_name, SemVer vulkan_api_ver
 #endif
 
     ENGINE_LOG_INFO("Vulkan instance created");
-}
-
-int VulkanCore::GetNumberOfImages() const { return static_cast<int>(m_images.size()); }
-
-const VkImage &VulkanCore::GetImage(int index)
-{
-    // TODO: Fix this static casting to a better solution
-    if (static_cast<size_t>(index) >= m_images.size()) {
-        ENGINE_LOG_FATAL("Invalid image index: {}", index);
-        ENGINE_THROW("Invalid image index!");
-    }
-
-    return m_images[static_cast<size_t>(index)];
 }
 
 void VulkanCore::CreateCommandBuffers(u32 count, VkCommandBuffer *command_buffers_ptr)
@@ -433,6 +409,16 @@ void VulkanCore::CreateTexture(std::string_view file_name, VulkanTexture &textur
     texture.p_sampler = CreateTextureSampler(p_device, min_filter, max_filter, address_mode);
 
     ENGINE_LOG_INFO("Created texture from: {}", file_name);
+}
+
+const VkImage &VulkanCore::GetImage(int index)
+{
+    if (static_cast<size_t>(index) >= m_images.size()) {
+        ENGINE_LOG_FATAL("Invalid image index: {}", index);
+        ENGINE_THROW("Invalid image index!");
+    }
+
+    return m_images[static_cast<size_t>(index)];
 }
 
 void VulkanCore::GetFramebufferSize(int &width, int &height) const { glfwGetWindowSize(p_window, &width, &height); }
@@ -866,7 +852,7 @@ void VulkanCore::SubmitCopyCommand()
 {
     vkEndCommandBuffer(p_copy_command_buffer);
 
-    m_queue.SubmitSync(p_copy_command_buffer);
+    m_queue.Submit(p_copy_command_buffer);
 
     m_queue.WaitIdle();
 }

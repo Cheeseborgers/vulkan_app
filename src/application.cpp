@@ -17,7 +17,6 @@ Application::Application(WindowSize window_size)
       m_is_iconified{false},
       m_current_frame{0}
 {
-    m_frame_fences.resize(MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 }
 
 Application::~Application()
@@ -70,12 +69,7 @@ void Application::Init(std::string_view application_title)
     CreateCommandBuffers();
     RecordCommandBuffers();
 
-    // Create fences for double buffering
-    VkFenceCreateInfo fence_info{.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT};
-    for (u32 i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        VkResult result = vkCreateFence(p_device, &fence_info, nullptr, &m_frame_fences[i]);
-        CHECK_VK_RESULT(result, "vkCreateFence\n");
-    }
+    CreateFences();
 
     SetupCallbacks();
 }
@@ -84,21 +78,16 @@ void Application::Update(f32 delta_time) {}
 
 void Application::RenderScene()
 {
-    // Wait for the current frame's previous work to finish
-    // vkWaitForFences(p_device, 1, &m_frame_fences[m_current_frame], VK_TRUE, UINT64_MAX);
-    // vkResetFences(p_device, 1, &m_frame_fences[m_current_frame]);
+    vkWaitForFences(p_device, 1, &m_frame_fences[m_current_frame], VK_TRUE, UINT64_MAX);
+    vkResetFences(p_device, 1, &m_frame_fences[m_current_frame]);
 
-    // Get the image index from the swapchain (next image to render)
-    u32 image_index = p_vk_queue->AcquireNextImage();
-
-    // Update uniform buffers for the current frame
+    u32 image_index = p_vk_queue->AcquireNextImage(m_current_frame);
     UpdateUniformBuffer(image_index);
 
-    // Submit the command buffer for rendering, ensuring that we're synchronizing using semaphores/fences
-    p_vk_queue->SubmitAsync(m_command_buffers[image_index]);
+    p_vk_queue->Submit(m_command_buffers[image_index], m_current_frame, m_frame_fences[m_current_frame]);
+    p_vk_queue->Present(image_index, m_current_frame);
 
-    // Present the rendered image to the window
-    p_vk_queue->FramePresent(image_index);
+    m_current_frame = (m_current_frame + 1) % p_vk_queue->GetMaxFramesInFlight();
 }
 
 void Application::Execute()
@@ -126,11 +115,11 @@ void Application::Execute()
         }
 
         while (accumulator >= fixed_timestep) {
-            this->Update(fixed_timestep);
+            Update(fixed_timestep);
             accumulator -= fixed_timestep;
         }
 
-        this->RenderScene(); // Render at variable FPS
+        RenderScene(); // Render at variable FPS
     }
 
     vkDeviceWaitIdle(p_device); // Wait for GPU to finish before destroying window
@@ -202,6 +191,21 @@ void Application::CreatePipeline()
                                                              m_uniform_buffers, sizeof(UniformData));
 }
 
+void Application::CreateFences()
+{
+    if (p_vk_queue) {
+        m_frame_fences.resize(p_vk_queue->GetMaxFramesInFlight(), VK_NULL_HANDLE);
+
+        // Create fences for double buffering
+        VkFenceCreateInfo fence_info{.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+                                     .flags = VK_FENCE_CREATE_SIGNALED_BIT};
+        for (u32 i = 0; i < p_vk_queue->GetMaxFramesInFlight(); i++) {
+            VkResult result = vkCreateFence(p_device, &fence_info, nullptr, &m_frame_fences[i]);
+            CHECK_VK_RESULT(result, "vkCreateFence\n");
+        }
+    }
+}
+
 void Application::RecordCommandBuffers()
 {
     VkClearColorValue clear_colour{1.0f, 0.0f, 0.0f, 0.0f};
@@ -255,24 +259,6 @@ void Application::UpdateUniformBuffer(u32 ImageIndex)
     rotation_angle += 0.001f; // Increment the angle for animation
 
     m_uniform_buffers[ImageIndex].Update(p_device, &rotation_matrix, sizeof(rotation_matrix));
-}
-
-// FIXME: Testing
-void Application::RecreateSwapchain(FrameBufferSize new_size)
-{
-    std::cout << "Recreating the swapchain as: " << new_size.ToString() << '\n';
-}
-
-// FIXME: Testing
-void Application::RecreateFramebuffers()
-{
-    vkDestroyRenderPass(m_vk_core.GetDevice(), p_render_pass, nullptr);
-
-    p_render_pass = m_vk_core.CreateSimpleRenderPass();
-
-    m_vk_core.DestroyFramebuffers(m_frame_buffers);
-
-    m_frame_buffers = m_vk_core.CreateFramebuffers(p_render_pass);
 }
 
 void Application::SetupCallbacks()

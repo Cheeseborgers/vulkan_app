@@ -15,14 +15,16 @@ public:
     void Init(VkDevice device_ptr, VkSwapchainKHR swap_chain_ptr, u32 queue_family, u32 queue_index);
     void Destroy();
 
-    u32 AcquireNextImage();
+    u32 AcquireNextImage(u32 frame_index);
 
-    void SubmitSync(VkCommandBuffer command_buffer_ptr);
-    void SubmitAsync(VkCommandBuffer command_buffer_ptr);
+    void Submit(VkCommandBuffer command_buffer, u32 frame_index, VkFence fence = VK_NULL_HANDLE); // For render loop
+    void Submit(VkCommandBuffer command_buffer, VkFence fence = VK_NULL_HANDLE);                  // For standalone ops
 
-    void FramePresent(u32 image_index);
+    void Present(u32 image_index, u32 frame_index);
 
     void WaitIdle();
+
+    u32 GetMaxFramesInFlight() const { return MAX_FRAMES_IN_FLIGHT; } // Expose to Application
 
 private:
     void CreateSemaphores();
@@ -31,8 +33,10 @@ private:
     VkDevice p_device;
     VkSwapchainKHR p_swap_chain;
     VkQueue p_queue;
-    VkSemaphore p_render_complete_semaphore;
-    VkSemaphore p_present_complete_semaphore;
+
+    static constexpr u32 MAX_FRAMES_IN_FLIGHT = 2;
+    std::vector<VkSemaphore> p_present_complete_semaphores; // One per frame
+    std::vector<VkSemaphore> p_render_complete_semaphores;  // One per frame
 };
 
 } // end namespace

@@ -32,13 +32,10 @@ private:
     void CreateUniformBuffers();
     void CreateShaders();
     void CreatePipeline();
+    void CreateFences();
     void RecordCommandBuffers();
     void UpdateUniformBuffer(u32 ImageIndex);
     void SetupCallbacks();
-
-    // FIXME: Testing
-    void RecreateSwapchain(FrameBufferSize new_size);
-    void RecreateFramebuffers();
 
     // Callback handlers
     void OnKey(GLFWwindow *window, int key, int scancode, int action, int mods);
@@ -62,7 +59,6 @@ private:
     VkShaderModule p_vertex_shader;
     VkShaderModule p_fragment_shader;
 
-    // GoudaVK::GraphicsPipeline *p_pipeline; // TODO: Think about how we handle this pointer
     std::unique_ptr<GoudaVK::GraphicsPipeline> p_pipeline;
 
     GoudaVK::SimpleMesh m_mesh;
@@ -74,5 +70,4 @@ private:
 
     std::vector<VkFence> m_frame_fences;
     u32 m_current_frame;
-    static constexpr u32 MAX_FRAMES_IN_FLIGHT = 2;
 };

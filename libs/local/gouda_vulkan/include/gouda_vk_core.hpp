@@ -36,30 +36,20 @@ public:
     std::vector<VkFramebuffer> CreateFramebuffers(VkRenderPass render_pass_ptr) const;
     void DestroyFramebuffers(std::vector<VkFramebuffer> &frame_buffers);
 
-    // FIXME: Testing swapchain recreation 18/2/25
-    void RecreateSwapChain();
-
-    VkDevice &GetDevice() { return p_device; }
-
-    int GetNumberOfImages() const;
-
-    const VkImage &GetImage(int index);
-
-    VulkanQueue *GetQueue() { return &m_queue; }
-
-    u32 GetQueueFamily() const { return m_queue_family; }
-
     void CreateCommandBuffers(u32 count, VkCommandBuffer *command_buffers_ptr);
     void FreeCommandBuffers(u32 count, const VkCommandBuffer *command_buffers_ptr);
-
     AllocatedBuffer CreateVertexBuffer(const void *vertices_ptr, size_t data_size);
-
     void CreateUniformBuffers(std::vector<AllocatedBuffer> &uniform_buffers, size_t data_size);
     std::vector<AllocatedBuffer> CreateUniformBuffers(size_t data_size);
-
-    void GetFramebufferSize(int &width, int &height) const;
-
     void CreateTexture(std::string_view file_name, VulkanTexture &texture);
+
+    // Getters
+    VulkanQueue *GetQueue() { return &m_queue; }
+    u32 GetQueueFamily() const { return m_queue_family; }
+    int GetNumberOfImages() const { return static_cast<int>(m_images.size()); }
+    const VkImage &GetImage(int index);
+    VkDevice &GetDevice() { return p_device; }
+    void GetFramebufferSize(int &width, int &height) const;
 
 private:
     void CreateInstance(std::string_view app_name, SemVer vulkan_api_version);
