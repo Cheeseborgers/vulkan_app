@@ -26,6 +26,9 @@
 
 enum class LogLevel { Info, Warning, Error, Fatal };
 
+// TODO: Make sure all member vars are set in the constructor
+// TODO: Sort stacktrace as a fallback for all spported platforms until gcc sorts its act out
+
 class Logger {
 protected:
     Logger(const std::string &log_file_path = "") : m_log_to_file(!log_file_path.empty()), m_file_path(log_file_path)
@@ -73,26 +76,27 @@ protected:
     void log_impl(LogLevel level, std::string_view prefix, std::string_view format_str, std::string_view tag,
                   const std::source_location &loc, std::tuple<TupleArgs...> &args_tuple, std::index_sequence<I...>)
     {
-        if (static_cast<int>(level) < static_cast<int>(m_minLevel))
+        if (static_cast<int>(level) < static_cast<int>(m_min_level))
             return;
 
-        std::string timestamp = get_timestamp();
-        static constexpr std::array<std::string_view, 4> levelStrings = {"[INFO] ", "[WARNING] ", "[ERROR] ",
-                                                                         "[FATAL] "};
+        // TODO: Add [DEBUG] flag to print crap when debugging
+        std::string timestamp{get_timestamp()};
+        static constexpr std::array<std::string_view, 4> level_strings = {"[INFO] ", "[WARNING] ", "[ERROR] ",
+                                                                          "[FATAL] "};
 
-        // Ensure level is within bounds
-        int levelIndex = static_cast<int>(level);
-        assert(levelIndex >= 0 && levelIndex < static_cast<int>(levelStrings.size()));
+        // Set and Ensure level is within bounds
+        int level_index{static_cast<int>(level)};
+        assert(level_index >= 0 && level_index < static_cast<int>(level_strings.size()));
 
-        std::string fullPrefix = tag.empty() ? std::string(prefix) : std::format("{} [{}] ", prefix, tag);
-        std::string message = std::vformat(format_str, std::make_format_args(std::get<I>(args_tuple)...));
+        std::string full_prefix{tag.empty() ? std::string(prefix) : std::format("{} [{}] ", prefix, tag)};
+        std::string message{std::vformat(format_str, std::make_format_args(std::get<I>(args_tuple)...))};
 
         // Common log format, optionally including source location
-        std::string log_message =
+        std::string log_message{
             (level == LogLevel::Info)
-                ? std::format("{} {}{}{}", timestamp, fullPrefix, levelStrings[levelIndex], message)
-                : std::format("{} {}{}{} ({}:{}:{})", timestamp, fullPrefix, levelStrings[levelIndex], message,
-                              loc.file_name(), loc.line(), loc.column());
+                ? std::format("{} {}{}{}", timestamp, full_prefix, level_strings[level_index], message)
+                : std::format("{} {}{}{} ({}:{}:{})", timestamp, full_prefix, level_strings[level_index], message,
+                              loc.file_name(), loc.line(), loc.column())};
 
 #ifdef __cpp_lib_stacktrace
         if (level == LogLevel::Fatal) {
@@ -170,7 +174,7 @@ protected:
     bool m_log_to_file;
     std::string m_file_path;
     std::ofstream m_file_stream;
-    LogLevel m_minLevel = LogLevel::Info;
+    LogLevel m_min_level = LogLevel::Info;
     bool m_buffered = false;
     std::mutex m_bufferMutex;
     std::vector<std::pair<LogLevel, std::string>> m_buffer;
@@ -178,7 +182,7 @@ protected:
     std::vector<Sink> m_sinks;
 
 public:
-    void setMinLogLevel(LogLevel level) { m_minLevel = level; }
+    void setMinLogLevel(LogLevel level) { m_min_level = level; }
     void setBuffered(bool enabled)
     {
         std::lock_guard<std::mutex> lock(m_bufferMutex);
