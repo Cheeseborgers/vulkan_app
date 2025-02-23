@@ -9,7 +9,7 @@ public:
 
     void Init(std::string_view application_title);
     void Update(f32 delta_time);
-    void RenderScene();
+    void RenderScene(f32 delta_time);
     void Execute();
 
 private:
@@ -22,7 +22,7 @@ private:
     void CreatePipeline();
     void CreateFences();
     void RecordCommandBuffers();
-    void UpdateUniformBuffer(u32 ImageIndex);
+    void UpdateUniformBuffer(u32 image_index, f32 delta_time);
     void SetupCallbacks();
 
     // Callback handlers

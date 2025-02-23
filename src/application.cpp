@@ -83,13 +83,13 @@ void Application::Init(std::string_view application_title)
 
 void Application::Update(f32 delta_time) {}
 
-void Application::RenderScene()
+void Application::RenderScene(f32 delta_time)
 {
     vkWaitForFences(p_device, 1, &m_frame_fences[m_current_frame], VK_TRUE, UINT64_MAX);
     vkResetFences(p_device, 1, &m_frame_fences[m_current_frame]);
-
     u32 image_index = p_vk_queue->AcquireNextImage(m_current_frame);
-    UpdateUniformBuffer(image_index);
+
+    UpdateUniformBuffer(image_index, delta_time);
 
     p_vk_queue->Submit(m_command_buffers[image_index], m_current_frame, m_frame_fences[m_current_frame]);
     p_vk_queue->Present(image_index, m_current_frame);
@@ -102,23 +102,28 @@ void Application::Execute()
     constexpr f32 fixed_timestep = 1.0f / 60.0f; // Physics updates at 60Hz
 
     auto previous_time = SteadyClock::now();
-    f32 accumulator = 0.0f;
+    f32 accumulator{0.0f};
+    f32 delta_time{0.0f};
 
-    constexpr Milliseconds sleep_duration(1); // Small sleep to reduce CPU usage
+    constexpr f64 sleep_duration(0.001); // Small sleep to reduce CPU usage
 
     while (!glfwWindowShouldClose(p_window)) {
         auto current_time = SteadyClock::now();
         std::chrono::duration<f32> frame_time = current_time - previous_time;
         previous_time = current_time;
 
-        f32 dt = frame_time.count();
-        accumulator += dt;
+        delta_time = frame_time.count();
+
+        // **Clamp the accumulator to prevent excessive lag compensation**
+        if (accumulator > 0.25f) {
+            accumulator = 0.25f;
+        }
 
         glfwPollEvents();
 
         if (m_is_iconified) {
-            std::this_thread::sleep_for(sleep_duration);
-            continue; // Skip rendering etc.. while minimized
+            glfwWaitEventsTimeout(sleep_duration); // Wait for events instead of busy waiting
+            continue;                              // Skip rendering etc.. while minimized
         }
 
         while (accumulator >= fixed_timestep) {
@@ -126,7 +131,7 @@ void Application::Execute()
             accumulator -= fixed_timestep;
         }
 
-        RenderScene(); // Render at variable FPS
+        RenderScene(delta_time); // Render at variable FPS
     }
 
     vkDeviceWaitIdle(p_device); // Wait for GPU to finish before destroying window
@@ -253,15 +258,19 @@ void Application::RecordCommandBuffers()
     APP_LOG_INFO("Command buffers recorded");
 }
 
-void Application::UpdateUniformBuffer(u32 ImageIndex)
+void Application::UpdateUniformBuffer(u32 ImageIndex, f32 delta_time)
 {
-    static float rotation_angle = 0.0f;
-    glm::mat4 rotation_matrix = glm::mat4(1.0f);
+    static f32 rotation_speed{1.0f};
+    static f32 rotation_angle{0.0f};
+
+    glm::mat4 rotation_matrix{glm::mat4(1.0f)};
 
     rotation_matrix =
         glm::rotate(rotation_matrix, glm::radians(rotation_angle), glm::normalize(glm::vec3(0.0f, 0.0f, 1.0f)));
 
-    rotation_angle += 0.001f; // Increment the angle for animation
+    rotation_angle = fmod(rotation_angle + rotation_speed * delta_time, 360.0f);
+
+    // std::cout << "Frame: " << ImageIndex << " Rotation: " << rotation_angle << std::endl;
 
     m_uniform_buffers[ImageIndex].Update(p_device, &rotation_matrix, sizeof(rotation_matrix));
 }

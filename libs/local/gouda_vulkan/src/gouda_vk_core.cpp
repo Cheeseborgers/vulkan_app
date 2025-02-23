@@ -550,7 +550,7 @@ static VkPresentModeKHR ChoosePresentMode(const std::vector<VkPresentModeKHR> &p
 {
     for (auto mode : present_modes) {
         if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
-            // return VK_PRESENT_MODE_FIFO_KHR;
+            // return VK_PRESENT_MODE_FIFO_KHR; // for debug purposes
             return mode;
         }
     }
