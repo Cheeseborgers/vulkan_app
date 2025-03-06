@@ -14,6 +14,8 @@
 #include <syncstream>
 #include <vector>
 
+#include "stacktrace.hpp"
+
 #ifdef __cpp_lib_stacktrace
 #include <stacktrace>
 #endif
@@ -24,7 +26,7 @@
 #include <unistd.h>
 #endif
 
-enum class LogLevel { Info, Warning, Error, Fatal };
+enum class LogLevel { Debug, Info, Warning, Error, Fatal };
 
 // TODO: Make sure all member vars are set in the constructor
 // TODO: Sort stacktrace as a fallback for all spported platforms until gcc sorts its act out
@@ -81,8 +83,8 @@ protected:
 
         // TODO: Add [DEBUG] flag to print crap when debugging
         std::string timestamp{get_timestamp()};
-        static constexpr std::array<std::string_view, 4> level_strings = {"[INFO] ", "[WARNING] ", "[ERROR] ",
-                                                                          "[FATAL] "};
+        static constexpr std::array<std::string_view, 5> level_strings = {"[DEBUG] ", "[INFO] ", "[WARNING] ",
+                                                                          "[ERROR] ", "[FATAL] "};
 
         // Set and Ensure level is within bounds
         int level_index{static_cast<int>(level)};
@@ -93,15 +95,15 @@ protected:
 
         // Common log format, optionally including source location
         std::string log_message{
-            (level == LogLevel::Info)
+            (level == LogLevel::Info || level == LogLevel::Debug)
                 ? std::format("{} {}{}{}", timestamp, full_prefix, level_strings[level_index], message)
                 : std::format("{} {}{}{} ({}:{}:{})", timestamp, full_prefix, level_strings[level_index], message,
                               loc.file_name(), loc.line(), loc.column())};
 
+// TODO: Implement stacktraing for all platforms
 #ifdef __cpp_lib_stacktrace
         if (level == LogLevel::Fatal) {
-            std::string stack = std::to_string(std::stacktrace::current());
-            log_message += "\nStacktrace:\n" + stack;
+            stacktrace::print_stacktrace();
         }
 #endif
 
@@ -124,6 +126,9 @@ protected:
         if (hConsole == INVALID_HANDLE_VALUE)
             return;
         switch (level) {
+            case LogLevel::Debug:
+                SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE);
+                break;
             case LogLevel::Info:
                 SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN);
                 break;
@@ -140,6 +145,9 @@ protected:
 #else
         if (isatty(STDOUT_FILENO)) {
             switch (level) {
+                case LogLevel::Debug:
+                    std::cout << "\033[34m";
+                    break;
                 case LogLevel::Info:
                     std::cout << "\033[32m";
                     break;
@@ -174,7 +182,7 @@ protected:
     bool m_log_to_file;
     std::string m_file_path;
     std::ofstream m_file_stream;
-    LogLevel m_min_level = LogLevel::Info;
+    LogLevel m_min_level = LogLevel::Debug;
     bool m_buffered = false;
     std::mutex m_bufferMutex;
     std::vector<std::pair<LogLevel, std::string>> m_buffer;
@@ -182,8 +190,8 @@ protected:
     std::vector<Sink> m_sinks;
 
 public:
-    void setMinLogLevel(LogLevel level) { m_min_level = level; }
-    void setBuffered(bool enabled)
+    void SetLogLevel(LogLevel level) { m_min_level = level; }
+    void SetBuffered(bool enabled)
     {
         std::lock_guard<std::mutex> lock(m_bufferMutex);
         m_buffered = enabled;
@@ -208,12 +216,22 @@ public:
     }
 };
 
+// TODO: FIX THIS TO WORK IN EVERY BUILD
 class EngineLogger : public Logger {
 public:
     static EngineLogger &GetInstance(const std::string &log_file_path = "")
     {
         static std::once_flag initFlag;
-        std::call_once(initFlag, [&]() { instance = new EngineLogger(log_file_path); });
+        std::call_once(initFlag, [&]() {
+            instance = new EngineLogger(log_file_path);
+#ifdef ENGINE_LOG_LEVEL_DEBUG
+            // instance->SetLogLevel(LogLevel::Debug);
+#elif defined(ENGINE_LOG_LEVEL_INFO)
+            // instance->SetLogLevel(LogLevel::Info);
+#else
+            // instance->SetLogLevel(LogLevel::Warning);  // Default log level
+#endif
+        });
         return *instance;
     }
 
@@ -242,7 +260,16 @@ public:
     static AppLogger &GetInstance(const std::string &log_file_path = "")
     {
         static std::once_flag initFlag;
-        std::call_once(initFlag, [&]() { instance = new AppLogger(log_file_path); });
+        std::call_once(initFlag, [&]() {
+            instance = new AppLogger(log_file_path);
+#ifdef APP_LOG_LEVEL_DEBUG
+            instance->SetLogLevel(LogLevel::Debug);
+#elif defined(APP_LOG_LEVEL_INFO)
+            instance->SetLogLevel(LogLevel::Info);
+#else
+            instance->SetLogLevel(LogLevel::Warning);  // Default log level
+#endif
+        });
         return *instance;
     }
 
@@ -274,6 +301,18 @@ private:
     EngineLogger::GetInstance().log(level, fmt, "", std::source_location::current(), ##__VA_ARGS__)
 #define ENGINE_LOG_TAG(level, tag, fmt, ...)                                                                           \
     EngineLogger::GetInstance().log(level, fmt, tag, std::source_location::current(), ##__VA_ARGS__)
+
+#if defined(ENGINE_LOG_LEVEL_DEBUG)
+#define ENGINE_LOG_DEBUG(fmt, ...) ENGINE_LOG(LogLevel::Debug, fmt, ##__VA_ARGS__)
+#define ENGINE_LOG_DEBUG_TAG(tag, fmt, ...) ENGINE_LOG_TAG(LogLevel::Debug, tag, fmt, ##__VA_ARGS__)
+#else
+#define ENGINE_LOG_DEBUG(fmt, ...)                                                                                     \
+    do {                                                                                                               \
+    } while (0)
+#define ENGINE_LOG_DEBUG_TAG(tag, fmt, ...)                                                                            \
+    do {                                                                                                               \
+    } while (0)
+#endif
 
 #if defined(ENGINE_LOG_LEVEL_INFO)
 #define ENGINE_LOG_INFO(fmt, ...) ENGINE_LOG(LogLevel::Info, fmt, ##__VA_ARGS__)
@@ -332,6 +371,12 @@ private:
 #define ENGINE_LOG_TAG(level, tag, fmt, ...)                                                                           \
     do {                                                                                                               \
     } while (0)
+#define ENGINE_LOG_DEBUG(fmt, ...)                                                                                     \
+    do {                                                                                                               \
+    } while (0)
+#define ENGINE_LOG_DEBUG_TAG(tag, fmt, ...)                                                                            \
+    do {                                                                                                               \
+    } while (0)
 #define ENGINE_LOG_INFO(fmt, ...)                                                                                      \
     do {                                                                                                               \
     } while (0)
@@ -366,6 +411,17 @@ private:
 #define APP_LOG_TAG(level, tag, fmt, ...)                                                                              \
     AppLogger::GetInstance().log(level, fmt, tag, std::source_location::current(), ##__VA_ARGS__)
 
+#if defined(APP_LOG_LEVEL_DEBUG)
+#define APP_LOG_DEBUG(fmt, ...) APP_LOG(LogLevel::Debug, fmt, ##__VA_ARGS__)
+#define APP_LOG_DEBUG_TAG(tag, fmt, ...) APP_LOG_TAG(LogLevel::Debug, tag, fmt, ##__VA_ARGS__)
+#else
+#define APP_LOG_DEBUG(fmt, ...)                                                                                        \
+    do {                                                                                                               \
+    } while (0)
+#define APP_LOG_DEBUG_TAG(tag, fmt, ...)                                                                               \
+    do {                                                                                                               \
+    } while (0)
+#endif
 #if defined(APP_LOG_LEVEL_INFO)
 #define APP_LOG_INFO(fmt, ...) APP_LOG(LogLevel::Info, fmt, ##__VA_ARGS__)
 #define APP_LOG_INFO_TAG(tag, fmt, ...) APP_LOG_TAG(LogLevel::Info, tag, fmt, ##__VA_ARGS__)
@@ -421,6 +477,12 @@ private:
     do {                                                                                                               \
     } while (0)
 #define APP_LOG_TAG(level, tag, fmt, ...)                                                                              \
+    do {                                                                                                               \
+    } while (0)
+#define APP_LOG_DEBUG(fmt, ...)                                                                                        \
+    do {                                                                                                               \
+    } while (0)
+#define APP_LOG_DEBUG_TAG(tag, fmt, ...)                                                                               \
     do {                                                                                                               \
     } while (0)
 #define APP_LOG_INFO(fmt, ...)                                                                                         \
