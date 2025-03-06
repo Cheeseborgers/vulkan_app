@@ -41,6 +41,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityF
 
 VulkanCore::VulkanCore()
     : m_is_initialized{false},
+      m_vsync_mode{VSyncMode::DISABLED},
       p_instance{VK_NULL_HANDLE},
       p_debug_messenger{VK_NULL_HANDLE},
       p_surface{VK_NULL_HANDLE},
@@ -75,10 +76,12 @@ VulkanCore::~VulkanCore()
         for (auto image_view : m_image_views) {
             vkDestroyImageView(p_device, image_view, nullptr);
         }
-        ENGINE_LOG_INFO("Image views destroyed");
+
+        m_image_views.clear();
 
         vkDestroySwapchainKHR(p_device, p_swap_chain, nullptr);
-        ENGINE_LOG_INFO("Swap chain destroyed");
+
+        ENGINE_LOG_INFO("Swapchain destroyed");
 
         vkDestroyDevice(p_device, nullptr);
         ENGINE_LOG_INFO("Device destroyed");
@@ -112,11 +115,13 @@ VulkanCore::~VulkanCore()
     }
 }
 
-void VulkanCore::Init(GLFWwindow *window_ptr, std::string_view app_name, SemVer vulkan_api_version)
+void VulkanCore::Init(GLFWwindow *window_ptr, std::string_view app_name, SemVer vulkan_api_version,
+                      VSyncMode vsync_mode)
 {
     ASSERT(window_ptr, "Window pointer cannot be null");
 
     p_window = window_ptr;
+    m_vsync_mode = vsync_mode;
 
     CreateInstance(app_name, vulkan_api_version);
     CreateDebugCallback();
@@ -126,10 +131,11 @@ void VulkanCore::Init(GLFWwindow *window_ptr, std::string_view app_name, SemVer 
     m_queue_family = m_physical_devices.SelectDevice(VK_QUEUE_GRAPHICS_BIT, true);
 
     CreateDevice();
-    CreateSwapChain();
+    CreateSwapchain();
+    CreateSwapchainImageViews();
     CreateCommandBufferPool();
 
-    m_queue.Init(p_device, p_swap_chain, m_queue_family, 0);
+    m_queue.Init(p_device, &p_swap_chain, m_queue_family, 0);
 
     CreateCommandBuffers(1, &p_copy_command_buffer);
 
@@ -192,6 +198,8 @@ std::vector<VkFramebuffer> VulkanCore::CreateFramebuffers(VkRenderPass render_pa
     FrameBufferSize frame_buffer_size;
     GetFramebufferSize(frame_buffer_size.width, frame_buffer_size.height);
 
+    ENGINE_LOG_INFO("Framebuffer size retrieved: {}x{}", frame_buffer_size.width, frame_buffer_size.height);
+
     // Ensure the framebuffer size is valid (non-zero area)
     ASSERT(frame_buffer_size.area() > 0, "Framebuffer dimensions cannot be zero");
 
@@ -206,7 +214,7 @@ std::vector<VkFramebuffer> VulkanCore::CreateFramebuffers(VkRenderPass render_pa
         frame_buffer_create_info.pAttachments = &m_image_views[i]; // Attach the corresponding image view
         frame_buffer_create_info.width = static_cast<u32>(frame_buffer_size.width);   // Set framebuffer width
         frame_buffer_create_info.height = static_cast<u32>(frame_buffer_size.height); // Set framebuffer height
-        frame_buffer_create_info.layers = 1;                                          // Single layer framebuffer
+        frame_buffer_create_info.layers = 1;
 
         // Create the framebuffer and check for errors
         VkResult result{vkCreateFramebuffer(p_device, &frame_buffer_create_info, nullptr, &frame_buffers[i])};
@@ -224,7 +232,9 @@ void VulkanCore::DestroyFramebuffers(std::vector<VkFramebuffer> &frame_buffers)
         vkDestroyFramebuffer(p_device, buffer, nullptr);
     }
 
-    ENGINE_LOG_INFO("Framebuffers(s) destroyed {}", frame_buffers.size());
+    frame_buffers.clear();
+
+    ENGINE_LOG_INFO("Framebuffers destroyed");
 }
 
 void VulkanCore::CreateInstance(std::string_view app_name, SemVer vulkan_api_version)
@@ -546,17 +556,33 @@ void VulkanCore::CreateDevice()
     ENGINE_LOG_INFO("Device created");
 }
 
-static VkPresentModeKHR ChoosePresentMode(const std::vector<VkPresentModeKHR> &present_modes)
+static VkPresentModeKHR GetVulkanPresentMode(VSyncMode mode)
 {
+    switch (mode) {
+        case VSyncMode::DISABLED:
+            return VK_PRESENT_MODE_IMMEDIATE_KHR; // No sync, high FPS
+        case VSyncMode::ENABLED:
+            return VK_PRESENT_MODE_FIFO_KHR; // Standard V-Sync
+        case VSyncMode::MAILBOX:
+            return VK_PRESENT_MODE_MAILBOX_KHR; // Adaptive V-Sync
+        default:
+            return VK_PRESENT_MODE_FIFO_KHR;
+    }
+}
+
+static VkPresentModeKHR ChoosePresentMode(const std::vector<VkPresentModeKHR> &present_modes, VSyncMode vsync_mode)
+{
+    if (vsync_mode == VSyncMode::ENABLED) {
+        return VK_PRESENT_MODE_FIFO_KHR; // FIFO is always supported and enables V-Sync
+    }
+
     for (auto mode : present_modes) {
         if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
-            // return VK_PRESENT_MODE_FIFO_KHR; // for debug purposes
-            return mode;
+            return mode; // Use Mailbox if available (low-latency V-Sync)
         }
     }
 
-    // Fallback to FIFO which is always supported
-    return VK_PRESENT_MODE_FIFO_KHR;
+    return VK_PRESENT_MODE_FIFO_KHR; // Fallback to FIFO which is always supported
 }
 
 static u32 ChooseNumImages(const VkSurfaceCapabilitiesKHR &capabilities)
@@ -586,16 +612,34 @@ static VkSurfaceFormatKHR ChooseSurfaceFormatAndColorSpace(const std::vector<VkS
     return surface_formats[0];
 }
 
-void VulkanCore::CreateSwapChain()
+void VulkanCore::CreateSwapchain()
 {
     const VkSurfaceCapabilitiesKHR &surface_capabiltities{m_physical_devices.Selected().m_surface_capabilties};
 
     const u32 number_of_images{ChooseNumImages(surface_capabiltities)};
 
     const std::vector<VkPresentModeKHR> &present_modes{m_physical_devices.Selected().m_present_modes};
-    VkPresentModeKHR present_mode{ChoosePresentMode(present_modes)};
+    VkPresentModeKHR present_mode{ChoosePresentMode(present_modes, m_vsync_mode)};
 
     m_swap_chain_surface_format = ChooseSurfaceFormatAndColorSpace(m_physical_devices.Selected().m_surface_formats);
+
+    FrameBufferSize framebuffer_size;
+    GetFramebufferSize(framebuffer_size.width, framebuffer_size.height);
+
+    ENGINE_LOG_INFO("Surface capabilities: currentExtent = {}x{}, minImageExtent = {}x{}, maxImageExtent = {}x{}",
+                    surface_capabiltities.currentExtent.width, surface_capabiltities.currentExtent.height,
+                    surface_capabiltities.minImageExtent.width, surface_capabiltities.minImageExtent.height,
+                    surface_capabiltities.maxImageExtent.width, surface_capabiltities.maxImageExtent.height);
+    // Log the capabilities for debugging
+
+    // Choose an appropriate extent
+    VkExtent2D extent;
+    if (surface_capabiltities.currentExtent.width != UINT32_MAX) {
+        // If currentExtent is valid, use it (some platforms mandate this)
+        extent = surface_capabiltities.currentExtent;
+    }
+
+    ENGINE_LOG_INFO("Selected swapchain extent: {}x{}", extent.width, extent.height);
 
     VkSwapchainCreateInfoKHR swap_chain_create_info = {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -605,7 +649,7 @@ void VulkanCore::CreateSwapChain()
         .minImageCount = number_of_images,
         .imageFormat = m_swap_chain_surface_format.format,
         .imageColorSpace = m_swap_chain_surface_format.colorSpace,
-        .imageExtent = surface_capabiltities.currentExtent,
+        .imageExtent = extent,
         .imageArrayLayers = 1,
         .imageUsage = (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT),
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -620,11 +664,21 @@ void VulkanCore::CreateSwapChain()
     VkResult result{vkCreateSwapchainKHR(p_device, &swap_chain_create_info, nullptr, &p_swap_chain)};
     CHECK_VK_RESULT(result, "vkCreateSwapchainKHR\n");
 
-    ENGINE_LOG_INFO("Swap chain created");
+    ENGINE_LOG_INFO("Swap chain created with V-Sync mode: {}", (m_vsync_mode == VSyncMode::ENABLED) ? "ENABLED (FIFO)"
+                                                               : (m_vsync_mode == VSyncMode::MAILBOX)
+                                                                   ? "DISABLED (MAILBOX)"
+                                                                   : "DISABLED (IMMEDIATE)");
+}
 
+void VulkanCore::CreateSwapchainImageViews()
+{
     uint number_of_swap_chain_images{0};
-    result = vkGetSwapchainImagesKHR(p_device, p_swap_chain, &number_of_swap_chain_images, nullptr);
+    VkResult result = vkGetSwapchainImagesKHR(p_device, p_swap_chain, &number_of_swap_chain_images, nullptr);
     CHECK_VK_RESULT(result, "vkGetSwapchainImagesKHR\n");
+
+    const VkSurfaceCapabilitiesKHR &surface_capabiltities{m_physical_devices.Selected().m_surface_capabilties};
+
+    const u32 number_of_images{ChooseNumImages(surface_capabiltities)};
 
     ASSERT(number_of_images == number_of_swap_chain_images,
            "Number of images is not equal to the number of swap chain images");
@@ -673,7 +727,8 @@ u32 VulkanCore::GetMemoryTypeIndex(u32 memory_type_bits, VkMemoryPropertyFlags r
     ENGINE_LOG_FATAL("Cannot find memory type for type: {}, requested memory properties: {}", memory_type_bits,
                      required_memory_property_flags);
     exit(1);
-    return 0; // TODO: handle this better than returing 0 as it exits the application before. maybe return std::optional
+    return 0; // TODO: handle this better than returing 0 as it exits the application before. maybe return
+              // std::optional
 }
 
 void VulkanCore::CopyBufferToBuffer(VkBuffer destination, VkBuffer source, VkDeviceSize size)
@@ -777,13 +832,15 @@ void VulkanCore::CreateImage(VulkanTexture &texture, ImageSize image_size, VkFor
         .pQueueFamilyIndices = nullptr,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED};
 
+    ENGINE_LOG_DEBUG("Created Image {} width: {}", image_size.width, image_size.width);
+
     VkResult result{vkCreateImage(p_device, &image_create_info, nullptr, &texture.p_image)};
     CHECK_VK_RESULT(result, "vkCreateImage error");
 
     VkMemoryRequirements memory_requirements;
     vkGetImageMemoryRequirements(p_device, texture.p_image, &memory_requirements);
 
-    u32 memory_type_index = GetMemoryTypeIndex(memory_requirements.memoryTypeBits, memory_property_flags);
+    u32 memory_type_index{GetMemoryTypeIndex(memory_requirements.memoryTypeBits, memory_property_flags)};
 
     VkMemoryAllocateInfo memory_allocate_info = {.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
                                                  .pNext = nullptr,
@@ -1010,6 +1067,94 @@ void VulkanCore::TransitionImageLayoutCmd(VkCommandBuffer command_buffer_ptr, Vk
     }
 
     vkCmdPipelineBarrier(command_buffer_ptr, source_stage, destination_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+}
+
+void VulkanCore::DestroySwapchain() { vkDestroySwapchainKHR(p_device, p_swap_chain, nullptr); }
+
+void VulkanCore::DestroySwapchainImageViews()
+{
+    for (size_t i = 0; i < m_image_views.size(); i++) {
+        vkDestroyImageView(p_device, m_image_views[i], nullptr);
+    }
+
+    m_image_views.clear();
+}
+
+void VulkanCore::ReCreateSwapchain()
+{
+    DestroySwapchainImageViews();
+
+    VkSurfaceCapabilitiesKHR surface_capabiltities;
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physical_devices.Selected().m_phys_device, p_surface,
+                                              &surface_capabiltities);
+
+    ENGINE_LOG_DEBUG("Surface capabilities: currentExtent = {}x{}, minImageExtent = {}x{}, maxImageExtent = {}x{}",
+                     surface_capabiltities.currentExtent.width, surface_capabiltities.currentExtent.height,
+                     surface_capabiltities.minImageExtent.width, surface_capabiltities.minImageExtent.height,
+                     surface_capabiltities.maxImageExtent.width, surface_capabiltities.maxImageExtent.height);
+
+    const u32 number_of_images = ChooseNumImages(surface_capabiltities);
+    const std::vector<VkPresentModeKHR> &present_modes = m_physical_devices.Selected().m_present_modes;
+    VkPresentModeKHR present_mode = ChoosePresentMode(present_modes, m_vsync_mode);
+
+    m_swap_chain_surface_format = ChooseSurfaceFormatAndColorSpace(m_physical_devices.Selected().m_surface_formats);
+
+    int width, height;
+    GetFramebufferSize(width, height);
+
+    VkExtent2D extent;
+    if (surface_capabiltities.currentExtent.width != UINT32_MAX) {
+        extent = surface_capabiltities.currentExtent;
+    }
+    else {
+        extent.width = std::max(surface_capabiltities.minImageExtent.width,
+                                std::min(surface_capabiltities.maxImageExtent.width, static_cast<u32>(width)));
+        extent.height = std::max(surface_capabiltities.minImageExtent.height,
+                                 std::min(surface_capabiltities.maxImageExtent.height, static_cast<u32>(height)));
+    }
+
+    ENGINE_LOG_DEBUG("Selected swapchain extent: {}x{}", extent.width, extent.height);
+
+    VkSwapchainCreateInfoKHR swap_chain_create_info = {
+        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .pNext = nullptr,
+        .flags = 0,
+        .surface = p_surface,
+        .minImageCount = number_of_images,
+        .imageFormat = m_swap_chain_surface_format.format,
+        .imageColorSpace = m_swap_chain_surface_format.colorSpace,
+        .imageExtent = extent,
+        .imageArrayLayers = 1,
+        .imageUsage = (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT),
+        .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 1,
+        .pQueueFamilyIndices = &m_queue_family,
+        .preTransform = surface_capabiltities.currentTransform,
+        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode = present_mode,
+        .clipped = VK_TRUE,
+        .oldSwapchain = p_swap_chain // Pass the old swapchain
+    };
+
+    VkSwapchainKHR new_swap_chain;
+    ENGINE_LOG_DEBUG("Old swapchain handle: {}", reinterpret_cast<void *>(p_swap_chain));
+    VkResult result = vkCreateSwapchainKHR(p_device, &swap_chain_create_info, nullptr, &new_swap_chain);
+    CHECK_VK_RESULT(result, "vkCreateSwapchainKHR\n");
+
+    // Destroy the old swapchain after the new one is created
+    if (p_swap_chain != VK_NULL_HANDLE) {
+        ENGINE_LOG_DEBUG("Destroying old swapchain: {}", reinterpret_cast<void *>(p_swap_chain));
+        vkDestroySwapchainKHR(p_device, p_swap_chain, nullptr);
+    }
+    p_swap_chain = new_swap_chain;
+    // ENGINE_LOG_DEBUG("New swapchain handle: {}", reinterpret_cast<void *>(p_swap_chain));
+
+    ENGINE_LOG_INFO("Swap chain recreated with V-Sync mode: {}", (m_vsync_mode == VSyncMode::ENABLED) ? "ENABLED (FIFO)"
+                                                                 : (m_vsync_mode == VSyncMode::MAILBOX)
+                                                                     ? "DISABLED (MAILBOX)"
+                                                                     : "DISABLED (IMMEDIATE)");
+
+    CreateSwapchainImageViews();
 }
 
 } // end GoudaVK namespace

@@ -1,6 +1,6 @@
 #include "gouda_vk_graphics_pipeline.hpp"
 
-#include <print>
+#include "logger.hpp"
 
 #include "gouda_assert.hpp"
 #include "gouda_types.hpp"
@@ -20,55 +20,40 @@ GraphicsPipeline::GraphicsPipeline(VkDevice device_ptr, GLFWwindow *p_window, Vk
       p_descriptor_pool{VK_NULL_HANDLE},
       p_descriptor_set_layout{VK_NULL_HANDLE}
 {
-    // If a valid mesh is provided, create descriptor sets for it
     if (mesh_ptr) {
         CreateDescriptorSets(mesh_ptr, number_of_images, uniform_buffers, uniform_data_size);
     }
 
-    // Define shader stages for the pipeline
     std::array<VkPipelineShaderStageCreateInfo, 2> ShaderStageCreateInfo = {
         VkPipelineShaderStageCreateInfo{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0,
                                         VK_SHADER_STAGE_VERTEX_BIT, p_vertex_shader, "main", nullptr},
         VkPipelineShaderStageCreateInfo{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0,
                                         VK_SHADER_STAGE_FRAGMENT_BIT, p_fragment_shader, "main", nullptr}};
 
-    // Define vertex input state (empty since we are not using vertex attributes directly here)
     VkPipelineVertexInputStateCreateInfo vertex_input_info{};
     vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
-    // Define input assembly state (describes how primitives are assembled)
     VkPipelineInputAssemblyStateCreateInfo pipeline_input_assembly_state_create_info{};
     pipeline_input_assembly_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    pipeline_input_assembly_state_create_info.topology =
-        VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; // Use triangle list topology
+    pipeline_input_assembly_state_create_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     pipeline_input_assembly_state_create_info.primitiveRestartEnable = VK_FALSE;
 
-    // Get the size of the framebuffer from the window
-    FrameBufferSize frame_buffer_size{};
-    glfwGetWindowSize(p_window, &frame_buffer_size.width, &frame_buffer_size.height);
+    // Define dynamic states
+    VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+    VkPipelineDynamicStateCreateInfo dynamic_state_info = {.sType =
+                                                               VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+                                                           .dynamicStateCount = 2,
+                                                           .pDynamicStates = dynamic_states};
 
-    // Define viewport (where the image is drawn)
-    VkViewport viewport = {.x = 0.0f,
-                           .y = 0.0f,
-                           .width = static_cast<f32>(frame_buffer_size.width),
-                           .height = static_cast<f32>(frame_buffer_size.height),
-                           .minDepth = 0.0f,
-                           .maxDepth = 1.0f};
-
-    // Define scissor (clip region for rendering)
-    VkRect2D scissor = {.offset = {0, 0},
-                        .extent = {.width = static_cast<u32>(frame_buffer_size.width),
-                                   .height = static_cast<u32>(frame_buffer_size.height)}};
-
-    // Viewport state configuration
+    // Viewport state with no static values
     VkPipelineViewportStateCreateInfo viewport_state_create_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-        .viewportCount = 1,
-        .pViewports = &viewport,
+        .viewportCount = 1,    // Required even for dynamic
+        .pViewports = nullptr, // Set dynamically at runtime
         .scissorCount = 1,
-        .pScissors = &scissor};
+        .pScissors = nullptr // Set dynamically at runtime
+    };
 
-    // Define rasterization state (controls how geometry is drawn)
     VkPipelineRasterizationStateCreateInfo pipeline_rasterization_state_create_info{};
     pipeline_rasterization_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     pipeline_rasterization_state_create_info.polygonMode = VK_POLYGON_MODE_FILL;
@@ -76,14 +61,12 @@ GraphicsPipeline::GraphicsPipeline(VkDevice device_ptr, GLFWwindow *p_window, Vk
     pipeline_rasterization_state_create_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     pipeline_rasterization_state_create_info.lineWidth = 1.0f;
 
-    // Define multisampling state (disabled for now)
     VkPipelineMultisampleStateCreateInfo pipeline_multisampler_create_info{};
     pipeline_multisampler_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     pipeline_multisampler_create_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     pipeline_multisampler_create_info.sampleShadingEnable = VK_FALSE;
     pipeline_multisampler_create_info.minSampleShading = 1.0f;
 
-    // Define color blending state (controls how colors are blended)
     VkPipelineColorBlendAttachmentState blend_attach_state{};
     blend_attach_state.blendEnable = VK_FALSE;
     blend_attach_state.colorWriteMask =
@@ -95,11 +78,8 @@ GraphicsPipeline::GraphicsPipeline(VkDevice device_ptr, GLFWwindow *p_window, Vk
     blend_create_info.attachmentCount = 1;
     blend_create_info.pAttachments = &blend_attach_state;
 
-    // Define pipeline layout (descriptor sets and push constants)
     VkPipelineLayoutCreateInfo layout_info{};
     layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-
-    // Use descriptor set layout if a valid mesh with a vertex buffer exists
     if (mesh_ptr && mesh_ptr->m_vertex_buffer.p_buffer) {
         layout_info.setLayoutCount = 1;
         layout_info.pSetLayouts = &p_descriptor_set_layout;
@@ -109,11 +89,9 @@ GraphicsPipeline::GraphicsPipeline(VkDevice device_ptr, GLFWwindow *p_window, Vk
         layout_info.pSetLayouts = nullptr;
     }
 
-    // Create the pipeline layout
     VkResult result = vkCreatePipelineLayout(p_device, &layout_info, nullptr, &p_pipeline_layout);
     CHECK_VK_RESULT(result, "vkCreatePipelineLayout\n");
 
-    // Define the graphics pipeline creation info
     VkGraphicsPipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeline_info.stageCount = std::size(ShaderStageCreateInfo);
@@ -124,17 +102,17 @@ GraphicsPipeline::GraphicsPipeline(VkDevice device_ptr, GLFWwindow *p_window, Vk
     pipeline_info.pRasterizationState = &pipeline_rasterization_state_create_info;
     pipeline_info.pMultisampleState = &pipeline_multisampler_create_info;
     pipeline_info.pColorBlendState = &blend_create_info;
+    pipeline_info.pDynamicState = &dynamic_state_info; // Enable dynamic states
     pipeline_info.layout = p_pipeline_layout;
     pipeline_info.renderPass = p_render_pass;
     pipeline_info.subpass = 0;
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_info.basePipelineIndex = -1;
 
-    // Create the graphics pipeline
     result = vkCreateGraphicsPipelines(p_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &p_pipeline);
     CHECK_VK_RESULT(result, "vkCreateGraphicsPipelines\n");
 
-    std::print("Graphics pipeline created\n");
+    ENGINE_LOG_DEBUG("Graphics pipeline created");
 }
 
 GraphicsPipeline::~GraphicsPipeline() { Destroy(); }
@@ -174,6 +152,8 @@ void GraphicsPipeline::Destroy()
         vkDestroyPipeline(p_device, p_pipeline, nullptr);
         p_pipeline = VK_NULL_HANDLE;
     }
+
+    ENGINE_LOG_DEBUG("Graphics pipeline destroyed");
 }
 
 void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
@@ -196,7 +176,8 @@ void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
 
     VkResult result{vkCreateDescriptorPool(p_device, &descriptor_pool_create_info, nullptr, &p_descriptor_pool)};
     CHECK_VK_RESULT(result, "vkCreateDescriptorPool");
-    std::printf("Descriptor pool created\n");
+
+    ENGINE_LOG_DEBUG("Descriptor pool created");
 }
 
 void GraphicsPipeline::CreateDescriptorSets(const SimpleMesh *mesh_ptr, int number_of_images,

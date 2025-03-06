@@ -17,8 +17,14 @@ find_package(glslang CONFIG REQUIRED)
 
 find_package(Threads REQUIRED)
 
-# Add ImGUI
+# OpenAL
+add_subdirectory(libs/thirdparty/openAL)
+add_subdirectory(libs/thirdparty/libsndfile)
+
 add_subdirectory(libs/thirdparty/imgui)
+
+# pcg random
+add_subdirectory(libs/thirdparty/pcg)
 
 # Add stb_image for texture creation
 add_subdirectory(libs/thirdparty/stb_image)
@@ -39,7 +45,14 @@ set(PROJECT_SOURCES
     src/gouda_vk_queue.cpp
     src/gouda_vk_shader.cpp
     src/gouda_vk_simple_mesh.cpp
-    src/gouda_vk_texture.cpp)
+    src/gouda_vk_texture.cpp
+
+    src/audio/audio_manager.cpp
+    src/audio/music_track.cpp
+    src/audio/sound_effect.cpp
+
+    src/utility/random.cpp
+)
 
 add_library(${PROJECT_NAME} STATIC ${PROJECT_SOURCES})
 
@@ -50,9 +63,15 @@ target_include_directories(${PROJECT_NAME}
     # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/local/gouda_image>
 
     # Thirdpart libs
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/imgui>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/openAL>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/libsndfile>
 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/imgui>
+
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/pcg>
+
+    # Project includes
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -61,15 +80,22 @@ target_link_libraries(${PROJECT_NAME}
     gouda_logger
 
     # gouda_image
+    stb_image
+
+    # Sound
+    OpenAL
+    sndfile
+
     imgui
+
+    pcg
 
     Vulkan::Vulkan
 
+    # Shaders
     glslang::glslang
     glslang::SPIRV
     glslang::glslang-default-resource-limits
-
-    stb_image
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE

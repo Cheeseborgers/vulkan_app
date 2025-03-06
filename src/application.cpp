@@ -1,8 +1,9 @@
 #include "application.hpp"
 
-// TODO: Move these to cpp file
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
+
+#include "utility/timer.hpp"
 
 #include "logger.hpp"
 
@@ -38,6 +39,7 @@ Application::~Application()
     for (auto fence : m_frame_fences) {
         if (fence != VK_NULL_HANDLE) {
             vkDestroyFence(p_device, fence, nullptr);
+            fence = VK_NULL_HANDLE;
         }
     }
 
@@ -61,9 +63,9 @@ void Application::Init(std::string_view application_title)
 {
     APP_LOG_INFO("Initializing");
 
-    p_window = GoudaVK::GLFW::vulkan_init(m_window_size, application_title, false).value_or(nullptr);
+    p_window = GoudaVK::GLFW::vulkan_init(m_window_size, application_title, true).value_or(nullptr);
 
-    m_vk_core.Init(p_window, application_title, {1, 3, 0, 0});
+    m_vk_core.Init(p_window, application_title, {1, 3, 0, 0}, m_time_settings.vsync_mode);
 
     p_device = m_vk_core.GetDevice();
     m_number_of_images = m_vk_core.GetNumberOfImages();
@@ -79,15 +81,32 @@ void Application::Init(std::string_view application_title)
     RecordCommandBuffers();
     CreateFences();
     SetupCallbacks();
+
+    m_audio_manager.Initialize();
+    m_laser_1.Load("assets/audio/sound_effects/laser1.wav");
+    m_laser_2.Load("assets/audio/sound_effects/laser2.wav");
+
+    m_music2.Load("assets/audio/music_tracks/moonlight.wav");
+    m_music.Load("assets/audio/music_tracks/track.mp3");
+    // m_music2.Load("assets/audio/music_tracks/blondie.mp3");
+
+    m_audio_manager.QueueMusic(m_music2);
+    m_audio_manager.QueueMusic(m_music);
 }
 
 void Application::Update(f32 delta_time) {}
 
 void Application::RenderScene(f32 delta_time)
 {
+    while (!p_vk_queue->IsSwapchainValid()) {
+        std::this_thread::yield();
+        ENGINE_LOG_INFO("Rendering paused, waiting for valid swapchain");
+    }
+
     vkWaitForFences(p_device, 1, &m_frame_fences[m_current_frame], VK_TRUE, UINT64_MAX);
     vkResetFences(p_device, 1, &m_frame_fences[m_current_frame]);
-    u32 image_index = p_vk_queue->AcquireNextImage(m_current_frame);
+
+    u32 image_index{p_vk_queue->AcquireNextImage(m_current_frame)};
 
     UpdateUniformBuffer(image_index, delta_time);
 
@@ -99,42 +118,50 @@ void Application::RenderScene(f32 delta_time)
 
 void Application::Execute()
 {
-    constexpr f32 fixed_timestep = 1.0f / 60.0f; // Physics updates at 60Hz
+    constexpr f64 sleep_duration{0.001}; // Small sleep to reduce CPU usage
 
-    auto previous_time = SteadyClock::now();
-    f32 accumulator{0.0f};
-    f32 delta_time{0.0f};
+    FrameTimer frame_timer;
+    FixedTimer physics_timer(m_time_settings.fixed_timestep);
+    GameClock game_clock;
 
-    constexpr f64 sleep_duration(0.001); // Small sleep to reduce CPU usage
+    // Only use FPS limiter if V-Sync is disabled
+    std::optional<FrameRateLimiter> fps_limiter;
+    if (m_time_settings.vsync_mode == GoudaVK::VSyncMode::DISABLED) {
+        fps_limiter.emplace(m_time_settings.target_fps);
+    }
 
     while (!glfwWindowShouldClose(p_window)) {
-        auto current_time = SteadyClock::now();
-        std::chrono::duration<f32> frame_time = current_time - previous_time;
-        previous_time = current_time;
-
-        delta_time = frame_time.count();
-
-        // **Clamp the accumulator to prevent excessive lag compensation**
-        if (accumulator > 0.25f) {
-            accumulator = 0.25f;
-        }
 
         glfwPollEvents();
+        m_audio_manager.Update();
+
+        frame_timer.Update();
+        f32 delta_time{frame_timer.GetDeltaTime()};
+
+        // Apply time scaling
+        delta_time = game_clock.ApplyTimeScale(delta_time);
 
         if (m_is_iconified) {
-            glfwWaitEventsTimeout(sleep_duration); // Wait for events instead of busy waiting
-            continue;                              // Skip rendering etc.. while minimized
+            glfwWaitEventsTimeout(sleep_duration); // Avoid busy waiting
+            continue;                              // Skip rendering while minimized
         }
 
-        while (accumulator >= fixed_timestep) {
-            Update(fixed_timestep);
-            accumulator -= fixed_timestep;
+        // Update physics at a fixed timestep
+        physics_timer.UpdateAccumulator(delta_time);
+        while (physics_timer.ShouldUpdate()) {
+            Update(physics_timer.GetFixedTimeStep());
+            physics_timer.Advance();
         }
 
         RenderScene(delta_time); // Render at variable FPS
+
+        // Apply FPS limiter only if V-Sync is off
+        if (fps_limiter) {
+            fps_limiter->Limit(delta_time);
+        }
     }
 
-    vkDeviceWaitIdle(p_device); // Wait for GPU to finish before destroying window
+    vkDeviceWaitIdle(p_device);
     glfwDestroyWindow(p_window);
     glfwTerminate();
 }
@@ -229,17 +256,32 @@ void Application::RecordCommandBuffers()
         .renderPass = p_render_pass,
         .framebuffer = VK_NULL_HANDLE, // Assigned in loop below
         .renderArea = {.offset = {.x = 0, .y = 0},
-                       .extent = {.width = m_window_size.width, .height = m_window_size.height}},
+                       .extent = {.width = (u32)m_window_size.width, .height = (u32)m_window_size.height}},
         .clearValueCount = 1,
         .pClearValues = &clear_value};
 
     for (size_t i = 0; i < m_command_buffers.size(); i++) {
-
         GoudaVK::BeginCommandBuffer(m_command_buffers[i], VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
 
         render_pass_begin_info.framebuffer = m_frame_buffers[i];
 
         vkCmdBeginRenderPass(m_command_buffers[i], &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+
+        // Set viewport
+        VkViewport viewport{.x = 0.0f,
+                            .y = 0.0f,
+                            .width = static_cast<f32>(m_window_size.width),
+                            .height = static_cast<f32>(m_window_size.height),
+                            .minDepth = 0.0f,
+                            .maxDepth = 1.0f};
+
+        vkCmdSetViewport(m_command_buffers[i], 0, 1, &viewport);
+
+        // Set scissor
+        VkRect2D scissor{.offset = {0, 0},
+                         .extent = {static_cast<u32>(m_window_size.width), static_cast<u32>(m_window_size.height)}};
+
+        vkCmdSetScissor(m_command_buffers[i], 0, 1, &scissor);
 
         p_pipeline->Bind(m_command_buffers[i], i);
 
@@ -312,6 +354,14 @@ void Application::OnKey(GLFWwindow *window, int key, int scancode, int action, i
         // TODO: Set close request flag?
     }
 
+    if ((key == GLFW_KEY_W) && (action == GLFW_PRESS)) {
+        m_audio_manager.PlaySoundEffect(m_laser_1);
+    }
+
+    if ((key == GLFW_KEY_S) && (action == GLFW_PRESS)) {
+        m_audio_manager.PlaySoundEffect(m_laser_2);
+    }
+
     if (action == GLFW_PRESS) {
         std::cout << "Key Pressed: " << key << '\n';
     }
@@ -336,20 +386,33 @@ void Application::OnMouseScroll(GLFWwindow *window, f32 x_offset, f32 y_offset)
 
 void Application::OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_size)
 {
-    // Step 1: Mark the window size as changed
-    m_window_size = new_size;
+    if (new_size.width == 0 || new_size.height == 0) {
+        APP_LOG_INFO("Window minimized, skipping swapchain recreation");
+        return; // Ignore minimized window to avoid swapchain issues
+    }
 
-    // Step 2: Recreate swapchain
-    // RecreateSwapchain(new_size);
+    p_vk_queue->SetSwapchainInvalid(); // Mark swapchain for recreation (stops rendering)
+    APP_LOG_INFO("Framebuffer resized: {}x{}, swapchain is now invalid", new_size.width, new_size.height);
 
-    // Step 3: Recreate associated framebuffers
-    // RecreateFramebuffers();
+    m_window_size = new_size; // Update stored window size
 
-    // Step 4: Update any dependent uniform buffers (like projection matrices)
-    // UpdateProjectionMatrix(new_size.width, new_size.height);
+    vkDeviceWaitIdle(p_device); // Ensure no commands are running before destruction
 
-    // Step 5: Re-record command buffers, as the framebuffer and swapchain have changed
-    // RecordCommandBuffers();
+    // Cleanup framebuffers
+    m_vk_core.DestroyFramebuffers(m_frame_buffers);
+
+    // Cleanup and Recreate swapchain and swapchain image views
+    m_vk_core.ReCreateSwapchain();
+
+    // Recreate framebuffers for new swapchain images
+    m_frame_buffers = m_vk_core.CreateFramebuffers(p_render_pass);
+
+    // Re-record command buffers with new framebuffers
+    RecordCommandBuffers();
+
+    APP_LOG_DEBUG("Swapchain and framebuffers recreated successfully.");
+
+    p_vk_queue->SetSwapchainValid(); // resume rendering)
 }
 
 void Application::OnWindowIconify(GLFWwindow *window, bool iconified) { m_is_iconified = iconified; }

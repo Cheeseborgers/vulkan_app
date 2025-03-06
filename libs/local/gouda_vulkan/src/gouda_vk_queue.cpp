@@ -2,13 +2,16 @@
 
 #include <vulkan/vulkan.h>
 
+#include "logger.hpp"
+
 #include "gouda_assert.hpp"
 #include "gouda_vk_utils.hpp"
 #include "gouda_vk_wrapper.hpp"
 
 namespace GoudaVK {
 
-VulkanQueue::VulkanQueue() : p_device{VK_NULL_HANDLE}, p_swap_chain{VK_NULL_HANDLE}, p_queue{VK_NULL_HANDLE}
+VulkanQueue::VulkanQueue()
+    : p_device{VK_NULL_HANDLE}, p_swap_chain{nullptr}, p_queue{VK_NULL_HANDLE}, m_swapchain_valid{false}
 {
     p_present_complete_semaphores.resize(MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
     p_render_complete_semaphores.resize(MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
@@ -16,7 +19,7 @@ VulkanQueue::VulkanQueue() : p_device{VK_NULL_HANDLE}, p_swap_chain{VK_NULL_HAND
 
 VulkanQueue::~VulkanQueue() {}
 
-void VulkanQueue::Init(VkDevice device_ptr, VkSwapchainKHR swap_chain_ptr, u32 queue_family, u32 queue_index)
+void VulkanQueue::Init(VkDevice device_ptr, VkSwapchainKHR *swap_chain_ptr, u32 queue_family, u32 queue_index)
 {
     ASSERT(device_ptr != nullptr, "Pointer 'device_ptr' should not be null!");
     ASSERT(swap_chain_ptr != nullptr, "Pointer 'swap_chain_ptr' should not be null!");
@@ -24,9 +27,12 @@ void VulkanQueue::Init(VkDevice device_ptr, VkSwapchainKHR swap_chain_ptr, u32 q
     p_device = device_ptr;
     p_swap_chain = swap_chain_ptr;
 
+    m_swapchain_valid = true;
+
     vkGetDeviceQueue(device_ptr, queue_family, queue_index, &p_queue);
 
-    std::cout << "Queue acquired and initialized\n";
+    ENGINE_LOG_INFO("Queue initialized");
+
     CreateSemaphores();
 }
 
@@ -49,10 +55,18 @@ u32 VulkanQueue::AcquireNextImage(u32 frame_index)
     ASSERT(frame_index < MAX_FRAMES_IN_FLIGHT, "Frame index out of bounds!");
 
     u32 image_index{0};
-    VkResult result{vkAcquireNextImageKHR(p_device, p_swap_chain, std::numeric_limits<u64>::max(),
+    VkResult result{vkAcquireNextImageKHR(p_device, *p_swap_chain, std::numeric_limits<u64>::max(),
                                           p_present_complete_semaphores[frame_index], VK_NULL_HANDLE, &image_index)};
 
-    CHECK_VK_RESULT(result, "vkAcquireNextImageKHR\n");
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        std::cout << "Swapchain outdated on acquire, recreating...\n";
+        // RecreateSwapchain();
+        // return AcquireNextImage(frame_index); // Retry acquiring after recreating
+        return 0;
+    }
+
+    // FIXME: what da fuck
+    // CHECK_VK_RESULT(result, "vkAcquireNextImageKHR\n");
 
     return image_index;
 }
@@ -101,15 +115,16 @@ void VulkanQueue::Present(u32 image_index, u32 frame_index)
                                   .waitSemaphoreCount = 1,
                                   .pWaitSemaphores = &p_render_complete_semaphores[frame_index],
                                   .swapchainCount = 1,
-                                  .pSwapchains = &p_swap_chain,
+                                  .pSwapchains = p_swap_chain,
                                   .pImageIndices = &image_index,
                                   .pResults = nullptr};
 
     VkResult result = vkQueuePresentKHR(p_queue, &present_info);
-    CHECK_VK_RESULT(result, "vkQueuePresentKHR\n");
-
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        // Handle in Application
+        std::cout << "Swapchain outdated after presentation, recreating...\n";
+    }
+    else {
+        CHECK_VK_RESULT(result, "vkQueuePresentKHR");
     }
 }
 

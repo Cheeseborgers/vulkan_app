@@ -2,6 +2,17 @@
 
 #include "gouda_vk_wrapper.hpp"
 
+#include "audio/audio_manager.hpp"
+
+struct TimeSettings {
+    f32 time_scale = 1.0f;             // Game speed modifier
+    f32 fixed_timestep = 1.0f / 60.0f; // Physics update rate
+    f32 max_accumulator = 0.25f;       // Prevents physics explosion
+    f32 target_fps = 144.0f;           // FPS limit (ignored if V-Sync is enabled)
+
+    GoudaVK::VSyncMode vsync_mode = GoudaVK::VSyncMode::ENABLED; // Default to normal V-Sync
+};
+
 class Application {
 public:
     Application(WindowSize window_size);
@@ -58,4 +69,13 @@ private:
 
     std::vector<VkFence> m_frame_fences;
     u32 m_current_frame;
+
+    TimeSettings m_time_settings;
+
+    GoudaVK::AudioManager m_audio_manager;
+
+    GoudaVK::SoundEffect m_laser_1;
+    GoudaVK::SoundEffect m_laser_2;
+    GoudaVK::MusicTrack m_music;
+    GoudaVK::MusicTrack m_music2;
 };

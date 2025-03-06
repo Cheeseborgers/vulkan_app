@@ -28,6 +28,7 @@ public:
     void Init(const VkInstance &instance, const VkSurfaceKHR &surface);
 
     u32 SelectDevice(VkQueueFlags required_queue_type, bool supports_present);
+    void RequeryDeviceCapabitites();
 
     const PhysicalDevice &Selected() const;
 
