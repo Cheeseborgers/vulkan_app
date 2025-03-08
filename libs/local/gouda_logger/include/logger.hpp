@@ -78,7 +78,7 @@ protected:
     void log_impl(LogLevel level, std::string_view prefix, std::string_view format_str, std::string_view tag,
                   const std::source_location &loc, std::tuple<TupleArgs...> &args_tuple, std::index_sequence<I...>)
     {
-        if (static_cast<int>(level) < static_cast<int>(m_min_level))
+        if (static_cast<int>(level) > static_cast<int>(m_min_level))
             return;
 
         // TODO: Add [DEBUG] flag to print crap when debugging
