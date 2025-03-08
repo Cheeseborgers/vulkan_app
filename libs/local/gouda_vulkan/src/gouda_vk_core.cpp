@@ -16,35 +16,10 @@
 
 namespace GoudaVK {
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-                                                    VkDebugUtilsMessageTypeFlagsEXT type,
-                                                    const VkDebugUtilsMessengerCallbackDataEXT *callback_data_ptr,
-                                                    [[maybe_unused]] void *user_data_ptr)
-{
-    std::ostringstream log;
-
-    log << "Debug callback: " << callback_data_ptr->pMessage << '\n'
-        << "  Severity: " << GetDebugSeverityStr(severity) << '\n'
-        << "  Type: " << GetDebugType(type) << '\n'
-        << "  Objects: ";
-
-    for (u32 i = 0; i < callback_data_ptr->objectCount; i++) {
-        log << std::hex << callback_data_ptr->pObjects[i].objectHandle << ' ';
-    }
-
-    log << "\n---------------------------------------\n";
-
-    ENGINE_LOG_ERROR(log.str());
-
-    return VK_FALSE; // The calling function should not be aborted
-}
-
 VulkanCore::VulkanCore()
     : m_is_initialized{false},
       m_vsync_mode{VSyncMode::DISABLED},
-      p_instance{VK_NULL_HANDLE},
-      p_debug_messenger{VK_NULL_HANDLE},
-      p_surface{VK_NULL_HANDLE},
+      p_instance{nullptr},
       p_window{nullptr},
       m_physical_devices{},
       m_queue_family{0},
@@ -85,33 +60,6 @@ VulkanCore::~VulkanCore()
 
         vkDestroyDevice(p_device, nullptr);
         ENGINE_LOG_INFO("Device destroyed");
-
-        PFN_vkDestroySurfaceKHR vkDestroySurface = VK_NULL_HANDLE;
-        vkDestroySurface =
-            reinterpret_cast<PFN_vkDestroySurfaceKHR>(vkGetInstanceProcAddr(p_instance, "vkDestroySurfaceKHR"));
-        if (!vkDestroySurface) {
-            ENGINE_LOG_ERROR("Cannot find the address of the VKSurfaceKHR");
-            ENGINE_THROW("Cannot find the address of the VKSurfaceKHR");
-        }
-
-        vkDestroySurfaceKHR(p_instance, p_surface, nullptr);
-        ENGINE_LOG_INFO("Surface destroyed");
-
-        // Destroy the debugger messaging utils
-        PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessenger = VK_NULL_HANDLE;
-        vkDestroyDebugUtilsMessenger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
-            vkGetInstanceProcAddr(p_instance, "vkDestroyDebugUtilsMessengerEXT"));
-
-        if (!vkDestroyDebugUtilsMessenger) {
-            ENGINE_LOG_ERROR("Cannot find the address of the vkDestroyDebugUtilsMessenger");
-            ENGINE_THROW("Cannot find the address of the vkDestroyDebugUtilsMessenger");
-        }
-        vkDestroyDebugUtilsMessenger(p_instance, p_debug_messenger, VK_NULL_HANDLE);
-        ENGINE_LOG_INFO("Vulkan DebugUtilsMessenger destroyed");
-
-        // Destroy the vulkan instance
-        vkDestroyInstance(p_instance, VK_NULL_HANDLE);
-        ENGINE_LOG_INFO("Vulkan instance destroyed");
     }
 }
 
@@ -123,11 +71,9 @@ void VulkanCore::Init(GLFWwindow *window_ptr, std::string_view app_name, SemVer 
     p_window = window_ptr;
     m_vsync_mode = vsync_mode;
 
-    CreateInstance(app_name, vulkan_api_version);
-    CreateDebugCallback();
-    CreateSurface();
+    p_instance = std::make_unique<VKInstance>(app_name, vulkan_api_version, p_window);
 
-    m_physical_devices.Init(p_instance, p_surface);
+    m_physical_devices.Init(p_instance->GetInstance(), p_instance->GetSurface());
     m_queue_family = m_physical_devices.SelectDevice(VK_QUEUE_GRAPHICS_BIT, true);
 
     CreateDevice();
@@ -144,39 +90,42 @@ void VulkanCore::Init(GLFWwindow *window_ptr, std::string_view app_name, SemVer 
 
 VkRenderPass VulkanCore::CreateSimpleRenderPass()
 {
-    VkAttachmentDescription colour_attachment_description{.flags = 0,
-                                                          .format = m_swap_chain_surface_format.format,
-                                                          .samples = VK_SAMPLE_COUNT_1_BIT,
-                                                          .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                                          .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                                                          .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                                                          .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                                          .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                                                          .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR};
+    VkAttachmentDescription colour_attachment_description{};
+    colour_attachment_description.flags = 0;
+    colour_attachment_description.format = m_swap_chain_surface_format.format;
+    colour_attachment_description.samples = VK_SAMPLE_COUNT_1_BIT;
+    colour_attachment_description.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colour_attachment_description.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colour_attachment_description.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colour_attachment_description.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colour_attachment_description.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colour_attachment_description.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
     VkAttachmentReference colour_attachment_reference = {.attachment = 0,
                                                          .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
 
-    VkSubpassDescription subpass_description{.flags = 0,
-                                             .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                             .inputAttachmentCount = 0,
-                                             .pInputAttachments = nullptr,
-                                             .colorAttachmentCount = 1,
-                                             .pColorAttachments = &colour_attachment_reference,
-                                             .pResolveAttachments = nullptr,
-                                             .pDepthStencilAttachment = nullptr,
-                                             .preserveAttachmentCount = 0,
-                                             .pPreserveAttachments = nullptr};
+    VkSubpassDescription subpass_description{};
+    subpass_description.flags = 0;
+    subpass_description.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass_description.inputAttachmentCount = 0;
+    subpass_description.pInputAttachments = nullptr;
+    subpass_description.colorAttachmentCount = 1;
+    subpass_description.pColorAttachments = &colour_attachment_reference;
+    subpass_description.pResolveAttachments = nullptr;
+    subpass_description.pDepthStencilAttachment = nullptr;
+    subpass_description.preserveAttachmentCount = 0;
+    subpass_description.pPreserveAttachments = nullptr;
 
-    VkRenderPassCreateInfo render_pass_create_info{.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-                                                   .pNext = nullptr,
-                                                   .flags = 0,
-                                                   .attachmentCount = 1,
-                                                   .pAttachments = &colour_attachment_description,
-                                                   .subpassCount = 1,
-                                                   .pSubpasses = &subpass_description,
-                                                   .dependencyCount = 0,
-                                                   .pDependencies = nullptr};
+    VkRenderPassCreateInfo render_pass_create_info{};
+    render_pass_create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    render_pass_create_info.pNext = nullptr;
+    render_pass_create_info.flags = 0;
+    render_pass_create_info.attachmentCount = 1;
+    render_pass_create_info.pAttachments = &colour_attachment_description;
+    render_pass_create_info.subpassCount = 1;
+    render_pass_create_info.pSubpasses = &subpass_description;
+    render_pass_create_info.dependencyCount = 0;
+    render_pass_create_info.pDependencies = nullptr;
 
     VkRenderPass render_pass;
 
@@ -235,55 +184,6 @@ void VulkanCore::DestroyFramebuffers(std::vector<VkFramebuffer> &frame_buffers)
     frame_buffers.clear();
 
     ENGINE_LOG_INFO("Framebuffers destroyed");
-}
-
-void VulkanCore::CreateInstance(std::string_view app_name, SemVer vulkan_api_version)
-{
-    std::vector<const char *> layers{"VK_LAYER_KHRONOS_validation"};
-
-    std::vector<const char *> extensions{
-        VK_KHR_SURFACE_EXTENSION_NAME,
-#if defined(_WIN32)
-        "VK_KHR_win32_surface",
-#endif
-#if defined(__APPLE__)
-        "VK_MVK_macos_surface",
-#endif
-#if defined(__linux__)
-        "VK_KHR_xcb_surface",
-#endif
-        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-    };
-
-    VkApplicationInfo application_info{.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-                                       .pNext = nullptr,
-                                       .pApplicationName = app_name.data(),
-                                       .applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
-                                       .pEngineName = "Gouda Engine",
-                                       .engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
-                                       .apiVersion =
-                                           VK_MAKE_API_VERSION(vulkan_api_version.variant, vulkan_api_version.major,
-                                                               vulkan_api_version.minor, vulkan_api_version.patch)};
-
-    ENGINE_LOG_INFO("Vulkan API version: {}", vulkan_api_version.ToString());
-
-    VkInstanceCreateInfo instance_create_info{.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-                                              .pNext = nullptr,
-                                              .flags = 0, // reserved for future use. Must be zero
-                                              .pApplicationInfo = &application_info,
-                                              .enabledLayerCount = static_cast<u32>(layers.size()),
-                                              .ppEnabledLayerNames = layers.data(),
-                                              .enabledExtensionCount = static_cast<u32>(extensions.size()),
-                                              .ppEnabledExtensionNames = extensions.data()};
-
-    VkResult vk_create_instance_result{vkCreateInstance(&instance_create_info, nullptr, &p_instance)};
-    CHECK_VK_RESULT(vk_create_instance_result, "vkCreateInstance");
-
-#ifdef GOUDA_DEBUG
-    PrintVKExtensions();
-#endif
-
-    ENGINE_LOG_INFO("Vulkan instance created");
 }
 
 void VulkanCore::CreateCommandBuffers(u32 count, VkCommandBuffer *command_buffers_ptr)
@@ -434,84 +334,6 @@ const VkImage &VulkanCore::GetImage(int index)
 void VulkanCore::GetFramebufferSize(int &width, int &height) const { glfwGetWindowSize(p_window, &width, &height); }
 
 // Private -----------------------------------------------------------------------------------------------------------
-void VulkanCore::CreateDebugCallback()
-{
-    // TODO: Set severity via macro flags
-    VkDebugUtilsMessengerCreateInfoEXT messenger_create_info{
-        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-        .pNext = nullptr,
-        .flags = 0,
-        .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-        /*
-        .messageSeverity =
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-        */
-        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                       VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-        .pfnUserCallback = &DebugCallback,
-        .pUserData = nullptr};
-
-    PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessenger{VK_NULL_HANDLE};
-    vkCreateDebugUtilsMessenger = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
-        vkGetInstanceProcAddr(p_instance, "vkCreateDebugUtilsMessengerEXT"));
-
-    if (!vkCreateDebugUtilsMessenger) {
-        ENGINE_LOG_FATAL("Cannot find address of vkCreateDebugUtilsMessenger");
-        ENGINE_THROW("Cannot find address of vkCreateDebugUtilsMessengerEXT");
-    }
-
-    VkResult vk_debug_create_result =
-        vkCreateDebugUtilsMessenger(p_instance, &messenger_create_info, nullptr, &p_debug_messenger);
-    CHECK_VK_RESULT(vk_debug_create_result, "debug utils messenger");
-
-    ENGINE_LOG_INFO("Vulkan debug utils messenger created");
-}
-
-void VulkanCore::CreateSurface()
-{
-    // TODO:Do we keep this?
-    if (p_surface != VK_NULL_HANDLE) {
-        ENGINE_LOG_ERROR("Vulkan surface already created");
-        vkDestroySurfaceKHR(p_instance, p_surface, nullptr);
-        p_surface = VK_NULL_HANDLE;
-    }
-
-    // TODO: Make this print to Engine log error
-    VkResult result{glfwCreateWindowSurface(p_instance, p_window, nullptr, &p_surface)};
-    if (result != VK_SUCCESS) {
-        switch (result) {
-            case VK_ERROR_OUT_OF_HOST_MEMORY:
-                ENGINE_LOG_ERROR("Failed to create Vulkan surface. Reason: Out of host memory");
-                break;
-            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                ENGINE_LOG_ERROR("Failed to create Vulkan surface. Reason: Out of device memory");
-                break;
-            case VK_ERROR_INITIALIZATION_FAILED:
-                ENGINE_LOG_ERROR("Reason: Initialization failed. Check Vulkan instance and extensions");
-                break;
-            case VK_ERROR_EXTENSION_NOT_PRESENT:
-                ENGINE_LOG_ERROR("Failed to create Vulkan surface. Reason: Required extension not present. Make sure "
-                                 "`VK_KHR_surface` and "
-                                 "`VK_KHR_xcb_surface` (or equivalent) are enabled");
-                break;
-            case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
-                ENGINE_LOG_ERROR(
-                    "Failed to create Vulkan surface. Reason: The window is already in use by another Vulkan "
-                    "instance");
-                break;
-            default:
-                ENGINE_LOG_ERROR("Failed to create Vulkan surface. Unknown Vulkan error occurred");
-        }
-
-        ENGINE_THROW("Vulkan surface creation failed");
-    }
-
-    ENGINE_LOG_INFO("Surface created");
-}
-
 void VulkanCore::CreateDevice()
 {
     f32 queue_priorities[]{1.0f};
@@ -645,7 +467,7 @@ void VulkanCore::CreateSwapchain()
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .pNext = nullptr,
         .flags = 0,
-        .surface = p_surface,
+        .surface = p_instance->GetSurface(),
         .minImageCount = number_of_images,
         .imageFormat = m_swap_chain_surface_format.format,
         .imageColorSpace = m_swap_chain_surface_format.colorSpace,
@@ -1085,7 +907,7 @@ void VulkanCore::ReCreateSwapchain()
     DestroySwapchainImageViews();
 
     VkSurfaceCapabilitiesKHR surface_capabiltities;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physical_devices.Selected().m_phys_device, p_surface,
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physical_devices.Selected().m_phys_device, p_instance->GetSurface(),
                                               &surface_capabiltities);
 
     ENGINE_LOG_DEBUG("Surface capabilities: currentExtent = {}x{}, minImageExtent = {}x{}, maxImageExtent = {}x{}",
@@ -1119,7 +941,7 @@ void VulkanCore::ReCreateSwapchain()
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .pNext = nullptr,
         .flags = 0,
-        .surface = p_surface,
+        .surface = p_instance->GetSurface(),
         .minImageCount = number_of_images,
         .imageFormat = m_swap_chain_surface_format.format,
         .imageColorSpace = m_swap_chain_surface_format.colorSpace,

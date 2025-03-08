@@ -29,6 +29,7 @@
 
 #include "gouda_vk_allocated_buffer.hpp"
 #include "gouda_vk_device.hpp"
+#include "gouda_vk_instance.hpp"
 #include "gouda_vk_queue.hpp"
 #include "gouda_vk_texture.hpp"
 
@@ -81,9 +82,6 @@ public:
     void ReCreateSwapchain();
 
 private:
-    void CreateInstance(std::string_view app_name, SemVer vulkan_api_version);
-    void CreateDebugCallback();
-    void CreateSurface();
     void CreateDevice();
     void CreateSwapchain();
     void CreateSwapchainImageViews();
@@ -115,9 +113,8 @@ private:
     bool m_is_initialized;
     VSyncMode m_vsync_mode;
 
-    VkInstance p_instance;
-    VkDebugUtilsMessengerEXT p_debug_messenger;
-    VkSurfaceKHR p_surface;
+    std::unique_ptr<VKInstance> p_instance;
+
     GLFWwindow *p_window;
     VulkanPhysicalDevices m_physical_devices;
     u32 m_queue_family;

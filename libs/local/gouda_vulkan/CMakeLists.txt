@@ -40,6 +40,7 @@ set(PROJECT_SOURCES
     src/gouda_vk_device.cpp
     src/gouda_vk_glfw.cpp
     src/gouda_vk_graphics_pipeline.cpp
+    src/gouda_vk_instance.cpp
     src/gouda_vk_utils.cpp
     src/gouda_vk_wrapper.cpp
     src/gouda_vk_queue.cpp
