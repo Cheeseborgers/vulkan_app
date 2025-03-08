@@ -53,6 +53,7 @@ struct ArenaAllocatorWrapper {
 
 // Define Arena-backed std::vector and std::string
 template <typename T>
+using ArenaVector = std::vector<T, ArenaAllocatorWrapper<T>>;
 
 using ArenaString = std::basic_string<char, std::char_traits<char>, ArenaAllocatorWrapper<char>>;
 
