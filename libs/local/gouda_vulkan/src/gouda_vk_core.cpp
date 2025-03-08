@@ -419,7 +419,8 @@ void VulkanCore::CreateSwapchain()
 
     ENGINE_LOG_INFO("Selected swapchain extent: {}x{}", extent.width, extent.height);
 
-    const u32 queue_family_index{p_device->GetQueueFamily()};
+    // FIXME: This is unsafe. store in swapchain ish when we refactor it
+    u32 queue_family_index{p_device->GetQueueFamily()};
 
     VkSwapchainCreateInfoKHR swap_chain_create_info = {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -434,7 +435,7 @@ void VulkanCore::CreateSwapchain()
         .imageUsage = (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT),
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .queueFamilyIndexCount = 1,
-        .pQueueFamilyIndices = &queue_family_index,
+        .pQueueFamilyIndices = &queue_family_index, // FIXME: This is unsafe. store in swapchain ish when we refactor it
         .preTransform = surface_capabiltities.currentTransform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .presentMode = present_mode,
@@ -884,10 +885,10 @@ void VulkanCore::ReCreateSwapchain()
     m_swap_chain_surface_format =
         ChooseSurfaceFormatAndColorSpace(p_device->GetSelectedPhysicalDevice().m_surface_formats);
 
-    FrameBufferSize framebuffer_size;
+    FrameBufferSize framebuffer_size{0, 0};
     GetFramebufferSize(framebuffer_size.width, framebuffer_size.height);
 
-    VkExtent2D extent;
+    VkExtent2D extent{0, 0};
     if (surface_capabiltities.currentExtent.width != UINT32_MAX) {
         extent = surface_capabiltities.currentExtent;
     }
@@ -925,7 +926,7 @@ void VulkanCore::ReCreateSwapchain()
         .oldSwapchain = p_swap_chain // Pass the old swapchain
     };
 
-    VkSwapchainKHR new_swap_chain{nullptr};
+    VkSwapchainKHR new_swap_chain{VK_NULL_HANDLE};
     ENGINE_LOG_DEBUG("Old swapchain handle: {}", reinterpret_cast<void *>(p_swap_chain));
     VkResult result{vkCreateSwapchainKHR(p_device->GetDevice(), &swap_chain_create_info, nullptr, &new_swap_chain)};
     CHECK_VK_RESULT(result, "vkCreateSwapchainKHR\n");
