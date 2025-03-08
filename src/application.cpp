@@ -1,6 +1,6 @@
 #include "application.hpp"
 
-#include <glm/ext.hpp>
+#include <glm/ext.hpp> // TODO: Check is this the best way to include glm for vulkan coords
 #include <glm/glm.hpp>
 
 #include "utility/timer.hpp"
@@ -88,10 +88,13 @@ void Application::Init(std::string_view application_title)
 
     m_music2.Load("assets/audio/music_tracks/moonlight.wav");
     m_music.Load("assets/audio/music_tracks/track.mp3");
-    // m_music2.Load("assets/audio/music_tracks/blondie.mp3");
+    m_music3.Load("assets/audio/music_tracks/blondie.mp3");
 
-    m_audio_manager.QueueMusic(m_music2);
-    m_audio_manager.QueueMusic(m_music);
+    m_audio_manager.QueueMusic(m_music3, false);
+    m_audio_manager.QueueMusic(m_music2, false);
+    m_audio_manager.QueueMusic(m_music, false);
+    m_audio_manager.ShuffleRemainingTracks();
+    m_audio_manager.PlayMusic();
 }
 
 void Application::Update(f32 delta_time) {}
@@ -119,13 +122,14 @@ void Application::RenderScene(f32 delta_time)
 void Application::Execute()
 {
     constexpr f64 sleep_duration{0.001}; // Small sleep to reduce CPU usage
+    f32 delta_time{0.0f};
 
-    FrameTimer frame_timer;
-    FixedTimer physics_timer(m_time_settings.fixed_timestep);
-    GameClock game_clock;
+    Gouda::FrameTimer frame_timer;
+    Gouda::FixedTimer physics_timer(m_time_settings.fixed_timestep);
+    Gouda::GameClock game_clock;
 
     // Only use FPS limiter if V-Sync is disabled
-    std::optional<FrameRateLimiter> fps_limiter;
+    std::optional<Gouda::FrameRateLimiter> fps_limiter;
     if (m_time_settings.vsync_mode == GoudaVK::VSyncMode::DISABLED) {
         fps_limiter.emplace(m_time_settings.target_fps);
     }
@@ -133,10 +137,10 @@ void Application::Execute()
     while (!glfwWindowShouldClose(p_window)) {
 
         glfwPollEvents();
-        m_audio_manager.Update();
+        m_audio_manager.Update(); // TODO: IS this where we want to update audio? also do we pause audio when minimised?
 
         frame_timer.Update();
-        f32 delta_time{frame_timer.GetDeltaTime()};
+        delta_time = frame_timer.GetDeltaTime();
 
         // Apply time scaling
         delta_time = game_clock.ApplyTimeScale(delta_time);
@@ -161,8 +165,8 @@ void Application::Execute()
         }
     }
 
-    vkDeviceWaitIdle(p_device);
-    glfwDestroyWindow(p_window);
+    vkDeviceWaitIdle(p_device);  // TODO: Use vk_core wait
+    glfwDestroyWindow(p_window); // TODO: add cleanup to vk_glfw .hpp / create window wrapper?
     glfwTerminate();
 }
 
@@ -355,7 +359,8 @@ void Application::OnKey(GLFWwindow *window, int key, int scancode, int action, i
     }
 
     if ((key == GLFW_KEY_W) && (action == GLFW_PRESS)) {
-        m_audio_manager.PlaySoundEffect(m_laser_1);
+        m_audio_manager.PlaySoundEffect(m_laser_1,
+                                        {Gouda::Audio::AudioEffectType::Echo, Gouda::Audio::AudioEffectType::Reverb});
     }
 
     if ((key == GLFW_KEY_S) && (action == GLFW_PRESS)) {
