@@ -4,7 +4,8 @@
 
 #include "logger.hpp"
 
-namespace GoudaVK {
+namespace Gouda {
+namespace Audio {
 
 MusicTrack::MusicTrack() : m_file{nullptr}, m_format{AL_NONE}, m_sample_rate{0}, m_channels{0}, m_finished{true}
 {
@@ -115,4 +116,5 @@ size_t MusicTrack::ReadFrames(float *buffer, size_t frames)
     return static_cast<size_t>(read);
 }
 
-} // namespace GoudaVK
+} // namespace Audio end
+} // namespace Gouda end

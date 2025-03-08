@@ -5,7 +5,8 @@
 #include "AL/al.h"
 #include "AL/alext.h"
 
-namespace GoudaVK {
+namespace Gouda {
+namespace Audio {
 
 static const char *FormatName(ALenum format)
 {
@@ -22,4 +23,5 @@ static const char *FormatName(ALenum format)
     return "Unknown Format";
 }
 
-} // end namespace GoudaVK
+} // namespace Audio end
+} // namespace Gouda end

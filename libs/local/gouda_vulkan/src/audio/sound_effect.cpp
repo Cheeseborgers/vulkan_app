@@ -7,7 +7,8 @@
 
 #include "logger.hpp"
 
-namespace GoudaVK {
+namespace Gouda {
+namespace Audio {
 
 SoundEffect::SoundEffect() : m_buffer{0}
 {
@@ -154,4 +155,5 @@ bool SoundEffect::Load(std::string_view filename)
     return true;
 }
 
-} // end namespace GoudaVK
+} // namespace Audio end
+} // namespace Gouda end
