@@ -1,11 +1,10 @@
 #pragma once
 
-#ifndef TIMER_HPP
-#define TIMER_HPP
-
 #include <chrono>
 #include <iostream>
 #include <thread>
+
+namespace Gouda {
 
 using SteadyClock = std::chrono::steady_clock;
 using f32 = float;
@@ -233,4 +232,4 @@ private:
     f32 accumulator;
 };
 
-#endif // TIMER_HPP
+} // namespace Gouda end
