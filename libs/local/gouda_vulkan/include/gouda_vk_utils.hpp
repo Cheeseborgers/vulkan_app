@@ -21,3 +21,6 @@ void PrintVKExtensions();
 const char *GetDebugSeverityStr(VkDebugUtilsMessageSeverityFlagBitsEXT Severity);
 
 const char *GetDebugType(VkDebugUtilsMessageTypeFlagsEXT Type);
+
+VkFormat FindSupportedFormat(VkPhysicalDevice Device, const std::vector<VkFormat> &Candidates, VkImageTiling Tiling,
+                             VkFormatFeatureFlags Features);

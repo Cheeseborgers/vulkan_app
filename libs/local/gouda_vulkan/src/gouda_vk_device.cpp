@@ -29,6 +29,17 @@ struct std::formatter<VkColorSpaceKHR> : std::formatter<std::string> {
 
 namespace GoudaVK {
 
+static VkFormat FindDepthFormat(VkPhysicalDevice Device)
+{
+    std::vector<VkFormat> Candidates = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
+                                        VK_FORMAT_D24_UNORM_S8_UINT};
+
+    VkFormat DepthFormat = FindSupportedFormat(Device, Candidates, VK_IMAGE_TILING_OPTIMAL,
+                                               VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+    return DepthFormat;
+}
+
 // Vulkan Format to String Map
 std::string VkFormatToString(VkFormat format)
 {
@@ -134,6 +145,7 @@ static void PrintMemoryProperty(VkMemoryPropertyFlags PropertyFlags)
     std::cout << std::endl; // Ensures the output ends with a newline
 }
 
+// TODO: REMove these print statments and figure some other way
 void VulkanPhysicalDevices::Init(const VkInstance &instance, const VkSurfaceKHR &surface)
 {
     u32 number_of_devices{0};
