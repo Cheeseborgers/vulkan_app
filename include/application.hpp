@@ -66,7 +66,7 @@ private:
     // TODO: Create window wrapper to simplfy creation and destruction
     GLFWwindow *p_window;
     WindowSize m_window_size;
-    VkDevice p_device;
+
     GoudaVK::VulkanCore m_vk_core;
     GoudaVK::VulkanQueue *p_vk_queue;
     int m_number_of_images;

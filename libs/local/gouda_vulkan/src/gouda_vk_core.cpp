@@ -20,10 +20,8 @@ VulkanCore::VulkanCore()
     : m_is_initialized{false},
       m_vsync_mode{VSyncMode::DISABLED},
       p_instance{nullptr},
+      p_device{nullptr},
       p_window{nullptr},
-      m_physical_devices{},
-      m_queue_family{0},
-      p_device{VK_NULL_HANDLE},
       m_swap_chain_surface_format{},
       p_swap_chain{VK_NULL_HANDLE},
       p_command_buffer_pool{VK_NULL_HANDLE},
@@ -39,27 +37,24 @@ VulkanCore::~VulkanCore()
         ENGINE_LOG_INFO("Cleaning up Vulkan");
 
         // Destroy in this order!!!
-        vkFreeCommandBuffers(p_device, p_command_buffer_pool, 1, &p_copy_command_buffer);
+        vkFreeCommandBuffers(p_device->GetDevice(), p_command_buffer_pool, 1, &p_copy_command_buffer);
         ENGINE_LOG_INFO("Command buffers destroyed");
 
-        vkDestroyCommandPool(p_device, p_command_buffer_pool, nullptr);
+        vkDestroyCommandPool(p_device->GetDevice(), p_command_buffer_pool, nullptr);
         ENGINE_LOG_INFO("Command pool destroyed");
 
         m_queue.Destroy();
         ENGINE_LOG_INFO("Queue buffer destroyed");
 
         for (auto image_view : m_image_views) {
-            vkDestroyImageView(p_device, image_view, nullptr);
+            vkDestroyImageView(p_device->GetDevice(), image_view, nullptr);
         }
 
         m_image_views.clear();
 
-        vkDestroySwapchainKHR(p_device, p_swap_chain, nullptr);
+        vkDestroySwapchainKHR(p_device->GetDevice(), p_swap_chain, nullptr);
 
         ENGINE_LOG_INFO("Swapchain destroyed");
-
-        vkDestroyDevice(p_device, nullptr);
-        ENGINE_LOG_INFO("Device destroyed");
     }
 }
 
@@ -71,17 +66,17 @@ void VulkanCore::Init(GLFWwindow *window_ptr, std::string_view app_name, SemVer 
     p_window = window_ptr;
     m_vsync_mode = vsync_mode;
 
-    p_instance = std::make_unique<VKInstance>(app_name, vulkan_api_version, p_window);
+    p_instance = std::make_unique<VulkanInstance>(app_name, vulkan_api_version, p_window);
+    ENGINE_LOG_INFO("VulkanInstance initialized");
 
-    m_physical_devices.Init(p_instance->GetInstance(), p_instance->GetSurface());
-    m_queue_family = m_physical_devices.SelectDevice(VK_QUEUE_GRAPHICS_BIT, true);
+    p_device = std::make_unique<VulkanDevice>(*p_instance, VK_QUEUE_GRAPHICS_BIT);
+    ENGINE_LOG_INFO("VulkanDevice initialized");
 
-    CreateDevice();
     CreateSwapchain();
     CreateSwapchainImageViews();
     CreateCommandBufferPool();
 
-    m_queue.Init(p_device, &p_swap_chain, m_queue_family, 0);
+    m_queue.Init(p_device->GetDevice(), &p_swap_chain, p_device->GetQueueFamily(), 0);
 
     CreateCommandBuffers(1, &p_copy_command_buffer);
 
@@ -129,7 +124,7 @@ VkRenderPass VulkanCore::CreateSimpleRenderPass()
 
     VkRenderPass render_pass;
 
-    VkResult result{vkCreateRenderPass(p_device, &render_pass_create_info, nullptr, &render_pass)};
+    VkResult result{vkCreateRenderPass(p_device->GetDevice(), &render_pass_create_info, nullptr, &render_pass)};
     CHECK_VK_RESULT(result, "vkCreateRenderPass\n");
 
     ENGINE_LOG_INFO("Simple render pass created");
@@ -166,7 +161,8 @@ std::vector<VkFramebuffer> VulkanCore::CreateFramebuffers(VkRenderPass render_pa
         frame_buffer_create_info.layers = 1;
 
         // Create the framebuffer and check for errors
-        VkResult result{vkCreateFramebuffer(p_device, &frame_buffer_create_info, nullptr, &frame_buffers[i])};
+        VkResult result{
+            vkCreateFramebuffer(p_device->GetDevice(), &frame_buffer_create_info, nullptr, &frame_buffers[i])};
         CHECK_VK_RESULT(result, "vkCreateFramebuffer\n");
     }
 
@@ -178,7 +174,7 @@ std::vector<VkFramebuffer> VulkanCore::CreateFramebuffers(VkRenderPass render_pa
 void VulkanCore::DestroyFramebuffers(std::vector<VkFramebuffer> &frame_buffers)
 {
     for (auto buffer : frame_buffers) {
-        vkDestroyFramebuffer(p_device, buffer, nullptr);
+        vkDestroyFramebuffer(p_device->GetDevice(), buffer, nullptr);
     }
 
     frame_buffers.clear();
@@ -194,7 +190,8 @@ void VulkanCore::CreateCommandBuffers(u32 count, VkCommandBuffer *command_buffer
                                                                .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
                                                                .commandBufferCount = count};
 
-    VkResult result{vkAllocateCommandBuffers(p_device, &command_buffer_allocation_info, command_buffers_ptr)};
+    VkResult result{
+        vkAllocateCommandBuffers(p_device->GetDevice(), &command_buffer_allocation_info, command_buffers_ptr)};
     CHECK_VK_RESULT(result, "vkAllocateCommandBuffers\n");
 
     ENGINE_LOG_INFO("Command buffer(s) created: {}", count);
@@ -203,7 +200,7 @@ void VulkanCore::CreateCommandBuffers(u32 count, VkCommandBuffer *command_buffer
 void VulkanCore::FreeCommandBuffers(u32 count, const VkCommandBuffer *command_buffers_ptr)
 {
     m_queue.WaitIdle();
-    vkFreeCommandBuffers(p_device, p_command_buffer_pool, count, command_buffers_ptr);
+    vkFreeCommandBuffers(p_device->GetDevice(), p_command_buffer_pool, count, command_buffers_ptr);
 
     ENGINE_LOG_INFO("Command buffer(s) freed: {}", count);
 }
@@ -219,12 +216,12 @@ AllocatedBuffer VulkanCore::CreateVertexBuffer(const void *vertices_ptr, size_t 
     void *memory_ptr{nullptr};
     VkDeviceSize offset{0};
     VkMemoryMapFlags flags{0};
-    VkResult result{vkMapMemory(p_device, staging_vertex_buffer.p_memory, offset,
+    VkResult result{vkMapMemory(p_device->GetDevice(), staging_vertex_buffer.p_memory, offset,
                                 staging_vertex_buffer.m_allocation_size, flags, &memory_ptr)};
     CHECK_VK_RESULT(result, "vkMapMemory\n");
 
     memcpy(memory_ptr, vertices_ptr, size);
-    vkUnmapMemory(p_device, staging_vertex_buffer.p_memory);
+    vkUnmapMemory(p_device->GetDevice(), staging_vertex_buffer.p_memory);
 
     // Create the actual GPU vertex buffer (device local)
     AllocatedBuffer vertex_buffer{CreateBuffer(size,
@@ -238,8 +235,8 @@ AllocatedBuffer VulkanCore::CreateVertexBuffer(const void *vertices_ptr, size_t 
     m_queue.WaitIdle();
 
     // Now it is safe to destroy the staging buffer
-    vkDestroyBuffer(p_device, staging_vertex_buffer.p_buffer, nullptr);
-    vkFreeMemory(p_device, staging_vertex_buffer.p_memory, nullptr);
+    vkDestroyBuffer(p_device->GetDevice(), staging_vertex_buffer.p_buffer, nullptr);
+    vkFreeMemory(p_device->GetDevice(), staging_vertex_buffer.p_memory, nullptr);
 
     return vertex_buffer;
 }
@@ -309,14 +306,14 @@ void VulkanCore::CreateTexture(std::string_view file_name, VulkanTexture &textur
     VkImageAspectFlags image_aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;
     u32 mip_levels{1};
 
-    texture.p_view = CreateImageView(p_device, texture.p_image, format, image_aspect_flags, image_view_type,
-                                     layer_count, mip_levels);
+    texture.p_view = CreateImageView(p_device->GetDevice(), texture.p_image, format, image_aspect_flags,
+                                     image_view_type, layer_count, mip_levels);
 
     VkFilter min_filter{VK_FILTER_LINEAR};
     VkFilter max_filter{VK_FILTER_LINEAR};
     VkSamplerAddressMode address_mode{VK_SAMPLER_ADDRESS_MODE_REPEAT};
 
-    texture.p_sampler = CreateTextureSampler(p_device, min_filter, max_filter, address_mode);
+    texture.p_sampler = CreateTextureSampler(p_device->GetDevice(), min_filter, max_filter, address_mode);
 
     ENGINE_LOG_INFO("Created texture from: {}", file_name);
 }
@@ -334,49 +331,6 @@ const VkImage &VulkanCore::GetImage(int index)
 void VulkanCore::GetFramebufferSize(int &width, int &height) const { glfwGetWindowSize(p_window, &width, &height); }
 
 // Private -----------------------------------------------------------------------------------------------------------
-void VulkanCore::CreateDevice()
-{
-    f32 queue_priorities[]{1.0f};
-
-    VkDeviceQueueCreateInfo device_queue_create_info{.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-                                                     .pNext = nullptr,
-                                                     .flags = 0, // must be zero
-                                                     .queueFamilyIndex = m_queue_family,
-                                                     .queueCount = 1,
-                                                     .pQueuePriorities = &queue_priorities[0]};
-
-    std::vector<const char *> device_extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                                                VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME};
-
-    if (m_physical_devices.Selected().m_features.geometryShader == VK_FALSE) {
-        ENGINE_LOG_ERROR("The Geometry Shader is not supported!");
-    }
-
-    if (m_physical_devices.Selected().m_features.tessellationShader == VK_FALSE) {
-        ENGINE_LOG_ERROR("The Tessellation Shader is not supported!");
-    }
-
-    VkPhysicalDeviceFeatures physical_device_features{};
-    physical_device_features.geometryShader = VK_TRUE;
-    physical_device_features.tessellationShader = VK_TRUE;
-
-    VkDeviceCreateInfo device_create_info = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-                                             .pNext = nullptr,
-                                             .flags = 0,
-                                             .queueCreateInfoCount = 1,
-                                             .pQueueCreateInfos = &device_queue_create_info,
-                                             .enabledLayerCount = 0,         // DEPRECATED
-                                             .ppEnabledLayerNames = nullptr, // DEPRECATED
-                                             .enabledExtensionCount = static_cast<u32>(device_extensions.size()),
-                                             .ppEnabledExtensionNames = device_extensions.data(),
-                                             .pEnabledFeatures = &physical_device_features};
-
-    VkResult result{
-        vkCreateDevice(m_physical_devices.Selected().m_phys_device, &device_create_info, nullptr, &p_device)};
-    CHECK_VK_RESULT(result, "vkCreateDevice\n");
-
-    ENGINE_LOG_INFO("Device created");
-}
 
 static VkPresentModeKHR GetVulkanPresentMode(VSyncMode mode)
 {
@@ -436,14 +390,15 @@ static VkSurfaceFormatKHR ChooseSurfaceFormatAndColorSpace(const std::vector<VkS
 
 void VulkanCore::CreateSwapchain()
 {
-    const VkSurfaceCapabilitiesKHR &surface_capabiltities{m_physical_devices.Selected().m_surface_capabilties};
+    const VkSurfaceCapabilitiesKHR &surface_capabiltities{p_device->GetSelectedPhysicalDevice().m_surface_capabilties};
 
     const u32 number_of_images{ChooseNumImages(surface_capabiltities)};
 
-    const std::vector<VkPresentModeKHR> &present_modes{m_physical_devices.Selected().m_present_modes};
+    const std::vector<VkPresentModeKHR> &present_modes{p_device->GetSelectedPhysicalDevice().m_present_modes};
     VkPresentModeKHR present_mode{ChoosePresentMode(present_modes, m_vsync_mode)};
 
-    m_swap_chain_surface_format = ChooseSurfaceFormatAndColorSpace(m_physical_devices.Selected().m_surface_formats);
+    m_swap_chain_surface_format =
+        ChooseSurfaceFormatAndColorSpace(p_device->GetSelectedPhysicalDevice().m_surface_formats);
 
     FrameBufferSize framebuffer_size;
     GetFramebufferSize(framebuffer_size.width, framebuffer_size.height);
@@ -476,14 +431,18 @@ void VulkanCore::CreateSwapchain()
         .imageUsage = (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT),
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .queueFamilyIndexCount = 1,
-        .pQueueFamilyIndices = &m_queue_family,
+        .pQueueFamilyIndices = nullptr, // Set bellow
         .preTransform = surface_capabiltities.currentTransform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .presentMode = present_mode,
         .clipped = VK_TRUE,
         .oldSwapchain = nullptr};
 
-    VkResult result{vkCreateSwapchainKHR(p_device, &swap_chain_create_info, nullptr, &p_swap_chain)};
+    // Set pQueueFamilyIndices correctly
+    uint32_t queueFamilyIndex = p_device->GetQueueFamily();
+    swap_chain_create_info.pQueueFamilyIndices = &queueFamilyIndex;
+
+    VkResult result{vkCreateSwapchainKHR(p_device->GetDevice(), &swap_chain_create_info, nullptr, &p_swap_chain)};
     CHECK_VK_RESULT(result, "vkCreateSwapchainKHR\n");
 
     ENGINE_LOG_INFO("Swap chain created with V-Sync mode: {}", (m_vsync_mode == VSyncMode::ENABLED) ? "ENABLED (FIFO)"
@@ -495,10 +454,11 @@ void VulkanCore::CreateSwapchain()
 void VulkanCore::CreateSwapchainImageViews()
 {
     uint number_of_swap_chain_images{0};
-    VkResult result = vkGetSwapchainImagesKHR(p_device, p_swap_chain, &number_of_swap_chain_images, nullptr);
+    VkResult result =
+        vkGetSwapchainImagesKHR(p_device->GetDevice(), p_swap_chain, &number_of_swap_chain_images, nullptr);
     CHECK_VK_RESULT(result, "vkGetSwapchainImagesKHR\n");
 
-    const VkSurfaceCapabilitiesKHR &surface_capabiltities{m_physical_devices.Selected().m_surface_capabilties};
+    const VkSurfaceCapabilitiesKHR &surface_capabiltities{p_device->GetSelectedPhysicalDevice().m_surface_capabilties};
 
     const u32 number_of_images{ChooseNumImages(surface_capabiltities)};
 
@@ -510,13 +470,14 @@ void VulkanCore::CreateSwapchainImageViews()
     m_images.resize(number_of_swap_chain_images);
     m_image_views.resize(number_of_swap_chain_images);
 
-    result = vkGetSwapchainImagesKHR(p_device, p_swap_chain, &number_of_swap_chain_images, m_images.data());
+    result =
+        vkGetSwapchainImagesKHR(p_device->GetDevice(), p_swap_chain, &number_of_swap_chain_images, m_images.data());
     CHECK_VK_RESULT(result, "vkGetSwapchainImagesKHR\n");
 
     u32 layer_count{1};
     u32 mip_levels{1};
     for (u32 i = 0; i < number_of_swap_chain_images; i++) {
-        m_image_views[i] = CreateImageView(p_device, m_images[i], m_swap_chain_surface_format.format,
+        m_image_views[i] = CreateImageView(p_device->GetDevice(), m_images[i], m_swap_chain_surface_format.format,
                                            VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, layer_count, mip_levels);
     }
 }
@@ -526,9 +487,10 @@ void VulkanCore::CreateCommandBufferPool()
     VkCommandPoolCreateInfo command_pool_create_info{.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
                                                      .pNext = nullptr,
                                                      .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                                                     .queueFamilyIndex = m_queue_family};
+                                                     .queueFamilyIndex = p_device->GetQueueFamily()};
 
-    VkResult result{vkCreateCommandPool(p_device, &command_pool_create_info, nullptr, &p_command_buffer_pool)};
+    VkResult result{
+        vkCreateCommandPool(p_device->GetDevice(), &command_pool_create_info, nullptr, &p_command_buffer_pool)};
     CHECK_VK_RESULT(result, "vkCreateCommandPool\n");
 
     ENGINE_LOG_INFO("Command buffer pool created");
@@ -537,7 +499,8 @@ void VulkanCore::CreateCommandBufferPool()
 u32 VulkanCore::GetMemoryTypeIndex(u32 memory_type_bits, VkMemoryPropertyFlags required_memory_property_flags)
 {
     // FIXME: Sort logging and program exit here
-    const VkPhysicalDeviceMemoryProperties &memory_properties{m_physical_devices.Selected().m_memory_props};
+    const VkPhysicalDeviceMemoryProperties &memory_properties{
+        p_device->GetSelectedPhysicalDevice().m_memory_properties};
 
     for (uint i = 0; i < memory_properties.memoryTypeCount; i++) {
         if ((memory_type_bits & (1 << i)) && ((memory_properties.memoryTypes[i].propertyFlags &
@@ -579,12 +542,12 @@ AllocatedBuffer GoudaVK::VulkanCore::CreateBuffer(VkDeviceSize size, VkBufferUsa
     AllocatedBuffer buffer;
 
     // create a buffer
-    VkResult result{vkCreateBuffer(p_device, &vertex_buffer_create_info, nullptr, &buffer.p_buffer)};
+    VkResult result{vkCreateBuffer(p_device->GetDevice(), &vertex_buffer_create_info, nullptr, &buffer.p_buffer)};
     CHECK_VK_RESULT(result, "vkCreateBuffer\n");
 
     // Get the buffer memory requirements
     VkMemoryRequirements memory_requirements{};
-    vkGetBufferMemoryRequirements(p_device, buffer.p_buffer, &memory_requirements);
+    vkGetBufferMemoryRequirements(p_device->GetDevice(), buffer.p_buffer, &memory_requirements);
 
     buffer.m_allocation_size = memory_requirements.size;
 
@@ -597,11 +560,11 @@ AllocatedBuffer GoudaVK::VulkanCore::CreateBuffer(VkDeviceSize size, VkBufferUsa
                                               .allocationSize = memory_requirements.size,
                                               .memoryTypeIndex = memory_type_index};
 
-    result = vkAllocateMemory(p_device, &memory_allocate_info, nullptr, &buffer.p_memory);
+    result = vkAllocateMemory(p_device->GetDevice(), &memory_allocate_info, nullptr, &buffer.p_memory);
     CHECK_VK_RESULT(result, "vkAllocateMemory error %d\n");
 
     // Bind memory
-    result = vkBindBufferMemory(p_device, buffer.p_buffer, buffer.p_memory, 0);
+    result = vkBindBufferMemory(p_device->GetDevice(), buffer.p_buffer, buffer.p_memory, 0);
     CHECK_VK_RESULT(result, "vkBindBufferMemory error %d\n");
 
     return buffer;
@@ -656,11 +619,11 @@ void VulkanCore::CreateImage(VulkanTexture &texture, ImageSize image_size, VkFor
 
     ENGINE_LOG_DEBUG("Created Image {} width: {}", image_size.width, image_size.width);
 
-    VkResult result{vkCreateImage(p_device, &image_create_info, nullptr, &texture.p_image)};
+    VkResult result{vkCreateImage(p_device->GetDevice(), &image_create_info, nullptr, &texture.p_image)};
     CHECK_VK_RESULT(result, "vkCreateImage error");
 
     VkMemoryRequirements memory_requirements;
-    vkGetImageMemoryRequirements(p_device, texture.p_image, &memory_requirements);
+    vkGetImageMemoryRequirements(p_device->GetDevice(), texture.p_image, &memory_requirements);
 
     u32 memory_type_index{GetMemoryTypeIndex(memory_requirements.memoryTypeBits, memory_property_flags)};
 
@@ -669,10 +632,10 @@ void VulkanCore::CreateImage(VulkanTexture &texture, ImageSize image_size, VkFor
                                                  .allocationSize = memory_requirements.size,
                                                  .memoryTypeIndex = memory_type_index};
 
-    result = vkAllocateMemory(p_device, &memory_allocate_info, nullptr, &texture.p_memory);
+    result = vkAllocateMemory(p_device->GetDevice(), &memory_allocate_info, nullptr, &texture.p_memory);
     CHECK_VK_RESULT(result, "vkAllocateMemory error");
 
-    vkBindImageMemory(p_device, texture.p_image, texture.p_memory, 0);
+    vkBindImageMemory(p_device->GetDevice(), texture.p_image, texture.p_memory, 0);
 }
 
 void VulkanCore::UpdateTextureImage(VulkanTexture &texture, ImageSize image_size, VkFormat texture_format,
@@ -695,7 +658,7 @@ void VulkanCore::UpdateTextureImage(VulkanTexture &texture, ImageSize image_size
 
     AllocatedBuffer staging_texture = CreateBuffer(final_memory_size, buffer_usage_flags, memory_property_flags);
 
-    staging_texture.Update(p_device, pixels_data_ptr, final_memory_size);
+    staging_texture.Update(p_device->GetDevice(), pixels_data_ptr, final_memory_size);
 
     TransitionImageLayout(texture.p_image, texture_format, source_image_layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                           layer_count, 1);
@@ -704,7 +667,7 @@ void VulkanCore::UpdateTextureImage(VulkanTexture &texture, ImageSize image_size
     TransitionImageLayout(texture.p_image, texture_format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, layer_count, 1);
 
-    staging_texture.Destroy(p_device);
+    staging_texture.Destroy(p_device->GetDevice());
 }
 
 void VulkanCore::CopyBufferToImage(VkImage destination, VkBuffer source, ImageSize image_size, u32 layer_count)
@@ -891,12 +854,12 @@ void VulkanCore::TransitionImageLayoutCmd(VkCommandBuffer command_buffer_ptr, Vk
     vkCmdPipelineBarrier(command_buffer_ptr, source_stage, destination_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
-void VulkanCore::DestroySwapchain() { vkDestroySwapchainKHR(p_device, p_swap_chain, nullptr); }
+void VulkanCore::DestroySwapchain() { vkDestroySwapchainKHR(p_device->GetDevice(), p_swap_chain, nullptr); }
 
 void VulkanCore::DestroySwapchainImageViews()
 {
     for (size_t i = 0; i < m_image_views.size(); i++) {
-        vkDestroyImageView(p_device, m_image_views[i], nullptr);
+        vkDestroyImageView(p_device->GetDevice(), m_image_views[i], nullptr);
     }
 
     m_image_views.clear();
@@ -907,7 +870,7 @@ void VulkanCore::ReCreateSwapchain()
     DestroySwapchainImageViews();
 
     VkSurfaceCapabilitiesKHR surface_capabiltities;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physical_devices.Selected().m_phys_device, p_instance->GetSurface(),
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(p_device->GetPhysicalDevice(), p_instance->GetSurface(),
                                               &surface_capabiltities);
 
     ENGINE_LOG_DEBUG("Surface capabilities: currentExtent = {}x{}, minImageExtent = {}x{}, maxImageExtent = {}x{}",
@@ -916,10 +879,11 @@ void VulkanCore::ReCreateSwapchain()
                      surface_capabiltities.maxImageExtent.width, surface_capabiltities.maxImageExtent.height);
 
     const u32 number_of_images = ChooseNumImages(surface_capabiltities);
-    const std::vector<VkPresentModeKHR> &present_modes = m_physical_devices.Selected().m_present_modes;
+    const std::vector<VkPresentModeKHR> &present_modes = p_device->GetSelectedPhysicalDevice().m_present_modes;
     VkPresentModeKHR present_mode = ChoosePresentMode(present_modes, m_vsync_mode);
 
-    m_swap_chain_surface_format = ChooseSurfaceFormatAndColorSpace(m_physical_devices.Selected().m_surface_formats);
+    m_swap_chain_surface_format =
+        ChooseSurfaceFormatAndColorSpace(p_device->GetSelectedPhysicalDevice().m_surface_formats);
 
     int width, height;
     GetFramebufferSize(width, height);
@@ -950,7 +914,7 @@ void VulkanCore::ReCreateSwapchain()
         .imageUsage = (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT),
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .queueFamilyIndexCount = 1,
-        .pQueueFamilyIndices = &m_queue_family,
+        .pQueueFamilyIndices = nullptr, // Set bellow
         .preTransform = surface_capabiltities.currentTransform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .presentMode = present_mode,
@@ -958,15 +922,19 @@ void VulkanCore::ReCreateSwapchain()
         .oldSwapchain = p_swap_chain // Pass the old swapchain
     };
 
+    // Set pQueueFamilyIndices correctly
+    uint32_t queueFamilyIndex = p_device->GetQueueFamily();
+    swap_chain_create_info.pQueueFamilyIndices = &queueFamilyIndex;
+
     VkSwapchainKHR new_swap_chain;
     ENGINE_LOG_DEBUG("Old swapchain handle: {}", reinterpret_cast<void *>(p_swap_chain));
-    VkResult result = vkCreateSwapchainKHR(p_device, &swap_chain_create_info, nullptr, &new_swap_chain);
+    VkResult result = vkCreateSwapchainKHR(p_device->GetDevice(), &swap_chain_create_info, nullptr, &new_swap_chain);
     CHECK_VK_RESULT(result, "vkCreateSwapchainKHR\n");
 
     // Destroy the old swapchain after the new one is created
     if (p_swap_chain != VK_NULL_HANDLE) {
         ENGINE_LOG_DEBUG("Destroying old swapchain: {}", reinterpret_cast<void *>(p_swap_chain));
-        vkDestroySwapchainKHR(p_device, p_swap_chain, nullptr);
+        vkDestroySwapchainKHR(p_device->GetDevice(), p_swap_chain, nullptr);
     }
     p_swap_chain = new_swap_chain;
     // ENGINE_LOG_DEBUG("New swapchain handle: {}", reinterpret_cast<void *>(p_swap_chain));

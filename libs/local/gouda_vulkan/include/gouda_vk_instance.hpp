@@ -9,10 +9,10 @@
 #include "gouda_vk_utils.hpp"
 
 namespace GoudaVK {
-class VKInstance {
+class VulkanInstance {
 public:
-    VKInstance(std::string_view app_name, SemVer vulkan_api_version, GLFWwindow *window);
-    ~VKInstance();
+    VulkanInstance(std::string_view app_name, SemVer vulkan_api_version, GLFWwindow *window);
+    ~VulkanInstance();
 
     VkInstance GetInstance() const { return p_instance; }
     VkSurfaceKHR GetSurface() const { return p_surface; }

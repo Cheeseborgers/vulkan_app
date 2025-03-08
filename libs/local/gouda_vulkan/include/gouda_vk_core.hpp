@@ -48,7 +48,6 @@ class VulkanCore {
 
 public:
     VulkanCore();
-
     ~VulkanCore();
 
     void Init(GLFWwindow *window_ptr, std::string_view app_name, SemVer vulkan_api_version = {1, 3, 0, 0},
@@ -72,17 +71,16 @@ public:
 
     // Getters
     VulkanQueue *GetQueue() { return &m_queue; }
-    u32 GetQueueFamily() const { return m_queue_family; }
+    u32 GetQueueFamily() const { return p_device->GetQueueFamily(); }
     int GetNumberOfImages() const { return static_cast<int>(m_images.size()); }
     const VkImage &GetImage(int index);
-    VkDevice &GetDevice() { return p_device; }
+    VkDevice GetDevice() { return p_device->GetDevice(); }
     void GetFramebufferSize(int &width, int &height) const;
 
     void DestroySwapchain();
     void ReCreateSwapchain();
 
 private:
-    void CreateDevice();
     void CreateSwapchain();
     void CreateSwapchainImageViews();
     void DestroySwapchainImageViews();
@@ -113,12 +111,10 @@ private:
     bool m_is_initialized;
     VSyncMode m_vsync_mode;
 
-    std::unique_ptr<VKInstance> p_instance;
+    std::unique_ptr<VulkanInstance> p_instance;
+    std::unique_ptr<VulkanDevice> p_device;
 
     GLFWwindow *p_window;
-    VulkanPhysicalDevices m_physical_devices;
-    u32 m_queue_family;
-    VkDevice p_device;
 
     VkSurfaceFormatKHR m_swap_chain_surface_format;
     VkSwapchainKHR p_swap_chain;

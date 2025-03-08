@@ -23,7 +23,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityF
     return VK_FALSE;
 }
 
-VKInstance::VKInstance(std::string_view app_name, SemVer vulkan_api_version, GLFWwindow *window)
+VulkanInstance::VulkanInstance(std::string_view app_name, SemVer vulkan_api_version, GLFWwindow *window)
     : p_instance{VK_NULL_HANDLE}, p_debug_messenger{VK_NULL_HANDLE}, p_surface{VK_NULL_HANDLE}, p_window(window)
 {
     CreateInstance(app_name, vulkan_api_version);
@@ -31,7 +31,7 @@ VKInstance::VKInstance(std::string_view app_name, SemVer vulkan_api_version, GLF
     CreateSurface();
 }
 
-VKInstance::~VKInstance()
+VulkanInstance::~VulkanInstance()
 {
     if (p_instance != VK_NULL_HANDLE) {
         PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessenger =
@@ -42,11 +42,11 @@ VKInstance::~VKInstance()
         }
         vkDestroySurfaceKHR(p_instance, p_surface, nullptr);
         vkDestroyInstance(p_instance, nullptr);
-        ENGINE_LOG_INFO("VKInstance destroyed");
+        ENGINE_LOG_INFO("VulkanInstance destroyed");
     }
 }
 
-void VKInstance::CreateInstance(std::string_view app_name, SemVer vulkan_api_version)
+void VulkanInstance::CreateInstance(std::string_view app_name, SemVer vulkan_api_version)
 {
     std::vector<const char *> layers{"VK_LAYER_KHRONOS_validation"};
     std::vector<const char *> extensions{
@@ -84,7 +84,7 @@ void VKInstance::CreateInstance(std::string_view app_name, SemVer vulkan_api_ver
     ENGINE_LOG_INFO("Vulkan instance created");
 }
 
-void VKInstance::CreateDebugCallback()
+void VulkanInstance::CreateDebugCallback()
 {
     VkDebugUtilsMessengerCreateInfoEXT messenger_create_info = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -107,7 +107,7 @@ void VKInstance::CreateDebugCallback()
     ENGINE_LOG_INFO("Vulkan debug utils messenger created");
 }
 
-void VKInstance::CreateSurface()
+void VulkanInstance::CreateSurface()
 {
     if (p_surface != VK_NULL_HANDLE) {
         ENGINE_LOG_ERROR("Vulkan surface already created");

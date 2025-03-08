@@ -8,6 +8,9 @@
 #include <vector>
 
 #include "gouda_assert.hpp"
+#include "gouda_throw.hpp"
+
+#include "logger.hpp"
 
 #include "gouda_vk_utils.hpp"
 
@@ -146,44 +149,45 @@ static void PrintMemoryProperty(VkMemoryPropertyFlags PropertyFlags)
 }
 
 // TODO: REMove these print statments and figure some other way
-void VulkanPhysicalDevices::Init(const VkInstance &instance, const VkSurfaceKHR &surface)
+void VulkanPhysicalDevices::Init(const VulkanInstance &instance, const VkSurfaceKHR &surface)
 {
     u32 number_of_devices{0};
-
-    VkResult result = vkEnumeratePhysicalDevices(instance, &number_of_devices, nullptr);
+    VkResult result = vkEnumeratePhysicalDevices(instance.GetInstance(), &number_of_devices, nullptr);
     CHECK_VK_RESULT(result, "vkEnumeratePhysicalDevices error (1)\n");
 
-    std::print("Num physical devices: {}\n\n", number_of_devices);
-    m_devices.resize(number_of_devices);
+    if (number_of_devices == 0) {
+        ENGINE_THROW("No Vulkan physical devices found");
+    }
 
+    m_devices.resize(number_of_devices);
     std::vector<VkPhysicalDevice> devices(number_of_devices);
-    result = vkEnumeratePhysicalDevices(instance, &number_of_devices, devices.data());
+    result = vkEnumeratePhysicalDevices(instance.GetInstance(), &number_of_devices, devices.data());
     CHECK_VK_RESULT(result, "vkEnumeratePhysicalDevices error (2)\n");
 
     for (auto &&[i, physical_device] : std::views::enumerate(devices)) {
         auto &device_info = m_devices[i];
-        device_info.m_phys_device = physical_device;
+        device_info.m_physical_device = physical_device;
 
-        vkGetPhysicalDeviceProperties(physical_device, &device_info.m_dev_props);
-        std::print("Device name: {}\n", device_info.m_dev_props.deviceName);
+        vkGetPhysicalDeviceProperties(physical_device, &device_info.m_device_properties);
+        std::print("Device name: {}\n", device_info.m_device_properties.deviceName);
 
-        u32 api_version = device_info.m_dev_props.apiVersion;
+        u32 api_version = device_info.m_device_properties.apiVersion;
         std::print("    API version: {}.{}.{}.{}\n", VK_API_VERSION_VARIANT(api_version),
                    VK_API_VERSION_MAJOR(api_version), VK_API_VERSION_MINOR(api_version),
                    VK_API_VERSION_PATCH(api_version));
 
-        // Queue Families
+        // Queue Families --------------------------------------------------------------------------------------
         u32 queue_family_count{0};
         vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, nullptr);
         std::print("    Num of family queues: {}\n", queue_family_count);
 
-        device_info.m_queue_family_props.resize(queue_family_count);
+        device_info.m_queue_family_properties.resize(queue_family_count);
         device_info.m_queue_supports_present.resize(queue_family_count);
 
         vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count,
-                                                 device_info.m_queue_family_props.data());
+                                                 device_info.m_queue_family_properties.data());
 
-        for (auto &&[q, queue_props] : std::views::enumerate(device_info.m_queue_family_props)) {
+        for (auto &&[q, queue_props] : std::views::enumerate(device_info.m_queue_family_properties)) {
             VkQueueFlags flags = queue_props.queueFlags;
             std::print("    Family {} Num queues: {} | GFX: {}, Compute: {}, Transfer: {}, Sparse: {}\n", q,
                        queue_props.queueCount, (flags & VK_QUEUE_GRAPHICS_BIT) ? "Yes" : "No",
@@ -195,14 +199,14 @@ void VulkanPhysicalDevices::Init(const VkInstance &instance, const VkSurfaceKHR 
             CHECK_VK_RESULT(result, "vkGetPhysicalDeviceSurfaceSupportKHR error\n");
         }
 
-        // Surface Formats
-        u32 num_formats{0};
-        result = vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &num_formats, nullptr);
+        // Surface Formats --------------------------------------------------------------------------------------
+        u32 format_count{0};
+        result = vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, nullptr);
         CHECK_VK_RESULT(result, "vkGetPhysicalDeviceSurfaceFormatsKHR (1)\n");
-        ASSERT(num_formats > 0, "Number of device surface formats cannot be zero");
+        ASSERT(format_count > 0, "Number of device surface formats cannot be zero");
 
-        device_info.m_surface_formats.resize(num_formats);
-        result = vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &num_formats,
+        device_info.m_surface_formats.resize(format_count);
+        result = vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count,
                                                       device_info.m_surface_formats.data());
         CHECK_VK_RESULT(result, "vkGetPhysicalDeviceSurfaceFormatsKHR (2)\n");
 
@@ -211,39 +215,42 @@ void VulkanPhysicalDevices::Init(const VkInstance &instance, const VkSurfaceKHR 
                        VkColorSpaceToString(surface_format.colorSpace));
         }
 
-        // Surface Capabilities
+        // Surface Capabilities -----------------------------------------------------------------------------------
         result =
             vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &device_info.m_surface_capabilties);
         CHECK_VK_RESULT(result, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR\n");
         PrintImageUsageFlags(device_info.m_surface_capabilties.supportedUsageFlags);
 
-        // Present Modes
-        u32 num_present_modes{0};
-        result = vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &num_present_modes, nullptr);
+        // Present Modes -------------------------------------------------------------------------------------------
+        u32 present_mode_count{0};
+        result = vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, nullptr);
         CHECK_VK_RESULT(result, "vkGetPhysicalDeviceSurfacePresentModesKHR (1) error\n");
-        ASSERT(num_present_modes != 0, "Number of device present modes cannot be zero");
+        ASSERT(present_mode_count != 0, "Number of device present modes cannot be zero");
 
-        device_info.m_present_modes.resize(num_present_modes);
-        result = vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &num_present_modes,
+        device_info.m_present_modes.resize(present_mode_count);
+        result = vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count,
                                                            device_info.m_present_modes.data());
         CHECK_VK_RESULT(result, "vkGetPhysicalDeviceSurfacePresentModesKHR (2) error\n");
 
-        std::print("Number of presentation modes: {}\n", num_present_modes);
+        std::print("Number of presentation modes: {}\n", present_mode_count);
 
-        // Memory Properties
-        vkGetPhysicalDeviceMemoryProperties(physical_device, &device_info.m_memory_props);
-        std::print("Num memory types: {}\n", device_info.m_memory_props.memoryTypeCount);
+        // Memory Properties --------------------------------------------------------------------------------------
+        vkGetPhysicalDeviceMemoryProperties(physical_device, &device_info.m_memory_properties);
+        std::print("Num memory types: {}\n", device_info.m_memory_properties.memoryTypeCount);
 
-        for (auto &&[j, mem_type] : std::views::enumerate(
-                 std::span{device_info.m_memory_props.memoryTypes, device_info.m_memory_props.memoryTypeCount})) {
+        for (auto &&[j, mem_type] : std::views::enumerate(std::span{device_info.m_memory_properties.memoryTypes,
+                                                                    device_info.m_memory_properties.memoryTypeCount})) {
             std::print("{}: flags {:x}, heap {}\n", j, mem_type.propertyFlags, mem_type.heapIndex);
             PrintMemoryProperty(mem_type.propertyFlags);
         }
 
-        std::print("Num heap types: {}\n\n", device_info.m_memory_props.memoryHeapCount);
+        std::print("Num heap types: {}\n\n", device_info.m_memory_properties.memoryHeapCount);
 
-        // Device Features
-        vkGetPhysicalDeviceFeatures(device_info.m_phys_device, &device_info.m_features);
+        // Device Features ---------------------------------------------------------------------------------------
+        vkGetPhysicalDeviceFeatures(device_info.m_physical_device, &device_info.m_features);
+
+        // TODO: Placeholder for depth format (query supported formats here)
+        device_info.m_depth_format = VK_FORMAT_D32_SFLOAT;
     }
 }
 
@@ -251,8 +258,8 @@ u32 VulkanPhysicalDevices::SelectDevice(VkQueueFlags required_queue_type, bool s
 {
     for (u32 i = 0; i < m_devices.size(); i++) {
 
-        for (u32 j = 0; j < m_devices[i].m_queue_family_props.size(); j++) {
-            const VkQueueFamilyProperties &queue_family_properties = m_devices[i].m_queue_family_props[j];
+        for (u32 j = 0; j < m_devices[i].m_queue_family_properties.size(); j++) {
+            const VkQueueFamilyProperties &queue_family_properties = m_devices[i].m_queue_family_properties[j];
 
             if ((queue_family_properties.queueFlags & required_queue_type) &&
                 (static_cast<bool>(m_devices[i].m_queue_supports_present[j]) == supports_present)) {
@@ -279,10 +286,65 @@ const PhysicalDevice &VulkanPhysicalDevices::Selected() const
 {
     if (m_dev_index < 0) {
         // TODO: Add to logger when created
-        std::cout << "A physical device has not been selected\n";
+        std::cout << "No physical device selected\n";
     }
 
     return m_devices[static_cast<size_t>(m_dev_index)];
+}
+
+// VulkanDevice
+// ----------------------------------------------------------------------------------------------------------
+VulkanDevice::VulkanDevice(const VulkanInstance &instance, VkQueueFlags requiredQueueFlags)
+    : p_device{VK_NULL_HANDLE}, m_physical_devices{}, m_queue_family{0}
+{
+    m_physical_devices.Init(instance, instance.GetSurface());
+    m_queue_family = m_physical_devices.SelectDevice(requiredQueueFlags, true);
+    CreateDevice(requiredQueueFlags);
+}
+
+VulkanDevice::~VulkanDevice()
+{
+    if (p_device != VK_NULL_HANDLE) {
+        vkDestroyDevice(p_device, nullptr);
+        ENGINE_LOG_INFO("Device destroyed");
+    }
+}
+
+void VulkanDevice::CreateDevice(VkQueueFlags requiredQueueFlags)
+{
+    float queue_priorities[] = {1.0f};
+    VkDeviceQueueCreateInfo device_queue_create_info = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                                                        .queueFamilyIndex = m_queue_family,
+                                                        .queueCount = 1,
+                                                        .pQueuePriorities = queue_priorities};
+
+    std::vector<const char *> device_extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                                                VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME};
+
+    VkPhysicalDeviceFeatures physical_device_features{};
+    physical_device_features.geometryShader = VK_TRUE;
+    physical_device_features.tessellationShader = VK_TRUE;
+
+    VkDeviceCreateInfo device_create_info = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+                                             .queueCreateInfoCount = 1,
+                                             .pQueueCreateInfos = &device_queue_create_info,
+                                             .enabledExtensionCount = static_cast<u32>(device_extensions.size()),
+                                             .ppEnabledExtensionNames = device_extensions.data(),
+                                             .pEnabledFeatures = &physical_device_features};
+
+    VkResult result =
+        vkCreateDevice(m_physical_devices.Selected().m_physical_device, &device_create_info, nullptr, &p_device);
+    CHECK_VK_RESULT(result, "vkCreateDevice\n");
+
+    // Log feature support for debugging
+    if (m_physical_devices.Selected().m_features.geometryShader == VK_FALSE) {
+        ENGINE_LOG_ERROR("The Geometry Shader is not supported!");
+    }
+    if (m_physical_devices.Selected().m_features.tessellationShader == VK_FALSE) {
+        ENGINE_LOG_ERROR("The Tessellation Shader is not supported!");
+    }
+
+    ENGINE_LOG_INFO("Device created with queue family index: {}", queueFamily);
 }
 
 } // end namespace

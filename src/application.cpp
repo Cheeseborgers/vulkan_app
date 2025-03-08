@@ -18,7 +18,6 @@ struct UniformData {
 Application::Application(WindowSize window_size)
     : p_window{nullptr},
       m_window_size{window_size},
-      p_device{VK_NULL_HANDLE},
       p_vk_queue{nullptr},
       m_number_of_images{},
       p_render_pass{VK_NULL_HANDLE},
@@ -34,11 +33,11 @@ Application::~Application()
 {
     APP_LOG_INFO("Cleaning up application");
 
-    vkDeviceWaitIdle(p_device); // Ensure GPU is idle before cleanup
+    vkDeviceWaitIdle(m_vk_core.GetDevice()); // Ensure GPU is idle before cleanup
 
     for (auto fence : m_frame_fences) {
         if (fence != VK_NULL_HANDLE) {
-            vkDestroyFence(p_device, fence, nullptr);
+            vkDestroyFence(m_vk_core.GetDevice(), fence, nullptr);
             fence = VK_NULL_HANDLE;
         }
     }
@@ -52,10 +51,10 @@ Application::~Application()
 
     vkDestroyRenderPass(m_vk_core.GetDevice(), p_render_pass, nullptr);
 
-    m_mesh.Destroy(p_device);
+    m_mesh.Destroy(m_vk_core.GetDevice());
 
     for (auto uniform_buffer : m_uniform_buffers) {
-        uniform_buffer.Destroy(p_device);
+        uniform_buffer.Destroy(m_vk_core.GetDevice());
     }
 }
 
@@ -67,7 +66,6 @@ void Application::Init(std::string_view application_title)
 
     m_vk_core.Init(p_window, application_title, {1, 3, 0, 0}, m_time_settings.vsync_mode);
 
-    p_device = m_vk_core.GetDevice();
     m_number_of_images = m_vk_core.GetNumberOfImages();
     p_vk_queue = m_vk_core.GetQueue();
     p_render_pass = m_vk_core.CreateSimpleRenderPass();
@@ -106,8 +104,8 @@ void Application::RenderScene(f32 delta_time)
         ENGINE_LOG_INFO("Rendering paused, waiting for valid swapchain");
     }
 
-    vkWaitForFences(p_device, 1, &m_frame_fences[m_current_frame], VK_TRUE, UINT64_MAX);
-    vkResetFences(p_device, 1, &m_frame_fences[m_current_frame]);
+    vkWaitForFences(m_vk_core.GetDevice(), 1, &m_frame_fences[m_current_frame], VK_TRUE, UINT64_MAX);
+    vkResetFences(m_vk_core.GetDevice(), 1, &m_frame_fences[m_current_frame]);
 
     u32 image_index{p_vk_queue->AcquireNextImage(m_current_frame)};
 
@@ -165,8 +163,8 @@ void Application::Execute()
         }
     }
 
-    vkDeviceWaitIdle(p_device);  // TODO: Use vk_core wait
-    glfwDestroyWindow(p_window); // TODO: add cleanup to vk_glfw .hpp / create window wrapper?
+    vkDeviceWaitIdle(m_vk_core.GetDevice()); // TODO: Use vk_core wait
+    glfwDestroyWindow(p_window);             // TODO: add cleanup to vk_glfw .hpp / create window wrapper?
     glfwTerminate();
 }
 
@@ -228,9 +226,9 @@ void Application::CreateShaders()
 
 void Application::CreatePipeline()
 {
-    p_pipeline = std::make_unique<GoudaVK::GraphicsPipeline>(p_device, p_window, p_render_pass, p_vertex_shader,
-                                                             p_fragment_shader, &m_mesh, m_number_of_images,
-                                                             m_uniform_buffers, sizeof(UniformData));
+    p_pipeline = std::make_unique<GoudaVK::GraphicsPipeline>(
+        m_vk_core.GetDevice(), p_window, p_render_pass, p_vertex_shader, p_fragment_shader, &m_mesh, m_number_of_images,
+        m_uniform_buffers, sizeof(UniformData));
 }
 
 void Application::CreateFences()
@@ -243,7 +241,7 @@ void Application::CreateFences()
                                      .flags = VK_FENCE_CREATE_SIGNALED_BIT};
 
         for (u32 i = 0; i < p_vk_queue->GetMaxFramesInFlight(); i++) {
-            GoudaVK::CreateFence(p_device, &fence_info, nullptr, &m_frame_fences[i]);
+            GoudaVK::CreateFence(m_vk_core.GetDevice(), &fence_info, nullptr, &m_frame_fences[i]);
         }
     }
 }
@@ -318,7 +316,7 @@ void Application::UpdateUniformBuffer(u32 ImageIndex, f32 delta_time)
 
     // std::cout << "Frame: " << ImageIndex << " Rotation: " << rotation_angle << std::endl;
 
-    m_uniform_buffers[ImageIndex].Update(p_device, &rotation_matrix, sizeof(rotation_matrix));
+    m_uniform_buffers[ImageIndex].Update(m_vk_core.GetDevice(), &rotation_matrix, sizeof(rotation_matrix));
 }
 
 void Application::SetupCallbacks()
@@ -401,7 +399,7 @@ void Application::OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_si
 
     m_window_size = new_size; // Update stored window size
 
-    vkDeviceWaitIdle(p_device); // Ensure no commands are running before destruction
+    vkDeviceWaitIdle(m_vk_core.GetDevice()); // Ensure no commands are running before destruction
 
     // Cleanup framebuffers
     m_vk_core.DestroyFramebuffers(m_frame_buffers);
