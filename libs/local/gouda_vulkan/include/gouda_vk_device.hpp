@@ -37,20 +37,20 @@ private:
 
 class VulkanDevice {
 public:
-    VulkanDevice(const VulkanInstance &instance, VkQueueFlags requiredQueueFlags);
+    VulkanDevice(const VulkanInstance &instance, VkQueueFlags required_queue_flags);
     ~VulkanDevice();
 
     VkDevice GetDevice() const { return p_device; }
     VkPhysicalDevice GetPhysicalDevice() const { return m_physical_devices.Selected().m_physical_device; }
-    uint32_t GetQueueFamily() const { return m_queue_family; }
+    u32 GetQueueFamily() const { return m_queue_family; }
     const PhysicalDevice &GetSelectedPhysicalDevice() const { return m_physical_devices.Selected(); }
 
 private:
     VkDevice p_device;
     VulkanPhysicalDevices m_physical_devices;
-    uint32_t m_queue_family;
+    u32 m_queue_family;
 
-    void CreateDevice(VkQueueFlags requiredQueueFlags);
+    void CreateDevice(VkQueueFlags required_queue_flags);
 };
 
 } // end namespace

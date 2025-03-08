@@ -63,23 +63,23 @@ void VulkanInstance::CreateInstance(std::string_view app_name, SemVer vulkan_api
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
     };
 
-    VkApplicationInfo application_info = {.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-                                          .pApplicationName = app_name.data(),
-                                          .applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
-                                          .pEngineName = "Gouda Engine",
-                                          .engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
-                                          .apiVersion =
-                                              VK_MAKE_API_VERSION(vulkan_api_version.variant, vulkan_api_version.major,
-                                                                  vulkan_api_version.minor, vulkan_api_version.patch)};
+    VkApplicationInfo application_info{.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+                                       .pApplicationName = app_name.data(),
+                                       .applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
+                                       .pEngineName = "Gouda Engine",
+                                       .engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
+                                       .apiVersion =
+                                           VK_MAKE_API_VERSION(vulkan_api_version.variant, vulkan_api_version.major,
+                                                               vulkan_api_version.minor, vulkan_api_version.patch)};
 
-    VkInstanceCreateInfo instance_create_info = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-                                                 .pApplicationInfo = &application_info,
-                                                 .enabledLayerCount = static_cast<u32>(layers.size()),
-                                                 .ppEnabledLayerNames = layers.data(),
-                                                 .enabledExtensionCount = static_cast<u32>(extensions.size()),
-                                                 .ppEnabledExtensionNames = extensions.data()};
+    VkInstanceCreateInfo instance_create_info{.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+                                              .pApplicationInfo = &application_info,
+                                              .enabledLayerCount = static_cast<u32>(layers.size()),
+                                              .ppEnabledLayerNames = layers.data(),
+                                              .enabledExtensionCount = static_cast<u32>(extensions.size()),
+                                              .ppEnabledExtensionNames = extensions.data()};
 
-    VkResult result = vkCreateInstance(&instance_create_info, nullptr, &p_instance);
+    VkResult result{vkCreateInstance(&instance_create_info, nullptr, &p_instance)};
     CHECK_VK_RESULT(result, "vkCreateInstance");
     ENGINE_LOG_INFO("Vulkan instance created");
 }
@@ -102,7 +102,7 @@ void VulkanInstance::CreateDebugCallback()
         ENGINE_THROW("Cannot find address of vkCreateDebugUtilsMessengerEXT");
     }
 
-    VkResult result = vkCreateDebugUtilsMessenger(p_instance, &messenger_create_info, nullptr, &p_debug_messenger);
+    VkResult result{vkCreateDebugUtilsMessenger(p_instance, &messenger_create_info, nullptr, &p_debug_messenger)};
     CHECK_VK_RESULT(result, "debug utils messenger");
     ENGINE_LOG_INFO("Vulkan debug utils messenger created");
 }
