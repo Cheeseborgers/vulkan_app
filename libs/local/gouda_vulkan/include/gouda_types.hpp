@@ -7,6 +7,7 @@
 #include <chrono>
 #include <concepts>
 #include <cstdint>
+#include <functional>
 #include <sstream>
 #include <string>
 
@@ -80,6 +81,9 @@ struct Dimensions {
 
     std::string ToString() { return std::string(std::format("{}x{}", width, height)); }
 };
+
+template <typename... Args>
+using CallbackFunction = std::function<void(Args...)>;
 
 using FrameBufferSize = Dimensions<int>;
 using WindowSize = Dimensions<int>;

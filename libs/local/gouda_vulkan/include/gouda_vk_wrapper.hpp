@@ -3,7 +3,6 @@
 #include "gouda_types.hpp"
 
 #include "gouda_vk_core.hpp"
-#include "gouda_vk_glfw.hpp"
 #include "gouda_vk_graphics_pipeline.hpp"
 #include "gouda_vk_shader.hpp"
 #include "gouda_vk_simple_mesh.hpp"

@@ -38,7 +38,6 @@ set(PROJECT_SOURCES
     src/gouda_vk_allocated_buffer.cpp
     src/gouda_vk_core.cpp
     src/gouda_vk_device.cpp
-    src/gouda_vk_glfw.cpp
     src/gouda_vk_graphics_pipeline.cpp
     src/gouda_vk_instance.cpp
     src/gouda_vk_utils.cpp
@@ -51,6 +50,9 @@ set(PROJECT_SOURCES
     src/audio/audio_manager.cpp
     src/audio/music_track.cpp
     src/audio/sound_effect.cpp
+
+    src/backends/common.cpp
+    src/backends/glfw_window.cpp
 
     src/utility/random.cpp
 )

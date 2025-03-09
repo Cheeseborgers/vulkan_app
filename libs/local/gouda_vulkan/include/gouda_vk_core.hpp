@@ -80,6 +80,9 @@ public:
     void DestroySwapchain();
     void ReCreateSwapchain();
 
+    // TODO: Rethink this
+    void DeviceWait() { p_device->Wait(); }
+
 private:
     void CreateSwapchain();
     void CreateSwapchainImageViews();

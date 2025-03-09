@@ -1,10 +1,12 @@
 #pragma once
 
+#include "backends/glfw_window.hpp"
 #include "gouda_vk_wrapper.hpp"
 
 #include "audio/audio_manager.hpp"
 #include "utility/timer.hpp"
 
+// TODO: Figure how this will intergrate with app config, window config and such
 struct TimeSettings {
     f32 time_scale;                // Game speed modifier
     f32 fixed_timestep;            // Physics update rate
@@ -22,21 +24,17 @@ struct TimeSettings {
     }
 };
 
-// TODO: Utilize this
-struct ApplicationTimers {
-    Gouda::FrameTimer frame_timer;
-    Gouda::FixedTimer physics_timer;
-    Gouda::GameClock game_clock;
-
-    ApplicationTimers(f32 fixed_timestep) : frame_timer{}, physics_timer{fixed_timestep}, game_clock{} {}
-};
+// TODO: Load and save the application config from file, with safe defaults (ignore renderer, platform and title for
+// now)
+// TODO: Create an application config and construct the window config from that so we can hold data such as the
+// renderer. we dont require window size as the window should return those
 
 class Application {
 public:
-    Application(WindowSize window_size);
+    Application();
     ~Application();
 
-    void Init(std::string_view application_title);
+    void Init(const Gouda::WindowConfig &config);
     void Update(f32 delta_time);
     void RenderScene(f32 delta_time);
     void Execute();
@@ -63,9 +61,8 @@ private:
     void OnWindowIconify(GLFWwindow *window, bool iconified);
 
 private:
-    // TODO: Create window wrapper to simplfy creation and destruction
-    GLFWwindow *p_window;
-    WindowSize m_window_size;
+    std::unique_ptr<Gouda::GLFW::Window> p_window;
+    std::unique_ptr<Gouda::GLFW::Callbacks<GLFWwindow *>> p_callbacks; // TODO: Create an input handler to hide this
 
     GoudaVK::VulkanCore m_vk_core;
     GoudaVK::VulkanQueue *p_vk_queue;
@@ -81,8 +78,6 @@ private:
 
     GoudaVK::SimpleMesh m_mesh;
     std::vector<GoudaVK::AllocatedBuffer> m_uniform_buffers;
-
-    GoudaVK::GLFW::Callbacks m_callbacks;
 
     bool m_is_iconified;
 

@@ -15,9 +15,9 @@ struct UniformData {
 };
 }
 
-Application::Application(WindowSize window_size)
+Application::Application()
     : p_window{nullptr},
-      m_window_size{window_size},
+      p_callbacks{nullptr},
       p_vk_queue{nullptr},
       m_number_of_images{},
       p_render_pass{VK_NULL_HANDLE},
@@ -33,7 +33,7 @@ Application::~Application()
 {
     APP_LOG_INFO("Cleaning up application");
 
-    vkDeviceWaitIdle(m_vk_core.GetDevice()); // Ensure GPU is idle before cleanup
+    m_vk_core.DeviceWait(); // Ensure GPU is idle before cleanup
 
     for (auto fence : m_frame_fences) {
         if (fence != VK_NULL_HANDLE) {
@@ -42,6 +42,7 @@ Application::~Application()
         }
     }
 
+    // TODO: Decide whether to pass the vector or as is to make this cleaner
     m_vk_core.FreeCommandBuffers(static_cast<u32>(m_command_buffers.size()), m_command_buffers.data());
 
     m_vk_core.DestroyFramebuffers(m_frame_buffers);
@@ -58,13 +59,14 @@ Application::~Application()
     }
 }
 
-void Application::Init(std::string_view application_title)
+void Application::Init(const Gouda::WindowConfig &window_config)
 {
+    // TODO: Utilize the TimeSettings struct from Application config when make/loaded
     APP_LOG_INFO("Initializing");
 
-    p_window = GoudaVK::GLFW::vulkan_init(m_window_size, application_title, true).value_or(nullptr);
+    p_window = std::make_unique<Gouda::GLFW::Window>(window_config);
 
-    m_vk_core.Init(p_window, application_title, {1, 3, 0, 0}, m_time_settings.vsync_mode);
+    m_vk_core.Init(p_window->GetWindow(), window_config.title, {1, 3, 0, 0}, m_time_settings.vsync_mode);
 
     m_number_of_images = m_vk_core.GetNumberOfImages();
     p_vk_queue = m_vk_core.GetQueue();
@@ -132,9 +134,9 @@ void Application::Execute()
         fps_limiter.emplace(m_time_settings.target_fps);
     }
 
-    while (!glfwWindowShouldClose(p_window)) {
+    while (!p_window->ShouldClose()) {
 
-        glfwPollEvents();
+        p_window->PollEvents();
         m_audio_manager.Update(); // TODO: IS this where we want to update audio? also do we pause audio when minimised?
 
         frame_timer.Update();
@@ -144,6 +146,7 @@ void Application::Execute()
         delta_time = game_clock.ApplyTimeScale(delta_time);
 
         if (m_is_iconified) {
+            // TODO: Hide bellow in the event handle when done
             glfwWaitEventsTimeout(sleep_duration); // Avoid busy waiting
             continue;                              // Skip rendering while minimized
         }
@@ -163,9 +166,8 @@ void Application::Execute()
         }
     }
 
-    vkDeviceWaitIdle(m_vk_core.GetDevice()); // TODO: Use vk_core wait
-    glfwDestroyWindow(p_window);             // TODO: add cleanup to vk_glfw .hpp / create window wrapper?
-    glfwTerminate();
+    m_vk_core.DeviceWait();
+    p_window->Destroy(); // FIXME: Do we need this
 }
 
 // Private -------------------------------------------------------------------------------------------------------------
@@ -227,8 +229,8 @@ void Application::CreateShaders()
 void Application::CreatePipeline()
 {
     p_pipeline = std::make_unique<GoudaVK::GraphicsPipeline>(
-        m_vk_core.GetDevice(), p_window, p_render_pass, p_vertex_shader, p_fragment_shader, &m_mesh, m_number_of_images,
-        m_uniform_buffers, sizeof(UniformData));
+        m_vk_core.GetDevice(), p_window->GetWindow(), p_render_pass, p_vertex_shader, p_fragment_shader, &m_mesh,
+        m_number_of_images, m_uniform_buffers, sizeof(UniformData));
 }
 
 void Application::CreateFences()
@@ -252,13 +254,16 @@ void Application::RecordCommandBuffers()
     VkClearValue clear_value;
     clear_value.color = clear_colour;
 
+    FrameBufferSize framebuffer_size{p_window->GetFramebufferSize()};
+
     VkRenderPassBeginInfo render_pass_begin_info{
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .pNext = nullptr,
         .renderPass = p_render_pass,
         .framebuffer = VK_NULL_HANDLE, // Assigned in loop below
         .renderArea = {.offset = {.x = 0, .y = 0},
-                       .extent = {.width = (u32)m_window_size.width, .height = (u32)m_window_size.height}},
+                       .extent = {.width = static_cast<u32>(framebuffer_size.width),
+                                  .height = static_cast<u32>(framebuffer_size.height)}},
         .clearValueCount = 1,
         .pClearValues = &clear_value};
 
@@ -272,16 +277,17 @@ void Application::RecordCommandBuffers()
         // Set viewport
         VkViewport viewport{.x = 0.0f,
                             .y = 0.0f,
-                            .width = static_cast<f32>(m_window_size.width),
-                            .height = static_cast<f32>(m_window_size.height),
+                            .width = static_cast<f32>(framebuffer_size.width),
+                            .height = static_cast<f32>(framebuffer_size.height),
                             .minDepth = 0.0f,
                             .maxDepth = 1.0f};
 
         vkCmdSetViewport(m_command_buffers[i], 0, 1, &viewport);
 
         // Set scissor
-        VkRect2D scissor{.offset = {0, 0},
-                         .extent = {static_cast<u32>(m_window_size.width), static_cast<u32>(m_window_size.height)}};
+        VkRect2D scissor{
+            .offset = {0, 0},
+            .extent = {static_cast<u32>(framebuffer_size.width), static_cast<u32>(framebuffer_size.height)}};
 
         vkCmdSetScissor(m_command_buffers[i], 0, 1, &scissor);
 
@@ -321,31 +327,33 @@ void Application::UpdateUniformBuffer(u32 ImageIndex, f32 delta_time)
 
 void Application::SetupCallbacks()
 {
-    m_callbacks.key_callback = [this](GLFWwindow *window, int key, int scancode, int action, int mods) {
+    p_callbacks = std::make_unique<Gouda::GLFW::Callbacks<GLFWwindow *>>();
+
+    p_callbacks->key_callback = [this](GLFWwindow *window, int key, int scancode, int action, int mods) {
         this->OnKey(window, key, scancode, action, mods);
     };
 
-    m_callbacks.mouse_move_callback = [this](GLFWwindow *window, f32 x_position, f32 y_position) {
+    p_callbacks->mouse_move_callback = [this](GLFWwindow *window, f32 x_position, f32 y_position) {
         this->OnMouseMove(window, x_position, y_position);
     };
 
-    m_callbacks.mouse_button_callback = [this](GLFWwindow *window, int button, int action, int mods) {
+    p_callbacks->mouse_button_callback = [this](GLFWwindow *window, int button, int action, int mods) {
         this->OnMouseButton(window, button, action, mods);
     };
 
-    m_callbacks.mouse_scroll_callback = [this](GLFWwindow *window, f32 x_offset, f32 y_offset) {
+    p_callbacks->mouse_scroll_callback = [this](GLFWwindow *window, f32 x_offset, f32 y_offset) {
         this->OnMouseScroll(window, x_offset, y_offset);
     };
 
-    m_callbacks.window_iconify_callback = [this](GLFWwindow *window, bool iconified) {
+    p_callbacks->window_iconify_callback = [this](GLFWwindow *window, bool iconified) {
         this->OnWindowIconify(window, iconified);
     };
 
-    m_callbacks.framebuffer_resized_callback = [this](GLFWwindow *window, FrameBufferSize new_size) {
+    p_callbacks->framebuffer_resized_callback = [this](GLFWwindow *window, FrameBufferSize new_size) {
         this->OnFramebufferResize(window, new_size);
     };
 
-    GoudaVK::GLFW::set_callbacks(p_window, &m_callbacks);
+    p_window->SetCallbacks(p_callbacks.get());
 }
 
 void Application::OnKey(GLFWwindow *window, int key, int scancode, int action, int mods)
@@ -396,8 +404,6 @@ void Application::OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_si
 
     p_vk_queue->SetSwapchainInvalid(); // Mark swapchain for recreation (stops rendering)
     APP_LOG_INFO("Framebuffer resized: {}x{}, swapchain is now invalid", new_size.width, new_size.height);
-
-    m_window_size = new_size; // Update stored window size
 
     vkDeviceWaitIdle(m_vk_core.GetDevice()); // Ensure no commands are running before destruction
 

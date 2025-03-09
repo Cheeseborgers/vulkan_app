@@ -45,6 +45,8 @@ public:
     u32 GetQueueFamily() const { return m_queue_family; }
     const PhysicalDevice &GetSelectedPhysicalDevice() const { return m_physical_devices.Selected(); }
 
+    void Wait() { vkDeviceWaitIdle(p_device); };
+
 private:
     VkDevice p_device;
     VulkanPhysicalDevices m_physical_devices;

@@ -3,6 +3,7 @@
 **/thirdparty/
 **/logs/
 **/profiling/
+**/assets/
 
 # ignore an entire directory
 /bin/
