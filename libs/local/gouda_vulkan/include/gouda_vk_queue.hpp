@@ -4,7 +4,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "gouda_types.hpp"
+#include "core/types.hpp"
 
 namespace GoudaVK {
 

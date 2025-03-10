@@ -2,7 +2,7 @@
 
 #include <GLFW/glfw3.h>
 
-#include "gouda_types.hpp"
+#include "core/types.hpp"
 
 namespace Gouda {
 namespace GLFW {

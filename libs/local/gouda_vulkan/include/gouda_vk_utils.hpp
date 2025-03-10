@@ -4,7 +4,7 @@
 #include <iostream>
 #include <stdexcept>
 
-#include "gouda_types.hpp"
+#include "core/types.hpp"
 
 inline void check_vk_result(VkResult res, const char *msg, const char *file, int line)
 {

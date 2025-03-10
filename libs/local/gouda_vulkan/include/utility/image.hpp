@@ -5,7 +5,7 @@
 
 #include "stb_image.h"
 
-#include "gouda_types.hpp"
+#include "core/types.hpp"
 
 class StbiImage {
 public:

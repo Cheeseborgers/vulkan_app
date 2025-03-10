@@ -3,8 +3,8 @@
 #include <GLFW/glfw3.h>
 
 #include "common.hpp"
+#include "core/types.hpp"
 #include "glfw_callbacks.hpp"
-#include "gouda_types.hpp"
 #include "window.hpp"
 
 namespace Gouda {

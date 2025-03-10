@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gouda_types.hpp"
+#include "core/types.hpp"
 
 #include "gouda_vk_core.hpp"
 #include "gouda_vk_graphics_pipeline.hpp"

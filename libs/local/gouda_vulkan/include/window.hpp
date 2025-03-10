@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gouda_types.hpp"
+#include "core/types.hpp"
 
 namespace Gouda {
 

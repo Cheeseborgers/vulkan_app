@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "gouda_types.hpp"
+#include "core/types.hpp"
 #include "music_track.hpp"
 #include "sound_effect.hpp"
 

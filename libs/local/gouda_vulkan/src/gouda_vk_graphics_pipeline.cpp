@@ -2,8 +2,8 @@
 
 #include "logger.hpp"
 
+#include "core/types.hpp"
 #include "gouda_assert.hpp"
-#include "gouda_types.hpp"
 
 #include "gouda_vk_utils.hpp"
 

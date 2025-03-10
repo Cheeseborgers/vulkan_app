@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "gouda_types.hpp"
+#include "core/types.hpp"
 
 namespace Gouda {
 namespace Internal {

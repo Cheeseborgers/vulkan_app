@@ -25,7 +25,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "gouda_types.hpp"
+#include "core/types.hpp"
 
 #include "gouda_vk_allocated_buffer.hpp"
 #include "gouda_vk_device.hpp"
