@@ -33,7 +33,6 @@ add_subdirectory(libs/thirdparty/stb_image)
 set(PROJECT_SOURCES
 
     src/gouda_assert.cpp
-    src/gouda_utils.cpp
 
     src/gouda_vk_allocated_buffer.cpp
     src/gouda_vk_core.cpp
@@ -54,6 +53,7 @@ set(PROJECT_SOURCES
     src/backends/common.cpp
     src/backends/glfw_window.cpp
 
+    src/utility/filesystem.cpp
     src/utility/random.cpp
 )
 
