@@ -336,7 +336,7 @@ void VulkanDevice::CreateDevice(VkQueueFlags requiredQueueFlags)
         ENGINE_LOG_ERROR("The Tessellation Shader is not supported!");
     }
 
-    ENGINE_LOG_INFO("Device created with queue family index: {}", queueFamily);
+    ENGINE_LOG_INFO("Device created with queue family index: {}", m_queue_family);
 }
 
 } // end namespace

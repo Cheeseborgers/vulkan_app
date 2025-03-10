@@ -14,7 +14,7 @@
 #include <syncstream>
 #include <vector>
 
-#include "stacktrace.hpp"
+// #include "stacktrace.hpp"
 
 #ifdef __cpp_lib_stacktrace
 #include <stacktrace>
@@ -26,10 +26,10 @@
 #include <unistd.h>
 #endif
 
-enum class LogLevel { Debug, Info, Warning, Error, Fatal };
+enum class LogLevel : uint8_t { Debug, Info, Warning, Error, Fatal };
 
 // TODO: Make sure all member vars are set in the constructor
-// TODO: Sort stacktrace as a fallback for all spported platforms until gcc sorts its act out
+// TODO: Sort stacktrace as a fallback for all supported platforms until gcc sorts its act out
 
 class Logger {
 protected:
@@ -78,7 +78,7 @@ protected:
     void log_impl(LogLevel level, std::string_view prefix, std::string_view format_str, std::string_view tag,
                   const std::source_location &loc, std::tuple<TupleArgs...> &args_tuple, std::index_sequence<I...>)
     {
-        if (static_cast<int>(level) > static_cast<int>(m_min_level))
+        if (static_cast<int>(level) < static_cast<int>(m_min_level))
             return;
 
         // TODO: Add [DEBUG] flag to print crap when debugging
@@ -263,11 +263,11 @@ public:
         std::call_once(initFlag, [&]() {
             instance = new AppLogger(log_file_path);
 #ifdef APP_LOG_LEVEL_DEBUG
-            instance->SetLogLevel(LogLevel::Debug);
+            // instance->SetLogLevel(LogLevel::Debug);
 #elif defined(APP_LOG_LEVEL_INFO)
-            instance->SetLogLevel(LogLevel::Info);
+            // instance->SetLogLevel(LogLevel::Info);
 #else
-            instance->SetLogLevel(LogLevel::Warning);  // Default log level
+            // instance->SetLogLevel(LogLevel::Warning);  // Default log level
 #endif
         });
         return *instance;
