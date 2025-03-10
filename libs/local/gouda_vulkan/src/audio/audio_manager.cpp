@@ -2,6 +2,7 @@
 
 #include <algorithm> // for std::shuffle
 #include <stdexcept>
+#include <utility> // for std::exchange
 
 #include "AL/alext.h"
 #include "AL/efx-presets.h"
@@ -262,7 +263,7 @@ void AudioManager::StopCurrentTrack()
 void AudioManager::ShuffleRemainingTracks()
 {
     if (m_current_index < m_music_tracks.size()) {
-        std::shuffle(m_music_tracks.begin() + m_current_index, m_music_tracks.end(), GoudaVK::GetGlobalRNG());
+        std::shuffle(m_music_tracks.begin() + m_current_index, m_music_tracks.end(), Gouda::GetGlobalRNG());
     }
 
     ENGINE_LOG_DEBUG("Shuffled music queue with {} tracks", m_music_tracks.size());
