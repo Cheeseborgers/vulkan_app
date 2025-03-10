@@ -66,6 +66,7 @@ void Application::Init(const Gouda::WindowConfig &window_config)
 
     p_window = std::make_unique<Gouda::GLFW::Window>(window_config);
 
+    // TODO: Figure out how we are going to deal with Semvars and such here
     m_vk_core.Init(p_window->GetWindow(), window_config.title, {1, 3, 0, 0}, m_time_settings.vsync_mode);
 
     m_number_of_images = m_vk_core.GetNumberOfImages();

@@ -1,7 +1,6 @@
 #include "gouda_vk_shader.hpp"
 
-#include <assert.h>
-#include <memory>
+#include <ranges>
 #include <vector>
 
 #include <vulkan/vulkan.h>
@@ -11,11 +10,12 @@
 
 #include "logger.hpp"
 
+#include "core/types.hpp"
 #include "gouda_assert.hpp"
-#include "gouda_types.hpp"
-#include "gouda_utils.hpp"
+#include "gouda_throw.hpp"
 #include "gouda_vk_shader.hpp"
 #include "gouda_vk_utils.hpp"
+#include "utility/filesystem.hpp"
 
 namespace GoudaVK {
 
@@ -32,29 +32,13 @@ struct GlslProgramDeleter {
     void operator()(glslang_program_t *program) const { glslang_program_delete(program); }
 };
 
-// Helper function to print shader logs
-void PrintLog(const std::string &stage, const char *log, const char *debugLog)
-{
-    std::cerr << std::format("{} failed:\n{}\n{}", stage, log ? log : "", debugLog ? debugLog : "");
-}
-
-// TODO: Is there a better way in c++ for this?
-static void PrintShaderSource(const char *text)
+static void PrintShaderSource(std::string_view text)
 {
     int line{1};
 
-    std::printf("\n(%3i) ", line);
-
-    while (text && *text++) {
-        if (*text == '\n') {
-            std::printf("\n(%3i) ", ++line);
-        }
-        else if (*text == '\r') {
-            // nothing to do
-        }
-        else {
-            std::printf("%c", *text);
-        }
+    for (auto line_text : std::views::split(text, '\n')) {
+        std::printf("\n(%3i) ", line++);
+        std::cout << std::string_view{line_text.begin(), line_text.end()};
     }
 
     std::printf("\n");
@@ -82,18 +66,18 @@ static std::size_t CompileShader(VkDevice &device, glslang_stage_t stage, const 
     // Use smart pointers for automatic cleanup
     std::unique_ptr<glslang_shader_t, GlslShaderDeleter> shader{glslang_shader_create(&input)};
     if (!glslang_shader_preprocess(shader.get(), &input)) {
-        // TODO: Use logger for these and remove PrintLog
-        PrintLog("GLSL Preprocessing", glslang_shader_get_info_log(shader.get()),
-                 glslang_shader_get_info_debug_log(shader.get()));
+        ENGINE_LOG_ERROR("GLSL Preprocessing failed: info log: {}, debug log: {}",
+                         glslang_shader_get_info_log(shader.get()), glslang_shader_get_info_debug_log(shader.get()));
         PrintShaderSource(input.code);
+
         return 0;
     }
 
     if (!glslang_shader_parse(shader.get(), &input)) {
-        // TODO: Use logger for these and remove PrintLog
-        PrintLog("GLSL Parsing", glslang_shader_get_info_log(shader.get()),
-                 glslang_shader_get_info_debug_log(shader.get()));
+        ENGINE_LOG_ERROR("GLSL Parsing failed: info log: {}, debug log: {}", glslang_shader_get_info_log(shader.get()),
+                         glslang_shader_get_info_debug_log(shader.get()));
         PrintShaderSource(glslang_shader_get_preprocessed_code(shader.get()));
+
         return 0;
     }
 
@@ -101,9 +85,8 @@ static std::size_t CompileShader(VkDevice &device, glslang_stage_t stage, const 
     glslang_program_add_shader(program.get(), shader.get());
 
     if (!glslang_program_link(program.get(), GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT)) {
-        // TODO: Use logger for these and remove PrintLog
-        PrintLog("GLSL Linking", glslang_program_get_info_log(program.get()),
-                 glslang_program_get_info_debug_log(program.get()));
+        ENGINE_LOG_ERROR("GLSL Linking failed: info log: {}, debug log: {}", glslang_shader_get_info_log(shader.get()),
+                         glslang_shader_get_info_debug_log(shader.get()));
         return 0;
     }
 
@@ -161,22 +144,25 @@ static glslang_stage_t ShaderStageFromFilename(std::string_view file_name)
     }
 
     ENGINE_LOG_FATAL("Unknown shader stage in: {}", file_name);
-
-    // TODO: Handle this error and return better (use optional?)
-    exit(1);
+    ENGINE_THROW("Unknown shader stage in: {}", file_name);
 
     return GLSLANG_STAGE_VERTEX;
 }
 
 VkShaderModule CreateShaderModuleFromText(VkDevice device_ptr, std::string_view file_name)
 {
+    const std::string current_path{Gouda::FS::GetCurrentWorkingDirectory()};
     std::string shader_source;
-    const std::string current_path{GoudaUtils::GetCurrentWorkingDirectory()};
 
     ENGINE_LOG_INFO("Creating shader from text file: {}", file_name);
 
-    if (!GoudaUtils::ReadFile(file_name, shader_source)) {
-        ASSERT(false, "Failed to read shader file");
+    auto file_result = Gouda::FS::ReadFile(file_name);
+    if (file_result) {
+        shader_source = *file_result;
+    }
+    else {
+        ENGINE_LOG_ERROR("Failed to read shader from text file: {}", file_result.error());
+        ENGINE_THROW("Failed to read shader from text file");
     }
 
     glslang_initialize_process();
@@ -191,7 +177,7 @@ VkShaderModule CreateShaderModuleFromText(VkDevice device_ptr, std::string_view 
 
         // TODO: Check this saves in the correct place since we no longer save directly in build dir
         const std::string binary_filename{std::string(file_name) + ".spv"};
-        GoudaUtils::WriteBinaryFile(binary_filename, shader.m_SPIRV);
+        Gouda::FS::WriteBinaryFile(binary_filename, shader.m_SPIRV);
 
         ENGINE_LOG_INFO("Created SPIRV shader from text file: {}{} as {}{}.spv", current_path, file_name, current_path,
                         binary_filename);
@@ -204,24 +190,30 @@ VkShaderModule CreateShaderModuleFromText(VkDevice device_ptr, std::string_view 
 
 VkShaderModule CreateShaderModuleFromBinary(VkDevice device_ptr, std::string_view file_name)
 {
-    std::vector<char> shader_code{GoudaUtils::ReadBinaryFile(file_name)};
-
-    ASSERT(!shader_code.empty(), "Shader code cannot be empty when reading from binary: {}", file_name);
-
-    VkShaderModuleCreateInfo shader_create_info = {.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-                                                   .pNext = nullptr,
-                                                   .flags = 0,
-                                                   .codeSize = shader_code.size() * sizeof(char),
-                                                   .pCode = reinterpret_cast<const u32 *>(shader_code.data())};
-
     VkShaderModule shader_module{nullptr};
-    VkResult result{vkCreateShaderModule(device_ptr, &shader_create_info, nullptr, &shader_module)};
-    CHECK_VK_RESULT(result, "vkCreateShaderModule\n");
 
-    ASSERT(result == VK_SUCCESS, "Could not create shader from binary file: {}", file_name);
+    auto file_result = Gouda::FS::ReadBinaryFile(file_name);
+    if (file_result) {
+        std::vector<char> shader_code = *file_result;
 
-    // TODO: Remove logging?
-    ENGINE_LOG_INFO("Created shader from binary: {}", file_name);
+        ASSERT(!shader_code.empty(), "Shader code cannot be empty when reading from binary: {}", file_name);
+
+        VkShaderModuleCreateInfo shader_create_info = {.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                                                       .pNext = nullptr,
+                                                       .flags = 0,
+                                                       .codeSize = shader_code.size() * sizeof(char),
+                                                       .pCode = reinterpret_cast<const u32 *>(shader_code.data())};
+
+        VkResult result{vkCreateShaderModule(device_ptr, &shader_create_info, nullptr, &shader_module)};
+        CHECK_VK_RESULT(result, "vkCreateShaderModule\n");
+
+        ASSERT(result == VK_SUCCESS, "Could not create shader from binary file: {}", file_name);
+
+        ENGINE_LOG_DEBUG("Created shader from binary: {}", file_name);
+    }
+    else {
+        ENGINE_LOG_ERROR("Failed to read file when creating shader from binary: {}", file_name);
+    }
 
     return shader_module;
 }
