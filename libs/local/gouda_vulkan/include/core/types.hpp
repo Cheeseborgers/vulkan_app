@@ -38,10 +38,10 @@ using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
 using DateTime = std::chrono::system_clock::time_point;
 
 struct SemVer {
-    u32 major;
-    u32 minor;
-    u32 patch;
-    u32 variant; // Variant is typically 0 for Vulkan
+    u32 major{0};
+    u32 minor{0};
+    u32 patch{0};
+    u32 variant{0}; // Variant is typically 0 for Vulkan
 
     std::string ToString() const
     {
