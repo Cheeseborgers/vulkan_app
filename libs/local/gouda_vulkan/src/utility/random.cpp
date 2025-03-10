@@ -1,6 +1,7 @@
 #include "utility/random.hpp"
 
 #include <numeric> // For std::accumulate
+#include <random>
 
 namespace {
 
@@ -13,7 +14,7 @@ inline u32 GenerateSeed()
 
 } // end anonymous namespace
 
-namespace GoudaVK {
+namespace Gouda {
 
 BaseRNG::BaseRNG(u32 seed) : rng(seed) {}
 
@@ -65,4 +66,4 @@ ThreadSafeRNG &GetGlobalThreadSafeRNG()
     return rng;
 }
 
-} // end namespace GoudaVK
+} // namespace Gouda

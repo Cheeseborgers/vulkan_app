@@ -10,14 +10,12 @@
 #pragma once
 
 #include <mutex>
-#include <random>
 
-#include "gouda_types.hpp"
 #include "pcg_random.hpp"
 
-// TODO: Change namespace!!!
+#include "core/types.hpp"
 
-namespace GoudaVK {
+namespace Gouda {
 
 /// Define the RNG type (PCG 32-bit)
 using RNG = pcg32;
@@ -31,7 +29,7 @@ using RNG = pcg32;
  */
 class BaseRNG {
 public:
-    using result_type = uint32_t; ///< Type required for STL random operations
+    using result_type = u32; ///< Type required for STL random operations
 
 public:
     /**
@@ -135,4 +133,4 @@ BaseRNG &GetGlobalRNG();
  */
 ThreadSafeRNG &GetGlobalThreadSafeRNG();
 
-} // end namespace GoudaVK
+} // namespace Gouda
