@@ -16,6 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 #pragma once
 
+#include <expected>
 #include <string_view>
 
 // #include "backends/imgui_impl_glfw.h"
@@ -36,9 +37,10 @@
 // TODO: Think about how we are going to handle application exiting on errors
 // TODO: Implement image loading with 'gouda_image'
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
-enum class VSyncMode {
+enum class VSyncMode : u8 {
     DISABLED, // Uncapped FPS
     ENABLED,  // Standard V-Sync (reduces tearing, may cause input lag)
     MAILBOX   // Adaptive V-Sync (triple-buffering, minimizes lag & tearing)
@@ -51,7 +53,7 @@ public:
     ~VulkanCore();
 
     void Init(GLFWwindow *window_ptr, std::string_view app_name, SemVer vulkan_api_version = {1, 3, 0, 0},
-              VSyncMode v_sync = GoudaVK::VSyncMode::ENABLED);
+              VSyncMode v_sync = gouda::vk::VSyncMode::ENABLED);
 
     VkRenderPass CreateSimpleRenderPass();
 
@@ -75,22 +77,25 @@ public:
     int GetNumberOfImages() const { return static_cast<int>(m_images.size()); }
     const VkImage &GetImage(int index);
     VkDevice GetDevice() { return p_device->GetDevice(); }
-    void GetFramebufferSize(int &width, int &height) const;
+    void GetFramebufferSize(FrameBufferSize &size) const;
 
     void DestroySwapchain();
     void ReCreateSwapchain();
 
-    // TODO: Rethink this
     void DeviceWait() { p_device->Wait(); }
 
 private:
+    void CacheFrameBufferSize();
     void CreateSwapchain();
     void CreateSwapchainImageViews();
     void DestroySwapchainImageViews();
+    void CreateDepthResources();
+    void DestroyDepthResources();
     void CreateCommandBufferPool();
     AllocatedBuffer CreateUniformBuffer(size_t size);
 
-    u32 GetMemoryTypeIndex(u32 memory_type_bits, VkMemoryPropertyFlags required_memory_property_flags);
+    Expect<u32, std::string> GetMemoryTypeIndex(u32 memory_type_bits,
+                                                VkMemoryPropertyFlags required_memory_property_flags);
 
     void CopyBufferToBuffer(VkBuffer destination, VkBuffer source, VkDeviceSize size);
     AllocatedBuffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
@@ -100,6 +105,9 @@ private:
     void CreateImage(VulkanTexture &texture, ImageSize image_size, VkFormat texture_format, VkImageTiling image_tiling,
                      VkImageUsageFlags usage_flags, VkMemoryPropertyFlagBits memory_property_flags,
                      VkImageCreateFlags create_flags, u32 mip_levels);
+    void CreateTextureImage(VulkanTexture &texture, ImageSize size, VkFormat format, u32 mip_levels, u32 layer_count,
+                            VkImageCreateFlags create_flags, VkImageUsageFlags additional_usage_flags = 0);
+    void CreateDepthImage(VulkanTexture &texture, ImageSize size, VkFormat format);
     void UpdateTextureImage(VulkanTexture &texture, ImageSize image_size, VkFormat texture_format, u32 layer_count,
                             const void *pixels_ptr, VkImageLayout source_image_layout);
     void CopyBufferToImage(VkImage destination, VkBuffer source, ImageSize image_size, u32 layer_count);
@@ -111,6 +119,7 @@ private:
     void SubmitCopyCommand();
 
 private:
+    // TODO: Think about storing and updating the current framebuffer size;
     bool m_is_initialized;
     VSyncMode m_vsync_mode;
 
@@ -119,11 +128,14 @@ private:
 
     GLFWwindow *p_window;
 
+    FrameBufferSize m_frame_buffer_size;
+
     VkSurfaceFormatKHR m_swap_chain_surface_format;
     VkSwapchainKHR p_swap_chain;
 
     std::vector<VkImage> m_images;
     std::vector<VkImageView> m_image_views;
+    std::vector<VulkanTexture> m_depth_images;
 
     VkCommandPool p_command_buffer_pool;
     VulkanQueue m_queue;
@@ -131,4 +143,5 @@ private:
     VkCommandBuffer p_copy_command_buffer;
 };
 
-} // end GoudaVK namespace
+} // namespace vk
+} // namespace gouda

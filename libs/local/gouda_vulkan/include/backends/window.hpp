@@ -2,7 +2,7 @@
 
 #include "core/types.hpp"
 
-namespace Gouda {
+namespace gouda {
 
 /**
  * @class IWindow
@@ -58,4 +58,4 @@ public:
     virtual void SetVsync(bool enabled) = 0;
 };
 
-} // namespace Gouda
+} // namespace gouda

@@ -1,10 +1,10 @@
-#include "backends/glfw_window.hpp"
+#include "backends/glfw/window.hpp"
 
-#include "gouda_throw.hpp"
+#include "debug/debug.hpp"
 #include "logger.hpp"
 
-namespace Gouda {
-namespace GLFW {
+namespace gouda {
+namespace glfw {
 
 // GLFW Error callback
 static void error_callback(int error, const char *description)
@@ -19,11 +19,11 @@ static std::optional<std::string_view> detect_glfw_platform()
 
     // Using an unordered_map to map platform codes to platform strings
     static const std::unordered_map<int, std::string_view> platform_map{
-        {GLFW_PLATFORM_WAYLAND, Internal::Constants::Wayland},
-        {GLFW_PLATFORM_X11, Internal::Constants::X11},
-        {GLFW_PLATFORM_WIN32, Internal::Constants::Windows},
-        {GLFW_PLATFORM_COCOA, Internal::Constants::MacOS},
-        {GLFW_PLATFORM_NULL, Internal::Constants::Headless}};
+        {GLFW_PLATFORM_WAYLAND, internal::constants::Wayland},
+        {GLFW_PLATFORM_X11, internal::constants::X11},
+        {GLFW_PLATFORM_WIN32, internal::constants::Windows},
+        {GLFW_PLATFORM_COCOA, internal::constants::MacOS},
+        {GLFW_PLATFORM_NULL, internal::constants::Headless}};
 
     if (platform_map.find(platform) != platform_map.end()) {
         return platform_map.at(platform); // Return the mapped platform string
@@ -59,7 +59,7 @@ static void set_platform_hints(Platform platform)
     }
 }
 
-Window::Window(const WindowConfig &config) : p_window{nullptr}, m_window_config{config}
+Window::Window(const WindowConfig &config) : p_window{nullptr}
 {
     if (config.size.area() == 0) {
         ENGINE_THROW("Failed to initialize GLFW as window dimensions cannot be zero. Size: {}x{}", config.size.width,
@@ -156,9 +156,8 @@ void Window::Destroy()
     if (p_window) {
         glfwDestroyWindow(p_window);
         p_window = nullptr;
+        ENGINE_LOG_DEBUG("Window Destroyed");
     }
-
-    ENGINE_LOG_DEBUG("Window Destroyed");
 
     glfwTerminate();
 }
@@ -179,11 +178,12 @@ void Window::SetCallbacks(GLFWCallbacks *callbacks_ptr)
     glfwSetScrollCallback(p_window, &GLFWCallbacks::MouseScrollCallbackTrampoline);
     glfwSetWindowIconifyCallback(p_window, &GLFWCallbacks::WindowIconifyCallbackTrampoline);
     glfwSetFramebufferSizeCallback(p_window, &GLFWCallbacks::FramebufferResizedCallbackTrampoline);
+    glfwSetWindowSizeCallback(p_window, &GLFWCallbacks::WindowResizedCallbackTrampoline);
 }
 
 void Window::SetVsync(bool enabled)
 {
-    if (m_window_config.renderer == Renderer::OpenGL) {
+    if (m_renderer == Renderer::OpenGL) {
         if (enabled) {
             glfwSwapInterval(1); // Enable vsync for OpenGL
         }
@@ -191,7 +191,7 @@ void Window::SetVsync(bool enabled)
             glfwSwapInterval(0); // Disable vsync for OpenGL
         }
     }
-    else if (m_window_config.renderer == Renderer::Vulkan) {
+    else if (m_renderer == Renderer::Vulkan) {
         // For Vulkan, you'd typically need to adjust the swapchain's present mode.
         // You would need to recreate the swapchain if you're changing vsync settings in Vulkan.
 
@@ -227,5 +227,5 @@ FrameBufferSize Window::GetFramebufferSize() const
     return size;
 }
 
-} // namespace GLFW
-} // namespace Gouda
+} // namespace glfw
+} // namespace gouda

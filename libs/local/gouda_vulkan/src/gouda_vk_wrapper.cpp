@@ -1,10 +1,11 @@
 #include "gouda_vk_wrapper.hpp"
 
-#include "gouda_assert.hpp"
+#include "debug/assert.hpp"
 
 #include "gouda_vk_utils.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 void BeginCommandBuffer(VkCommandBuffer command_buffer_ptr, VkCommandBufferUsageFlags usage_flags)
 {
@@ -48,4 +49,5 @@ void CreateFence(VkDevice device, const VkFenceCreateInfo *create_info_ptr, cons
     ASSERT(result == VK_SUCCESS, "Failed to create fence");
 }
 
-} // end namespace
+} // namespace vk
+} // namespace gouda

@@ -1,23 +1,23 @@
 #include "backends/common.hpp"
 
-namespace Gouda {
+namespace gouda {
 
 std::string platform_to_string(Platform platform)
 {
     switch (platform) {
         case Platform::X11:
-            return Internal::Constants::X11;
+            return internal::constants::X11;
         case Platform::Wayland:
-            return Internal::Constants::Wayland;
+            return internal::constants::Wayland;
         case Platform::Windows:
-            return Internal::Constants::Windows;
+            return internal::constants::Windows;
         case Platform::Headless:
-            return Internal::Constants::Headless;
+            return internal::constants::Headless;
         case Platform::SystemDefault:
-            return Internal::Constants::SystemDefault;
+            return internal::constants::SystemDefault;
         default:
-            return Internal::Constants::Unknown; // We should never reach this
+            return internal::constants::Unknown; // We should never reach this
     }
 }
 
-} // namespace Gouda end
+} // namespace gouda end

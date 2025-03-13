@@ -5,7 +5,8 @@
 #include "core/types.hpp"
 #include "gouda_vk_core.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 struct SimpleMesh {
     AllocatedBuffer m_vertex_buffer;
@@ -17,4 +18,5 @@ struct SimpleMesh {
     void Destroy(VkDevice device_ptr);
 };
 
-} // end namespace
+} // namesapce vk
+} // namespace gouda

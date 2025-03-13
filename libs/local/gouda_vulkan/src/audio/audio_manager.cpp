@@ -7,13 +7,13 @@
 #include "AL/alext.h"
 #include "AL/efx-presets.h"
 
-#include "gouda_assert.hpp"
+#include "debug/assert.hpp"
 #include "logger.hpp"
 
-#include "utility/random.hpp"
+#include "math/random.hpp"
 
-namespace Gouda {
-namespace Audio {
+namespace gouda {
+namespace audio {
 
 AudioManager::AudioManager()
     : p_device{nullptr},
@@ -263,7 +263,7 @@ void AudioManager::StopCurrentTrack()
 void AudioManager::ShuffleRemainingTracks()
 {
     if (m_current_index < m_music_tracks.size()) {
-        std::shuffle(m_music_tracks.begin() + m_current_index, m_music_tracks.end(), Gouda::GetGlobalRNG());
+        std::shuffle(m_music_tracks.begin() + m_current_index, m_music_tracks.end(), math::GetGlobalRNG());
     }
 
     ENGINE_LOG_DEBUG("Shuffled music queue with {} tracks", m_music_tracks.size());
@@ -422,7 +422,7 @@ void AudioManager::SetListenerVelocity(const Vec3 &velocity)
 }
 
 // Private functions --------------------------------------------------------------------------
-void Audio::AudioManager::LoadAudioEffectFunctions()
+void AudioManager::LoadAudioEffectFunctions()
 {
 #define LOAD_PROC(T, x) ((x) = (T)alGetProcAddress(#x))
     LOAD_PROC(LPALGENEFFECTS, alGenEffects);
@@ -1052,5 +1052,5 @@ void AudioManager::PlayNextTrack()
     }
 }
 
-} // namespace Audio end
-} // namespace Gouda end
+} // namespace audio end
+} // namespace gouda end

@@ -58,14 +58,10 @@ add_subdirectory("libs/local/gouda_logger")
 # Include the Vulkan core stuff
 add_subdirectory("libs/local/gouda_vulkan")
 
-# glm (Suppress all warnings for GLM)
-add_subdirectory("libs/thirdparty/glm")
-
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(glm INTERFACE -w) # Suppress all warnings for GLM
-elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-    target_compile_options(glm INTERFACE /W0) # Suppress warnings for GLM in MSVC
-endif()
+# nlohmann_json
+add_subdirectory(libs/thirdparty/nlohmann_json)
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+set(JSON_Install OFF CACHE INTERNAL "")
 
 set(CMAKE_BINARY_DIR "${CMAKE_SOURCE_DIR}/build")
 
@@ -75,6 +71,8 @@ target_sources(${PROJECT_NAME}
     PRIVATE
     src/application.cpp
     src/main.cpp
+
+    src/core/settings_manager.cpp
 )
 
 # Include directories
@@ -82,23 +80,22 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE
 
     PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 
     # Local libs
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/local/gouda_vulkan>
 
     # Third party libs
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/glm>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/nlohmann_json>
 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
 target_link_libraries(${PROJECT_NAME}
     PUBLIC
-
     gouda_vulkan
     glfw
-    glm::glm
+    nlohmann_json::nlohmann_json
     Threads::Threads
 )
 

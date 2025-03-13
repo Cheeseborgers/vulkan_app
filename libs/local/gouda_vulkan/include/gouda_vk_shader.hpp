@@ -4,10 +4,12 @@
 
 #include <vulkan/vulkan.h>
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 VkShaderModule CreateShaderModuleFromBinary(VkDevice device_ptr, std::string_view file_name);
 
 VkShaderModule CreateShaderModuleFromText(VkDevice device_ptr, std::string_view file_name);
 
-} // end namespace
+} // namesapce vk
+} // namespace gouda

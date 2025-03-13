@@ -8,7 +8,8 @@
 
 #include "gouda_vk_utils.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 class VulkanInstance {
 public:
     VulkanInstance(std::string_view app_name, SemVer vulkan_api_version, GLFWwindow *window);
@@ -27,4 +28,6 @@ private:
     void CreateDebugCallback();
     void CreateSurface();
 };
-} // namespace GoudaVK
+
+} // namespace vk
+} // namespace gouda

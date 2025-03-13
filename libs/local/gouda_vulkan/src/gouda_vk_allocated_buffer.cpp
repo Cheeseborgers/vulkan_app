@@ -4,7 +4,8 @@
 
 #include "gouda_vk_utils.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 AllocatedBuffer::AllocatedBuffer() : p_buffer{nullptr}, p_memory{nullptr}, m_allocation_size{0} {}
 
@@ -29,4 +30,6 @@ void AllocatedBuffer::Destroy(VkDevice device_ptr)
         p_memory = VK_NULL_HANDLE;
     }
 }
-}
+
+} // namespace vk
+} // namespace gouda

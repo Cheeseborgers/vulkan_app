@@ -1,4 +1,3 @@
-// LoggerLib/include/Logger.hpp
 #pragma once
 
 #include <assert.h>
@@ -81,11 +80,9 @@ protected:
         if (static_cast<int>(level) < static_cast<int>(m_min_level))
             return;
 
-        // TODO: Add [DEBUG] flag to print crap when debugging
         std::string timestamp{get_timestamp()};
         static constexpr std::array<std::string_view, 5> level_strings = {"[DEBUG] ", "[INFO] ", "[WARNING] ",
                                                                           "[ERROR] ", "[FATAL] "};
-
         // Set and Ensure level is within bounds
         int level_index{static_cast<int>(level)};
         assert(level_index >= 0 && level_index < static_cast<int>(level_strings.size()));
@@ -103,7 +100,7 @@ protected:
 // TODO: Implement stacktraing for all platforms
 #ifdef __cpp_lib_stacktrace
         if (level == LogLevel::Fatal) {
-            stacktrace::print_stacktrace();
+            // stacktrace::print_stacktrace();
         }
 #endif
 

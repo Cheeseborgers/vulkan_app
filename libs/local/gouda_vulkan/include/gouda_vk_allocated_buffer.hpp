@@ -4,7 +4,8 @@
 
 #include <vulkan/vulkan.h>
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 class AllocatedBuffer {
 public:
@@ -19,4 +20,5 @@ public:
     void Destroy(VkDevice device_ptr);
 };
 
-} // end namespace
+} // namespace vk
+} // namespace gouda

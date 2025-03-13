@@ -7,19 +7,35 @@
 #include "core/types.hpp"
 #include "gouda_vk_instance.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 struct PhysicalDevice {
-    VkPhysicalDevice m_physical_device = VK_NULL_HANDLE;
-    VkPhysicalDeviceProperties m_device_properties{};
+    VkPhysicalDevice m_physical_device;
+    VkPhysicalDeviceProperties m_device_properties;
+    VkPhysicalDeviceMemoryProperties m_memory_properties;
+    VkPhysicalDeviceFeatures m_features;
+    VkSurfaceCapabilitiesKHR m_surface_capabilities;
+    VkFormat m_depth_format;
+
     std::vector<VkQueueFamilyProperties> m_queue_family_properties;
     std::vector<VkBool32> m_queue_supports_present;
     std::vector<VkSurfaceFormatKHR> m_surface_formats;
-    VkSurfaceCapabilitiesKHR m_surface_capabilties{};
-    VkPhysicalDeviceMemoryProperties m_memory_properties{};
     std::vector<VkPresentModeKHR> m_present_modes;
-    VkPhysicalDeviceFeatures m_features{};
-    VkFormat m_depth_format = VK_FORMAT_UNDEFINED;
+
+    PhysicalDevice()
+        : m_physical_device{VK_NULL_HANDLE},
+          m_device_properties{},
+          m_memory_properties{},
+          m_features{},
+          m_surface_capabilities{},
+          m_depth_format{VK_FORMAT_UNDEFINED},
+          m_queue_family_properties{},
+          m_queue_supports_present{},
+          m_surface_formats{},
+          m_present_modes{}
+    {
+    }
 };
 
 class VulkanPhysicalDevices {
@@ -55,4 +71,5 @@ private:
     void CreateDevice(VkQueueFlags required_queue_flags);
 };
 
-} // end namespace
+} // namespace vk
+} // namespace gouda

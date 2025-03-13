@@ -4,8 +4,8 @@
 
 #include "sndfile.h"
 
-namespace Gouda {
-namespace Audio {
+namespace gouda {
+namespace audio {
 
 /**
  * @class MusicTrack
@@ -59,10 +59,10 @@ public:
      *
      * This function opens the music track file, retrieves its audio properties, and prepares it for streaming.
      *
-     * @param filename The path to the music file to load.
+     * @param filepath The path to the music file to load.
      * @return True if the music track was loaded successfully, false otherwise.
      */
-    bool Load(std::string_view filename);
+    bool Load(std::string_view filepath);
 
     /**
      * @brief Reads a chunk of audio data for streaming.
@@ -82,7 +82,7 @@ public:
      *
      * @return The file handle (`SNDFILE *`) for the track.
      */
-    SNDFILE *GetFile() const { return m_file; }
+    SNDFILE *GetFile() const { return p_sndfile; }
 
     /**
      * @brief Gets the audio format for the track.
@@ -131,13 +131,13 @@ public:
     void SetFinished(bool finished) { m_finished = finished; }
 
 private:
-    SNDFILE *m_file;   ///< The file handle for the audio file.
-    SF_INFO m_sfinfo;  ///< Information structure containing the file's metadata (e.g., sample rate, channels).
-    ALenum m_format;   ///< The audio format used by OpenAL.
-    int m_sample_rate; ///< The sample rate of the audio track.
-    int m_channels;    ///< The number of channels (mono or stereo).
-    bool m_finished;   ///< Whether the track has finished playing or streaming.
+    SNDFILE *p_sndfile; ///< The file handle for the audio file.
+    SF_INFO m_sfinfo;   ///< Information structure containing the file's metadata (e.g., sample rate, channels).
+    ALenum m_format;    ///< The audio format used by OpenAL.
+    int m_sample_rate;  ///< The sample rate of the audio track.
+    int m_channels;     ///< The number of channels (mono or stereo).
+    bool m_finished;    ///< Whether the track has finished playing or streaming.
 };
 
-} // namespace Audio end
-} // namespace Gouda end
+} // namespace audio end
+} // namespace gouda end

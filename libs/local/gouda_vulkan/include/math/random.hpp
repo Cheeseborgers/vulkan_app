@@ -1,6 +1,6 @@
 /**
  * @file utility/random.hpp
- * @brief Random Number Generator (RNG) utilities for GoudaVK
+ * @brief Random Number Generator (RNG) utilities for gouda
  *
  * This file defines both a non-thread-safe and a thread-safe random number generator (RNG)
  * using the PCG (Permuted Congruential Generator) algorithm. These generators are compatible
@@ -15,17 +15,29 @@
 
 #include "core/types.hpp"
 
-namespace Gouda {
+namespace gouda {
+namespace math {
 
 /// Define the RNG type (PCG 32-bit)
 using RNG = pcg32;
 
 /**
- * @class BaseRNG
- * @brief Non-thread-safe RNG class.
+ * @brief Generates a random seed using multiple sources of entropy.
  *
- * This class provides a simple RNG implementation using the PCG algorithm.
- * It is compatible with STL functions like std::shuffle.
+ * @details This function collects random values from `std::random_device`
+ * and combines them using bitwise XOR.
+ *
+ * @return A 32-bit unsigned integer representing the generated seed.
+ */
+u32 GenerateSeed();
+
+/**
+ * @class BaseRNG
+ * @brief Non-thread-safe random number generator (RNG) class.
+ *
+ * @details This class provides a simple RNG implementation using the PCG (Permuted
+ * Congruential Generator) algorithm. It is designed to be lightweight and efficient
+ * but is **not thread-safe**. This RNG can be used with STL functions like `std::shuffle`.
  */
 class BaseRNG {
 public:
@@ -133,4 +145,5 @@ BaseRNG &GetGlobalRNG();
  */
 ThreadSafeRNG &GetGlobalThreadSafeRNG();
 
-} // namespace Gouda
+} // namespace math
+} // namespace gouda

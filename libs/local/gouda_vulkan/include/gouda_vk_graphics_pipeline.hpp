@@ -8,7 +8,8 @@
 
 #include "gouda_vk_simple_mesh.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 class GraphicsPipeline {
 public:
@@ -41,4 +42,5 @@ private:
     std::vector<VkDescriptorSet> m_descriptor_sets;
 };
 
-}
+} // namespace vk
+} // namespace gouda

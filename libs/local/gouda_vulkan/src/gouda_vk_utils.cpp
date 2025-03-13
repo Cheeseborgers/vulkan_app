@@ -5,8 +5,14 @@
 
 #include <vulkan/vulkan.h>
 
+#include "logger.hpp"
+
 #include "core/types.hpp"
+#include "debug/throw.hpp"
 #include "gouda_vk_utils.hpp"
+
+namespace gouda {
+namespace vk {
 
 void PrintVKExtensions()
 {
@@ -15,6 +21,7 @@ void PrintVKExtensions()
     std::vector<VkExtensionProperties> extensions(extension_count);
     vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, extensions.data());
 
+    // TODO: Figure how we are going to log this better
     std::cout << "Available vulkan extensions:\n";
 
     for (const auto &extension : extensions) {
@@ -22,9 +29,10 @@ void PrintVKExtensions()
     }
 }
 
-const char *GetDebugSeverityStr(VkDebugUtilsMessageSeverityFlagBitsEXT Severity)
+// TODO: Look into returning expected?
+const char *GetDebugSeverityStr(VkDebugUtilsMessageSeverityFlagBitsEXT severity)
 {
-    switch (Severity) {
+    switch (severity) {
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
             return "Verbose";
 
@@ -38,17 +46,16 @@ const char *GetDebugSeverityStr(VkDebugUtilsMessageSeverityFlagBitsEXT Severity)
             return "Error";
 
         default:
-            // Log error to console for now
-            std::fprintf(stderr, "Invalid severity code - %d\n", static_cast<int>(Severity));
-            exit(1); // Exit program or handle error appropriately
+            ENGINE_THROW("Invalid debug message severity code: {}.", static_cast<int>(severity));
     }
 
-    return "NO SUCH SEVERITY!";
+    return "No such severity!";
 }
 
-const char *GetDebugType(VkDebugUtilsMessageTypeFlagsEXT Type)
+// TODO: Look into returning expected?
+const char *GetDebugType(VkDebugUtilsMessageTypeFlagsEXT type)
 {
-    switch (Type) {
+    switch (type) {
         case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT:
             return "General";
 
@@ -62,15 +69,13 @@ const char *GetDebugType(VkDebugUtilsMessageTypeFlagsEXT Type)
             return "Device address binding";
 
         default:
-            // Log error to console for now
-            std::fprintf(stderr, "Invalid type code - %d\n", static_cast<int>(Type));
-            exit(1);
+            ENGINE_THROW("Invalid debug type code: {}.", static_cast<int>(type));
     }
 
-    return "NO SUCH TYPE!";
+    return "No such type!";
 }
 
-uint32_t GetBytesPerTexFormat(VkFormat Format)
+u32 GetBytesPerTexFormat(VkFormat Format)
 {
     switch (Format) {
         case VK_FORMAT_R8_SINT:
@@ -97,22 +102,24 @@ uint32_t GetBytesPerTexFormat(VkFormat Format)
     return 0;
 }
 
-VkFormat FindSupportedFormat(VkPhysicalDevice Device, const std::vector<VkFormat> &Candidates, VkImageTiling Tiling,
-                             VkFormatFeatureFlags Features)
+VkFormat FindSupportedFormat(VkPhysicalDevice device, const std::vector<VkFormat> &candidates, VkImageTiling tiling,
+                             VkFormatFeatureFlags features)
 {
-    for (int i = 0; i < Candidates.size(); i++) {
-        VkFormat Format = Candidates[i];
-        VkFormatProperties Props;
-        vkGetPhysicalDeviceFormatProperties(Device, Format, &Props);
+    for (const auto &format : candidates) {
+        VkFormatProperties format_properties{};
+        vkGetPhysicalDeviceFormatProperties(device, format, &format_properties);
 
-        if ((Tiling == VK_IMAGE_TILING_LINEAR) && (Props.linearTilingFeatures & Features) == Features) {
-            return Format;
+        if ((tiling == VK_IMAGE_TILING_LINEAR) && (format_properties.linearTilingFeatures & features) == features) {
+            return format;
         }
-        else if (Tiling == VK_IMAGE_TILING_OPTIMAL && (Props.optimalTilingFeatures & Features) == Features) {
-            return Format;
+        else if (tiling == VK_IMAGE_TILING_OPTIMAL &&
+                 (format_properties.optimalTilingFeatures & features) == features) {
+            return format;
         }
     }
 
-    printf("Failed to find supported format!\n");
-    exit(1);
+    ENGINE_THROW("Failed to find supported format!");
 }
+
+} // namespace vk
+} // namespace gouda

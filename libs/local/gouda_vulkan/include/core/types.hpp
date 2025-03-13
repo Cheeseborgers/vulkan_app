@@ -7,14 +7,21 @@
 #include <chrono>
 #include <concepts>
 #include <cstdint>
+#include <expected>
+#include <filesystem>
 #include <functional>
 #include <sstream>
 #include <string>
+
+// #include <glm/mat4x4.hpp> // For glm::mat4
+// #include <glm/vec3.hpp>   // For glm::vec3
+// #include <glm/vec4.hpp>   // For glm::vec4
 
 using uint = unsigned int;
 using ushort = unsigned short;
 using uchar = unsigned char;
 
+// Integer type definitions
 using u8 = uint8_t;
 using i8 = int8_t;
 using u16 = uint16_t;
@@ -24,9 +31,11 @@ using i32 = int32_t;
 using u64 = uint64_t;
 using i64 = int64_t;
 
+// Floating point types
 using f32 = float;
 using f64 = double;
 
+// Chrono types
 using HighResClock = std::chrono::high_resolution_clock;
 using SystemClock = std::chrono::system_clock;
 using SteadyClock = std::chrono::steady_clock;
@@ -36,6 +45,53 @@ using Milliseconds = std::chrono::milliseconds;
 using Seconds = std::chrono::seconds;
 using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
 using DateTime = std::chrono::system_clock::time_point;
+
+using FilePath = std::filesystem::path;
+
+template <typename A, typename B>
+using Expect = std::expected<A, B>;
+
+// TODO: This is for input do we keep here?
+using KeyCode = int16_t;
+
+template <typename... Args>
+using CallbackFunction = std::function<void(Args...)>;
+
+// GLM type definitions
+// using Vec2 = glm::vec2;
+// using Vec3 = glm::vec3;
+// using Vec4 = glm::vec4;
+// using Mat4 = glm::mat4;
+
+// const glm::mat4 IdentityMatrix = glm::mat4(1.0f);
+
+// Containers --------------------------------
+template <typename T>
+using Vector = std::vector<T>;
+
+template <typename T, std::size_t N>
+using Array = std::array<T, N>;
+
+/**
+ * @brief Concept that checks if a type is a floating-point type.
+ * @tparam T The type to check.
+ */
+template <typename T>
+concept FloatingPointT = std::is_floating_point_v<T>;
+
+/**
+ * @brief Concept that checks if a type is a integral type.
+ * @tparam T The type to check.
+ */
+template <typename T>
+concept IntegerT = std::is_integral_v<T>;
+
+/**
+ * @brief Concept that checks if a type is an integer or floating-point type.
+ * @tparam T The type to check.
+ */
+template <typename T>
+concept NumericT = std::integral<T> || std::floating_point<T>;
 
 struct SemVer {
     u32 major{0};
@@ -61,10 +117,7 @@ struct SemVer {
     }
 };
 
-template <typename T>
-concept NumericType = std::integral<T> || std::floating_point<T>;
-
-template <NumericType T>
+template <NumericT T>
 struct Dimensions {
     T width;
     T height;
@@ -81,10 +134,6 @@ struct Dimensions {
 
     std::string ToString() { return std::string(std::format("{}x{}", width, height)); }
 };
-
-template <typename... Args>
-using CallbackFunction = std::function<void(Args...)>;
-
 using FrameBufferSize = Dimensions<int>;
 using WindowSize = Dimensions<int>;
 using ImageSize = Dimensions<int>;

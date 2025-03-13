@@ -4,11 +4,12 @@
 
 #include "logger.hpp"
 
-#include "gouda_assert.hpp"
+#include "debug/assert.hpp"
 #include "gouda_vk_utils.hpp"
 #include "gouda_vk_wrapper.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 VulkanQueue::VulkanQueue()
     : p_device{VK_NULL_HANDLE}, p_swap_chain{nullptr}, p_queue{VK_NULL_HANDLE}, m_swapchain_valid{false}
@@ -48,6 +49,8 @@ void VulkanQueue::Destroy()
             p_render_complete_semaphores[i] = VK_NULL_HANDLE;
         }
     }
+
+    ENGINE_LOG_INFO("Queue destroyed.");
 }
 
 u32 VulkanQueue::AcquireNextImage(u32 frame_index)
@@ -138,4 +141,5 @@ void VulkanQueue::CreateSemaphores()
     }
 }
 
-} // end namespace
+} // namespace vk
+} // namespace gouda

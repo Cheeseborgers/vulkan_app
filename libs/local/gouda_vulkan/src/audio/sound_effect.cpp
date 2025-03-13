@@ -1,14 +1,17 @@
 #include "audio/sound_effect.hpp"
 
-#include <filesystem>
 #include <memory>
+#include <string_view>
+#include <unordered_set>
 
 #include <sndfile.h>
 
 #include "logger.hpp"
+#include "math/math.hpp"
+#include "utility/filesystem.hpp"
 
-namespace Gouda {
-namespace Audio {
+namespace gouda {
+namespace audio {
 
 SoundEffect::SoundEffect() : m_buffer{0}
 {
@@ -22,138 +25,138 @@ SoundEffect::SoundEffect(SoundEffect &&other) noexcept : m_buffer{other.m_buffer
 SoundEffect &SoundEffect::operator=(SoundEffect &&other) noexcept
 {
     if (this != &other) {
-        if (m_buffer)
+        // Free existing buffer
+        if (m_buffer) {
             alDeleteBuffers(1, &m_buffer);
+        }
+
+        // Move ownership
         m_buffer = other.m_buffer;
-        other.m_buffer = 0;
+        other.m_buffer = 0; // Reset other
     }
     return *this;
 }
 
-bool SoundEffect::Load(std::string_view filename)
+bool SoundEffect::Load(std::string_view filepath)
 {
-    ENGINE_LOG_INFO("Attempting to load sound effect: {}", filename);
+    ENGINE_LOG_DEBUG("Attempting to load sound effect: {}", filepath);
 
-    if (m_buffer) {
-        alDeleteBuffers(1, &m_buffer); // Clear any existing buffer
-        m_buffer = 0;
-    }
-
-    enum FormatType { Int16, Float };
-    FormatType sample_format{Int16};
-    ALenum format;
-    SF_INFO sfinfo;
-
-    // Ensure filename is valid
-    if (filename.empty()) {
+    if (filepath.empty()) {
         ENGINE_LOG_ERROR("Empty filename provided");
         return false;
     }
 
-    SNDFILE *sndfile = sf_open(filename.data(), SFM_READ, &sfinfo);
-    if (!sndfile) {
-        ENGINE_LOG_ERROR("Could not open audio in {}: {}", filename, sf_strerror(nullptr));
+    if (!IsValidAudioExtension(filepath)) {
+        ENGINE_LOG_ERROR("Unsupported audio type");
+        return false;
+    }
+
+    if (m_buffer) {
+        alDeleteBuffers(1, &m_buffer);
+        m_buffer = 0;
+    }
+
+    ALenum format;
+    SF_INFO sfinfo;
+    SNDFILE *p_sndfile{sf_open(filepath.data(), SFM_READ, &sfinfo)};
+    if (!p_sndfile) {
+        ENGINE_LOG_ERROR("Could not open audio in {}: {}", filepath, sf_strerror(nullptr));
         return false;
     }
 
     if (!alcGetCurrentContext()) {
         ENGINE_LOG_ERROR("No OpenAL context current before buffer creation");
-        sf_close(sndfile);
-        return false;
+        return HandleError(p_sndfile);
     }
 
     ENGINE_LOG_DEBUG("File info: frames={}, channels={}, samplerate={}, format={:x}", sfinfo.frames, sfinfo.channels,
                      sfinfo.samplerate, sfinfo.format);
 
     if (sfinfo.frames < 1) {
-        ENGINE_LOG_ERROR("Bad sample count in {} ({} frames)", filename, sfinfo.frames);
-        sf_close(sndfile);
-        return false;
+        ENGINE_LOG_ERROR("Bad sample count in {} ({} frames)", filepath, sfinfo.frames);
+        return HandleError(p_sndfile);
     }
 
     // Format detection
+    bool is_float_format = false;
     if ((sfinfo.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_16 ||
         (sfinfo.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_24 ||
         (sfinfo.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_32) {
-        sample_format = Int16;
+        // Int16 format
+        is_float_format = false;
     }
     else if ((sfinfo.format & SF_FORMAT_SUBMASK) == SF_FORMAT_FLOAT ||
              (sfinfo.format & SF_FORMAT_SUBMASK) == SF_FORMAT_OPUS ||
              (sfinfo.format & SF_FORMAT_SUBMASK) == SF_FORMAT_MPEG_LAYER_III) {
+        // Float format
         if (alIsExtensionPresent("AL_EXT_FLOAT32")) {
-            sample_format = Float;
+            is_float_format = true;
         }
         else {
             ENGINE_LOG_ERROR("Float format not supported by OpenAL (AL_EXT_FLOAT32 missing)");
-            sf_close(sndfile);
-            return false;
+            return HandleError(p_sndfile);
         }
     }
     else {
-        ENGINE_LOG_ERROR("Unsupported audio format in {}: {:x}", filename, sfinfo.format);
-        sf_close(sndfile);
-        return false;
+        ENGINE_LOG_ERROR("Unsupported audio format in {}: {:x}", filepath, sfinfo.format);
+        return HandleError(p_sndfile);
     }
 
+    // Determine the OpenAL format based on channels and sample format
     if (sfinfo.channels == 1) {
-        format = (sample_format == Int16) ? AL_FORMAT_MONO16 : AL_FORMAT_MONO_FLOAT32;
+        format = is_float_format ? AL_FORMAT_MONO_FLOAT32 : AL_FORMAT_MONO16;
     }
     else if (sfinfo.channels == 2) {
-        format = (sample_format == Int16) ? AL_FORMAT_STEREO16 : AL_FORMAT_STEREO_FLOAT32;
+        format = is_float_format ? AL_FORMAT_STEREO_FLOAT32 : AL_FORMAT_STEREO16;
     }
     else {
         ENGINE_LOG_ERROR("Unsupported channel count: {}", sfinfo.channels);
-        sf_close(sndfile);
-        return false;
+        return HandleError(p_sndfile);
     }
 
-    size_t sample_size{(sample_format == Int16) ? 2 : 4};
+    size_t sample_size{is_float_format ? 4 : 2};
     size_t alloc_size{static_cast<size_t>(sfinfo.frames) * sfinfo.channels * sample_size};
-    ENGINE_LOG_DEBUG("Allocating {} bytes for audio data", alloc_size);
+    ENGINE_LOG_DEBUG("Allocating {} bytes ({}kb) for audio data", alloc_size, math::bytes_to_kb(alloc_size));
 
     auto membuf{std::unique_ptr<void, void (*)(void *)>(malloc(alloc_size), free)};
     if (!membuf) {
         ENGINE_LOG_ERROR("Memory allocation failed for audio buffer (size: {})", alloc_size);
-        sf_close(sndfile);
-        return false;
+        return HandleError(p_sndfile);
     }
 
-    sf_count_t num_frames;
-    if (sample_format == Int16) {
-        ENGINE_LOG_DEBUG("Reading as Int16");
-        num_frames = sf_readf_short(sndfile, static_cast<short *>(membuf.get()), sfinfo.frames);
+    sf_count_t num_frames = 0;
+    if (is_float_format) {
+        num_frames = sf_readf_float(p_sndfile, static_cast<f32 *>(membuf.get()), sfinfo.frames);
     }
     else {
-        ENGINE_LOG_DEBUG("Reading as Float");
-        num_frames = sf_readf_float(sndfile, static_cast<float *>(membuf.get()), sfinfo.frames);
+        num_frames = sf_readf_short(p_sndfile, static_cast<short *>(membuf.get()), sfinfo.frames);
     }
 
     if (num_frames < 1) {
-        ENGINE_LOG_ERROR("Failed to read samples in {} ({} frames returned)", filename, num_frames);
-        sf_close(sndfile);
-        return false;
+        ENGINE_LOG_ERROR("Failed to read samples in {} ({} frames returned)", filepath, num_frames);
+        return HandleError(p_sndfile);
     }
 
-    ALsizei num_bytes{static_cast<ALsizei>(num_frames * sfinfo.channels * sample_size)};
-    ENGINE_LOG_DEBUG("Read {} frames, {} bytes", num_frames, num_bytes);
+    ALsizei num_bytes = static_cast<ALsizei>(num_frames * sfinfo.channels * sample_size);
+    ENGINE_LOG_DEBUG("Read {} frames, {} bytes ({}kb)", num_frames, num_bytes, math::bytes_to_kb(num_bytes));
 
     alGenBuffers(1, &m_buffer);
     alBufferData(m_buffer, format, membuf.get(), num_bytes, sfinfo.samplerate);
 
-    ALenum err = alGetError();
-    if (err != AL_NO_ERROR) {
-        ENGINE_LOG_ERROR("OpenAL Error: {}", alGetString(err));
+    ALenum result{alGetError()};
+    if (result != AL_NO_ERROR) {
+        ENGINE_LOG_ERROR("OpenAL Error: {}", alGetString(result));
         alDeleteBuffers(1, &m_buffer);
         m_buffer = 0;
     }
     else {
-        ENGINE_LOG_INFO("Created sound effect from: {}, format: {}", filename, FormatName(format));
+        ENGINE_LOG_DEBUG("Created sound effect from: {}, format: {}", filepath, FormatName(format));
     }
 
-    sf_close(sndfile);
+    sf_close(p_sndfile);
 
     return true;
 }
 
-} // namespace Audio end
-} // namespace Gouda end
+} // namespace audio end
+} // namespace gouda end

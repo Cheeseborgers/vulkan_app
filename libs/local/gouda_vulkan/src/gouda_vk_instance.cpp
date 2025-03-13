@@ -1,9 +1,10 @@
 #include "gouda_vk_instance.hpp"
 
-#include "gouda_throw.hpp"
+#include "debug/throw.hpp"
 #include "logger.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
                                                     VkDebugUtilsMessageTypeFlagsEXT type,
@@ -147,4 +148,5 @@ void VulkanInstance::CreateSurface()
     ENGINE_LOG_INFO("Surface created");
 }
 
-} // namespace GoudaVK
+} // namespace vk
+} // namespace gouda

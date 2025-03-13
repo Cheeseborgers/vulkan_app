@@ -6,7 +6,8 @@
 
 #include "core/types.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 class VulkanQueue {
 
@@ -47,4 +48,5 @@ private:
     std::atomic<bool> m_swapchain_valid;
 };
 
-} // end namespace
+} // namesapce vk
+} // namespace gouda

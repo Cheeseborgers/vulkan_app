@@ -15,8 +15,8 @@
 // TODO: Move each audio effect init logic to own seperate functions?
 // TODO: Add comments to the rest of functions and members in this file
 
-namespace Gouda {
-namespace Audio {
+namespace gouda {
+namespace audio {
 
 /**
  * @brief Represents a 3D vector used for sound positioning.
@@ -333,5 +333,5 @@ private:
     bool m_effects_pointers_loaded;
 };
 
-} // namespace Audio end
-} // namespace Gouda end
+} // namespace audio end
+} // namespace gouda end

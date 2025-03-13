@@ -4,17 +4,17 @@
 #include <sstream>
 #include <vector>
 
-#include "gouda_throw.hpp"
 #include "logger.hpp"
 
-#include "gouda_assert.hpp"
-
+#include "debug/debug.hpp"
+#include "math/math.hpp"
 #include "utility/image.hpp"
 
 #include "gouda_vk_utils.hpp"
 #include "gouda_vk_wrapper.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 VulkanCore::VulkanCore()
     : m_is_initialized{false},
@@ -22,6 +22,7 @@ VulkanCore::VulkanCore()
       p_instance{nullptr},
       p_device{nullptr},
       p_window{nullptr},
+      m_frame_buffer_size{0, 0},
       m_swap_chain_surface_format{},
       p_swap_chain{VK_NULL_HANDLE},
       p_command_buffer_pool{VK_NULL_HANDLE},
@@ -34,54 +35,52 @@ VulkanCore::~VulkanCore()
 {
     if (m_is_initialized) {
 
-        ENGINE_LOG_INFO("Cleaning up Vulkan");
+        ENGINE_LOG_INFO("Cleaning up Vulkan.");
 
         // Destroy in this order!!!
         vkFreeCommandBuffers(p_device->GetDevice(), p_command_buffer_pool, 1, &p_copy_command_buffer);
-        ENGINE_LOG_INFO("Command buffers destroyed");
+        ENGINE_LOG_INFO("Command buffers destroyed.");
 
         vkDestroyCommandPool(p_device->GetDevice(), p_command_buffer_pool, nullptr);
-        ENGINE_LOG_INFO("Command pool destroyed");
+        ENGINE_LOG_INFO("Command pool destroyed.");
 
         m_queue.Destroy();
-        ENGINE_LOG_INFO("Queue buffer destroyed");
 
-        for (auto image_view : m_image_views) {
-            vkDestroyImageView(p_device->GetDevice(), image_view, nullptr);
-        }
-
-        m_image_views.clear();
-
-        vkDestroySwapchainKHR(p_device->GetDevice(), p_swap_chain, nullptr);
-
-        ENGINE_LOG_INFO("Swapchain destroyed");
+        DestroySwapchainImageViews();
+        DestroyDepthResources();
+        DestroySwapchain();
     }
 }
 
 void VulkanCore::Init(GLFWwindow *window_ptr, std::string_view app_name, SemVer vulkan_api_version,
                       VSyncMode vsync_mode)
 {
-    ASSERT(window_ptr, "Window pointer cannot be null");
+    ASSERT(window_ptr, "Window pointer cannot be null.");
 
     p_window = window_ptr;
     m_vsync_mode = vsync_mode;
 
+    // Firstly query and cache the current frame buffer size for further initialization
+    CacheFrameBufferSize();
+
     p_instance = std::make_unique<VulkanInstance>(app_name, vulkan_api_version, p_window);
-    ENGINE_LOG_INFO("VulkanInstance initialized");
+    ENGINE_LOG_DEBUG("VulkanInstance initialized.");
 
     p_device = std::make_unique<VulkanDevice>(*p_instance, VK_QUEUE_GRAPHICS_BIT);
-    ENGINE_LOG_INFO("VulkanDevice initialized");
+    ENGINE_LOG_DEBUG("VulkanDevice initialized.");
 
     CreateSwapchain();
     CreateSwapchainImageViews();
-
     CreateCommandBufferPool();
+    CreateCommandBuffers(1, &p_copy_command_buffer);
 
     m_queue.Init(p_device->GetDevice(), &p_swap_chain, p_device->GetQueueFamily(), 0);
 
-    CreateCommandBuffers(1, &p_copy_command_buffer);
+    CreateDepthResources();
 
     m_is_initialized = true;
+
+    ENGINE_LOG_DEBUG("VulkanCore initialized.");
 }
 
 VkRenderPass VulkanCore::CreateSimpleRenderPass()
@@ -100,6 +99,21 @@ VkRenderPass VulkanCore::CreateSimpleRenderPass()
     VkAttachmentReference colour_attachment_reference = {.attachment = 0,
                                                          .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
 
+    VkFormat depth_format{p_device->GetSelectedPhysicalDevice().m_depth_format};
+
+    VkAttachmentDescription depth_attachment_description{};
+    depth_attachment_description.format = depth_format;
+    depth_attachment_description.samples = VK_SAMPLE_COUNT_1_BIT;
+    depth_attachment_description.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depth_attachment_description.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment_description.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depth_attachment_description.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment_description.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depth_attachment_description.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depth_attachment_reference = {.attachment = 1,
+                                                        .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+
     VkSubpassDescription subpass_description{};
     subpass_description.flags = 0;
     subpass_description.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -108,16 +122,20 @@ VkRenderPass VulkanCore::CreateSimpleRenderPass()
     subpass_description.colorAttachmentCount = 1;
     subpass_description.pColorAttachments = &colour_attachment_reference;
     subpass_description.pResolveAttachments = nullptr;
-    subpass_description.pDepthStencilAttachment = nullptr;
+    subpass_description.pDepthStencilAttachment = &depth_attachment_reference;
     subpass_description.preserveAttachmentCount = 0;
     subpass_description.pPreserveAttachments = nullptr;
+
+    std::vector<VkAttachmentDescription> attachment_descriptions;
+    attachment_descriptions.push_back(colour_attachment_description);
+    attachment_descriptions.push_back(depth_attachment_description);
 
     VkRenderPassCreateInfo render_pass_create_info{};
     render_pass_create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     render_pass_create_info.pNext = nullptr;
     render_pass_create_info.flags = 0;
-    render_pass_create_info.attachmentCount = 1;
-    render_pass_create_info.pAttachments = &colour_attachment_description;
+    render_pass_create_info.attachmentCount = static_cast<u32>(attachment_descriptions.size());
+    render_pass_create_info.pAttachments = attachment_descriptions.data();
     render_pass_create_info.subpassCount = 1;
     render_pass_create_info.pSubpasses = &subpass_description;
     render_pass_create_info.dependencyCount = 0;
@@ -128,7 +146,7 @@ VkRenderPass VulkanCore::CreateSimpleRenderPass()
     VkResult result{vkCreateRenderPass(p_device->GetDevice(), &render_pass_create_info, nullptr, &render_pass)};
     CHECK_VK_RESULT(result, "vkCreateRenderPass\n");
 
-    ENGINE_LOG_INFO("Simple render pass created");
+    ENGINE_LOG_DEBUG("Simple render pass created.");
 
     return render_pass;
 }
@@ -139,26 +157,25 @@ std::vector<VkFramebuffer> VulkanCore::CreateFramebuffers(VkRenderPass render_pa
     std::vector<VkFramebuffer> frame_buffers;
     frame_buffers.resize(m_images.size());
 
-    // Retrieve the dimensions of the framebuffer
-    FrameBufferSize frame_buffer_size;
-    GetFramebufferSize(frame_buffer_size.width, frame_buffer_size.height);
-
-    ENGINE_LOG_INFO("Framebuffer size retrieved: {}x{}", frame_buffer_size.width, frame_buffer_size.height);
+    ENGINE_LOG_INFO("Framebuffer size retrieved: {}x{}.", m_frame_buffer_size.width, m_frame_buffer_size.height);
 
     // Ensure the framebuffer size is valid (non-zero area)
-    ASSERT(frame_buffer_size.area() > 0, "Framebuffer dimensions cannot be zero");
+    ASSERT(m_frame_buffer_size.area() > 0, "Framebuffer dimensions cannot be zero.");
 
     // Loop through each image in the swapchain to create a framebuffer
     for (uint i = 0; i < m_images.size(); i++) {
+        std::vector<VkImageView> attachments;
+        attachments.emplace_back(m_image_views[i]);
+        attachments.emplace_back(m_depth_images[i].p_view);
 
         // Define framebuffer creation settings
         VkFramebufferCreateInfo frame_buffer_create_info{};
         frame_buffer_create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        frame_buffer_create_info.renderPass = render_pass_ptr;     // Attach to the given render pass
-        frame_buffer_create_info.attachmentCount = 1;              // Single image attachment
-        frame_buffer_create_info.pAttachments = &m_image_views[i]; // Attach the corresponding image view
-        frame_buffer_create_info.width = static_cast<u32>(frame_buffer_size.width);   // Set framebuffer width
-        frame_buffer_create_info.height = static_cast<u32>(frame_buffer_size.height); // Set framebuffer height
+        frame_buffer_create_info.renderPass = render_pass_ptr; // Attach to the given render pass
+        frame_buffer_create_info.attachmentCount = static_cast<u32>(attachments.size());
+        frame_buffer_create_info.pAttachments = attachments.data();
+        frame_buffer_create_info.width = static_cast<u32>(m_frame_buffer_size.width);   // Set framebuffer width
+        frame_buffer_create_info.height = static_cast<u32>(m_frame_buffer_size.height); // Set framebuffer height
         frame_buffer_create_info.layers = 1;
 
         // Create the framebuffer and check for errors
@@ -167,7 +184,7 @@ std::vector<VkFramebuffer> VulkanCore::CreateFramebuffers(VkRenderPass render_pa
         CHECK_VK_RESULT(result, "vkCreateFramebuffer\n");
     }
 
-    ENGINE_LOG_INFO("Framebuffers created");
+    ENGINE_LOG_INFO("Framebuffers created.");
 
     return frame_buffers;
 }
@@ -180,7 +197,7 @@ void VulkanCore::DestroyFramebuffers(std::vector<VkFramebuffer> &frame_buffers)
 
     frame_buffers.clear();
 
-    ENGINE_LOG_INFO("Framebuffers destroyed");
+    ENGINE_LOG_INFO("Framebuffers destroyed.");
 }
 
 void VulkanCore::CreateCommandBuffers(u32 count, VkCommandBuffer *command_buffers_ptr)
@@ -195,7 +212,7 @@ void VulkanCore::CreateCommandBuffers(u32 count, VkCommandBuffer *command_buffer
         vkAllocateCommandBuffers(p_device->GetDevice(), &command_buffer_allocation_info, command_buffers_ptr)};
     CHECK_VK_RESULT(result, "vkAllocateCommandBuffers\n");
 
-    ENGINE_LOG_INFO("Command buffer(s) created: {}", count);
+    ENGINE_LOG_INFO("Command buffer(s) created: {}.", count);
 }
 
 void VulkanCore::FreeCommandBuffers(u32 count, const VkCommandBuffer *command_buffers_ptr)
@@ -203,7 +220,7 @@ void VulkanCore::FreeCommandBuffers(u32 count, const VkCommandBuffer *command_bu
     m_queue.WaitIdle();
     vkFreeCommandBuffers(p_device->GetDevice(), p_command_buffer_pool, count, command_buffers_ptr);
 
-    ENGINE_LOG_INFO("Command buffer(s) freed: {}", count);
+    ENGINE_LOG_INFO("Command buffer(s) freed: {}.", count);
 }
 
 AllocatedBuffer VulkanCore::CreateVertexBuffer(const void *vertices_ptr, size_t size)
@@ -264,23 +281,26 @@ std::vector<AllocatedBuffer> VulkanCore::CreateUniformBuffers(size_t data_size)
 VkImageView CreateImageView(VkDevice device_ptr, VkImage image_ptr, VkFormat format, VkImageAspectFlags aspect_flags,
                             VkImageViewType view_type, u32 layer_count, u32 mip_levels)
 {
-    VkImageViewCreateInfo view_info{.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                                    .pNext = nullptr,
-                                    .flags = 0,
-                                    .image = image_ptr,
-                                    .viewType = view_type,
-                                    .format = format,
-                                    .components = {.r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                   .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                   .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                   .a = VK_COMPONENT_SWIZZLE_IDENTITY},
-                                    .subresourceRange = {.aspectMask = aspect_flags,
-                                                         .baseMipLevel = 0,
-                                                         .levelCount = mip_levels,
-                                                         .baseArrayLayer = 0,
-                                                         .layerCount = layer_count}};
+    VkImageViewCreateInfo view_info{};
+    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.pNext = nullptr;
+    view_info.flags = 0;
+    view_info.image = image_ptr;
+    view_info.viewType = view_type;
+    view_info.format = format;
 
-    VkImageView image_view;
+    view_info.components = {.r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                            .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                            .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                            .a = VK_COMPONENT_SWIZZLE_IDENTITY},
+
+    view_info.subresourceRange = {.aspectMask = aspect_flags,
+                                  .baseMipLevel = 0,
+                                  .levelCount = mip_levels,
+                                  .baseArrayLayer = 0,
+                                  .layerCount = layer_count};
+
+    VkImageView image_view{VK_NULL_HANDLE};
     VkResult result{vkCreateImageView(device_ptr, &view_info, nullptr, &image_view)};
     CHECK_VK_RESULT(result, "vkCreateImageView");
 
@@ -292,8 +312,8 @@ void VulkanCore::CreateTexture(std::string_view file_name, VulkanTexture &textur
     StbiImage image(file_name);
 
     if (!image.GetData()) {
-        ENGINE_LOG_ERROR("Error loading texture from: {}", file_name);
-        ENGINE_THROW("Could not load texture image");
+        ENGINE_LOG_ERROR("Error loading texture from: {}.", file_name);
+        ENGINE_THROW("Could not load texture image.");
     }
 
     u32 layer_count{1};
@@ -303,9 +323,9 @@ void VulkanCore::CreateTexture(std::string_view file_name, VulkanTexture &textur
 
     image.free();
 
-    VkImageViewType image_view_type = VK_IMAGE_VIEW_TYPE_2D;
-    VkImageAspectFlags image_aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;
     u32 mip_levels{1};
+    VkImageViewType image_view_type{VK_IMAGE_VIEW_TYPE_2D};
+    VkImageAspectFlags image_aspect_flags{VK_IMAGE_ASPECT_COLOR_BIT};
 
     texture.p_view = CreateImageView(p_device->GetDevice(), texture.p_image, format, image_aspect_flags,
                                      image_view_type, layer_count, mip_levels);
@@ -316,20 +336,20 @@ void VulkanCore::CreateTexture(std::string_view file_name, VulkanTexture &textur
 
     texture.p_sampler = CreateTextureSampler(p_device->GetDevice(), min_filter, max_filter, address_mode);
 
-    ENGINE_LOG_INFO("Created texture from: {}", file_name);
+    ENGINE_LOG_INFO("Created texture from: '{}'.", file_name);
 }
 
 const VkImage &VulkanCore::GetImage(int index)
 {
     if (static_cast<size_t>(index) >= m_images.size()) {
-        ENGINE_LOG_FATAL("Invalid image index: {}", index);
+        ENGINE_LOG_FATAL("Invalid image index: {}.", index);
         ENGINE_THROW("Invalid image index!");
     }
 
     return m_images[static_cast<size_t>(index)];
 }
 
-void VulkanCore::GetFramebufferSize(int &width, int &height) const { glfwGetWindowSize(p_window, &width, &height); }
+void VulkanCore::GetFramebufferSize(FrameBufferSize &size) const { size = m_frame_buffer_size; }
 
 // Private -----------------------------------------------------------------------------------------------------------
 
@@ -389,9 +409,28 @@ static VkSurfaceFormatKHR ChooseSurfaceFormatAndColorSpace(const std::vector<VkS
     return surface_formats[0];
 }
 
+static VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities, FrameBufferSize framebuffer_size)
+{
+    if (capabilities.currentExtent.width != math::max_value<u32>()) {
+        return capabilities.currentExtent; // Vulkan mandates this
+    }
+
+    VkExtent2D extent{math::clamp(static_cast<u32>(framebuffer_size.width), capabilities.minImageExtent.width,
+                                  capabilities.maxImageExtent.width),
+                      math::clamp(static_cast<u32>(framebuffer_size.height), capabilities.minImageExtent.height,
+                                  capabilities.maxImageExtent.height)};
+
+    return extent;
+}
+
+void VulkanCore::CacheFrameBufferSize()
+{
+    glfwGetWindowSize(p_window, &m_frame_buffer_size.width, &m_frame_buffer_size.height);
+}
+
 void VulkanCore::CreateSwapchain()
 {
-    const VkSurfaceCapabilitiesKHR &surface_capabiltities{p_device->GetSelectedPhysicalDevice().m_surface_capabilties};
+    const VkSurfaceCapabilitiesKHR &surface_capabiltities{p_device->GetSelectedPhysicalDevice().m_surface_capabilities};
 
     const u32 number_of_images{ChooseNumImages(surface_capabiltities)};
 
@@ -401,28 +440,21 @@ void VulkanCore::CreateSwapchain()
     m_swap_chain_surface_format =
         ChooseSurfaceFormatAndColorSpace(p_device->GetSelectedPhysicalDevice().m_surface_formats);
 
-    FrameBufferSize framebuffer_size;
-    GetFramebufferSize(framebuffer_size.width, framebuffer_size.height);
-
     // Log the capabilities for debugging
-    ENGINE_LOG_INFO("Surface capabilities: currentExtent = {}x{}, minImageExtent = {}x{}, maxImageExtent = {}x{}",
-                    surface_capabiltities.currentExtent.width, surface_capabiltities.currentExtent.height,
-                    surface_capabiltities.minImageExtent.width, surface_capabiltities.minImageExtent.height,
-                    surface_capabiltities.maxImageExtent.width, surface_capabiltities.maxImageExtent.height);
+    ENGINE_LOG_DEBUG("Surface capabilities: currentExtent = {}x{}, minImageExtent = {}x{}, maxImageExtent = {}x{}.",
+                     surface_capabiltities.currentExtent.width, surface_capabiltities.currentExtent.height,
+                     surface_capabiltities.minImageExtent.width, surface_capabiltities.minImageExtent.height,
+                     surface_capabiltities.maxImageExtent.width, surface_capabiltities.maxImageExtent.height);
 
     // Choose an appropriate extent
-    VkExtent2D extent;
-    if (surface_capabiltities.currentExtent.width != UINT32_MAX) {
-        // If currentExtent is valid, use it (some platforms mandate this)
-        extent = surface_capabiltities.currentExtent;
-    }
+    VkExtent2D extent{ChooseSwapExtent(surface_capabiltities, m_frame_buffer_size)};
 
-    ENGINE_LOG_INFO("Selected swapchain extent: {}x{}", extent.width, extent.height);
+    ENGINE_LOG_DEBUG("Selected swapchain extent: {}x{}.", extent.width, extent.height);
 
     // FIXME: This is unsafe. store in swapchain ish when we refactor it
     u32 queue_family_index{p_device->GetQueueFamily()};
 
-    VkSwapchainCreateInfoKHR swap_chain_create_info = {
+    VkSwapchainCreateInfoKHR swap_chain_create_info{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .pNext = nullptr,
         .flags = 0,
@@ -445,10 +477,10 @@ void VulkanCore::CreateSwapchain()
     VkResult result{vkCreateSwapchainKHR(p_device->GetDevice(), &swap_chain_create_info, nullptr, &p_swap_chain)};
     CHECK_VK_RESULT(result, "vkCreateSwapchainKHR\n");
 
-    ENGINE_LOG_INFO("Swap chain created with V-Sync mode: {}", (m_vsync_mode == VSyncMode::ENABLED) ? "ENABLED (FIFO)"
-                                                               : (m_vsync_mode == VSyncMode::MAILBOX)
-                                                                   ? "DISABLED (MAILBOX)"
-                                                                   : "DISABLED (IMMEDIATE)");
+    ENGINE_LOG_DEBUG("Swap chain created with V-Sync mode: {}.", (m_vsync_mode == VSyncMode::ENABLED) ? "ENABLED (FIFO)"
+                                                                 : (m_vsync_mode == VSyncMode::MAILBOX)
+                                                                     ? "DISABLED (MAILBOX)"
+                                                                     : "DISABLED (IMMEDIATE)");
 }
 
 void VulkanCore::CreateSwapchainImageViews()
@@ -458,14 +490,14 @@ void VulkanCore::CreateSwapchainImageViews()
         vkGetSwapchainImagesKHR(p_device->GetDevice(), p_swap_chain, &number_of_swap_chain_images, nullptr)};
     CHECK_VK_RESULT(result, "vkGetSwapchainImagesKHR\n");
 
-    const VkSurfaceCapabilitiesKHR &surface_capabiltities{p_device->GetSelectedPhysicalDevice().m_surface_capabilties};
+    const VkSurfaceCapabilitiesKHR &surface_capabiltities{p_device->GetSelectedPhysicalDevice().m_surface_capabilities};
 
     const u32 number_of_images{ChooseNumImages(surface_capabiltities)};
 
     ASSERT(number_of_images == number_of_swap_chain_images,
-           "Number of images is not equal to the number of swap chain images");
+           "Number of images is not equal to the number of swap chain images.");
 
-    ENGINE_LOG_INFO("Created {} swap chain images", number_of_swap_chain_images);
+    ENGINE_LOG_INFO("Created {} swap chain images.", number_of_swap_chain_images);
 
     m_images.resize(number_of_swap_chain_images);
     m_image_views.resize(number_of_swap_chain_images);
@@ -493,27 +525,28 @@ void VulkanCore::CreateCommandBufferPool()
         vkCreateCommandPool(p_device->GetDevice(), &command_pool_create_info, nullptr, &p_command_buffer_pool)};
     CHECK_VK_RESULT(result, "vkCreateCommandPool\n");
 
-    ENGINE_LOG_INFO("Command buffer pool created");
+    ENGINE_LOG_INFO("Command buffer pool created.");
 }
 
-u32 VulkanCore::GetMemoryTypeIndex(u32 memory_type_bits, VkMemoryPropertyFlags required_memory_property_flags)
+Expect<u32, std::string> VulkanCore::GetMemoryTypeIndex(u32 memory_type_bits,
+                                                        VkMemoryPropertyFlags required_memory_property_flags)
 {
-    // FIXME: Sort logging and program exit here
     const VkPhysicalDeviceMemoryProperties &memory_properties{
         p_device->GetSelectedPhysicalDevice().m_memory_properties};
 
     for (uint i = 0; i < memory_properties.memoryTypeCount; i++) {
         if ((memory_type_bits & (1 << i)) && ((memory_properties.memoryTypes[i].propertyFlags &
                                                required_memory_property_flags) == required_memory_property_flags)) {
-            return i;
+            return i; // Found a valid memory type, return it.
         }
     }
 
-    ENGINE_LOG_FATAL("Cannot find memory type for type: {}, requested memory properties: {}", memory_type_bits,
-                     required_memory_property_flags);
-    exit(1);
-    return 0; // TODO: handle this better than returing 0 as it exits the application before. maybe return
-              // std::optional
+    std::string error_msg = "Cannot find memory type for type: " + std::to_string(memory_type_bits) +
+                            ", requested memory properties: " + std::to_string(required_memory_property_flags);
+
+    ENGINE_LOG_ERROR("{}", error_msg);
+
+    return std::unexpected(error_msg); // Return error message.
 }
 
 void VulkanCore::CopyBufferToBuffer(VkBuffer destination, VkBuffer source, VkDeviceSize size)
@@ -530,8 +563,7 @@ void VulkanCore::CopyBufferToBuffer(VkBuffer destination, VkBuffer source, VkDev
     SubmitCopyCommand();
 }
 
-AllocatedBuffer GoudaVK::VulkanCore::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                                                  VkMemoryPropertyFlags properties)
+AllocatedBuffer VulkanCore::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties)
 {
     VkBufferCreateInfo vertex_buffer_create_info{};
     vertex_buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -539,9 +571,9 @@ AllocatedBuffer GoudaVK::VulkanCore::CreateBuffer(VkDeviceSize size, VkBufferUsa
     vertex_buffer_create_info.usage = usage;
     vertex_buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    AllocatedBuffer buffer;
+    AllocatedBuffer buffer{};
 
-    // create a buffer
+    // Create a buffer
     VkResult result{vkCreateBuffer(p_device->GetDevice(), &vertex_buffer_create_info, nullptr, &buffer.p_buffer)};
     CHECK_VK_RESULT(result, "vkCreateBuffer\n");
 
@@ -552,13 +584,16 @@ AllocatedBuffer GoudaVK::VulkanCore::CreateBuffer(VkDeviceSize size, VkBufferUsa
     buffer.m_allocation_size = memory_requirements.size;
 
     // Get the memory type index
-    u32 memory_type_index{GetMemoryTypeIndex(memory_requirements.memoryTypeBits, properties)};
+    auto memory_type_index = GetMemoryTypeIndex(memory_requirements.memoryTypeBits, properties);
+    if (!memory_type_index) {
+        ENGINE_THROW("Memory type selection failed: {}", memory_type_index.error());
+    }
 
-    // Allocate memory
-    VkMemoryAllocateInfo memory_allocate_info{.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-                                              .pNext = nullptr,
-                                              .allocationSize = memory_requirements.size,
-                                              .memoryTypeIndex = memory_type_index};
+    VkMemoryAllocateInfo memory_allocate_info{};
+    memory_allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memory_allocate_info.pNext = nullptr;
+    memory_allocate_info.allocationSize = memory_requirements.size;
+    memory_allocate_info.memoryTypeIndex = *memory_type_index;
 
     result = vkAllocateMemory(p_device->GetDevice(), &memory_allocate_info, nullptr, &buffer.p_memory);
     CHECK_VK_RESULT(result, "vkAllocateMemory error %d\n");
@@ -578,8 +613,8 @@ AllocatedBuffer VulkanCore::CreateUniformBuffer(size_t size)
     AllocatedBuffer buffer{CreateBuffer(size, usage, memory_properties)};
 
     if (buffer.p_buffer == VK_NULL_HANDLE) {
-        ENGINE_LOG_ERROR("Failed to create uniform buffer");
-        std::terminate();
+        ENGINE_LOG_ERROR("Failed to create uniform buffer.");
+        ENGINE_THROW("Failed to create uniform buffer.");
     }
 
     return buffer;
@@ -588,10 +623,7 @@ AllocatedBuffer VulkanCore::CreateUniformBuffer(size_t size)
 void VulkanCore::CreateTextureImageFromData(VulkanTexture &texture, const void *pixels_data_ptr, ImageSize image_size,
                                             VkFormat texture_format, u32 layer_count, VkImageCreateFlags create_flags)
 {
-    CreateImage(texture, image_size, texture_format, VK_IMAGE_TILING_OPTIMAL,
-                (VkImageUsageFlagBits)(VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, create_flags, 1);
-
+    CreateTextureImage(texture, image_size, texture_format, 1, layer_count, create_flags);
     UpdateTextureImage(texture, image_size, texture_format, layer_count, pixels_data_ptr, VK_IMAGE_LAYOUT_UNDEFINED);
 }
 
@@ -617,20 +649,22 @@ void VulkanCore::CreateImage(VulkanTexture &texture, ImageSize image_size, VkFor
         .pQueueFamilyIndices = nullptr,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED};
 
-    ENGINE_LOG_DEBUG("Created Image {} width: {}", image_size.width, image_size.width);
-
     VkResult result{vkCreateImage(p_device->GetDevice(), &image_create_info, nullptr, &texture.p_image)};
     CHECK_VK_RESULT(result, "vkCreateImage error");
 
-    VkMemoryRequirements memory_requirements;
+    VkMemoryRequirements memory_requirements{};
     vkGetImageMemoryRequirements(p_device->GetDevice(), texture.p_image, &memory_requirements);
 
-    u32 memory_type_index{GetMemoryTypeIndex(memory_requirements.memoryTypeBits, memory_property_flags)};
+    auto memory_type_index = GetMemoryTypeIndex(memory_requirements.memoryTypeBits, memory_property_flags);
+    if (!memory_type_index) {
+        ENGINE_THROW("Memory type selection failed: {}", memory_type_index.error());
+    }
 
-    VkMemoryAllocateInfo memory_allocate_info = {.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-                                                 .pNext = nullptr,
-                                                 .allocationSize = memory_requirements.size,
-                                                 .memoryTypeIndex = memory_type_index};
+    VkMemoryAllocateInfo memory_allocate_info{};
+    memory_allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memory_allocate_info.pNext = nullptr;
+    memory_allocate_info.allocationSize = memory_requirements.size;
+    memory_allocate_info.memoryTypeIndex = *memory_type_index;
 
     result = vkAllocateMemory(p_device->GetDevice(), &memory_allocate_info, nullptr, &texture.p_memory);
     CHECK_VK_RESULT(result, "vkAllocateMemory error");
@@ -638,25 +672,46 @@ void VulkanCore::CreateImage(VulkanTexture &texture, ImageSize image_size, VkFor
     vkBindImageMemory(p_device->GetDevice(), texture.p_image, texture.p_memory, 0);
 }
 
+void VulkanCore::CreateTextureImage(VulkanTexture &texture, ImageSize size, VkFormat format, u32 mip_levels,
+                                    u32 layer_count, VkImageCreateFlags create_flags,
+                                    VkImageUsageFlags additional_usage_flags)
+{
+    VkImageUsageFlags usage_flags{VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                                  additional_usage_flags};
+
+    CreateImage(texture, size, format, VK_IMAGE_TILING_OPTIMAL, usage_flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                create_flags, mip_levels);
+
+    ENGINE_LOG_DEBUG("Created texture image of size: {}x{}.", size.width, size.height);
+}
+
+void VulkanCore::CreateDepthImage(VulkanTexture &texture, ImageSize size, VkFormat format)
+{
+    CreateImage(texture, size, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0, 1);
+
+    ENGINE_LOG_DEBUG("Created depth image of size: {}x{}.", size.width, size.height);
+}
+
 void VulkanCore::UpdateTextureImage(VulkanTexture &texture, ImageSize image_size, VkFormat texture_format,
                                     u32 layer_count, const void *pixels_data_ptr, VkImageLayout source_image_layout)
 {
     int bytes_per_pixel{GetBytesPerTextureFormat(texture_format)};
-    ASSERT(bytes_per_pixel > 0, "Texture bytes per pixel is zero");
+    ASSERT(bytes_per_pixel > 0, "Texture bytes per pixel is zero.");
 
     if (bytes_per_pixel == 0) {
-        ENGINE_LOG_ERROR("Texture bytes per pixel is zero");
-        throw std::runtime_error("Texture bytes per pixel is zero");
+        ENGINE_LOG_ERROR("Texture bytes per pixel is zero.");
+        throw std::runtime_error("Texture bytes per pixel is zero.");
     }
 
     VkDeviceSize layer_size{image_size.area() * bytes_per_pixel};
     VkDeviceSize final_memory_size{layer_size * layer_count};
 
-    VkBufferUsageFlags buffer_usage_flags = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    VkMemoryPropertyFlags memory_property_flags =
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    VkBufferUsageFlags buffer_usage_flags{VK_BUFFER_USAGE_TRANSFER_SRC_BIT};
+    VkMemoryPropertyFlags memory_property_flags{VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
 
-    AllocatedBuffer staging_texture = CreateBuffer(final_memory_size, buffer_usage_flags, memory_property_flags);
+    AllocatedBuffer staging_texture{CreateBuffer(final_memory_size, buffer_usage_flags, memory_property_flags)};
 
     staging_texture.Update(p_device->GetDevice(), pixels_data_ptr, final_memory_size);
 
@@ -674,15 +729,24 @@ void VulkanCore::CopyBufferToImage(VkImage destination, VkBuffer source, ImageSi
 {
     BeginCommandBuffer(p_copy_command_buffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    VkBufferImageCopy region = {
-        .bufferOffset = 0,
-        .bufferRowLength = 0,
-        .bufferImageHeight = 0,
-        .imageSubresource =
-            VkImageSubresourceLayers{
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = layer_count},
-        .imageOffset = VkOffset3D{.x = 0, .y = 0, .z = 0},
-        .imageExtent = VkExtent3D{.width = image_size.width, .height = image_size.height, .depth = 1}};
+    VkImageSubresourceLayers sub_resource_layers{};
+    sub_resource_layers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    sub_resource_layers.mipLevel = 0;
+    sub_resource_layers.baseArrayLayer = 0;
+    sub_resource_layers.layerCount = layer_count;
+
+    VkExtent3D image_extent{};
+    image_extent.width = static_cast<u32>(image_size.width);
+    image_extent.height = static_cast<u32>(image_size.height);
+    image_extent.depth = 1;
+
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource = sub_resource_layers;
+    region.imageOffset = VkOffset3D{.x = 0, .y = 0, .z = 0};
+    region.imageExtent = image_extent;
 
     vkCmdCopyBufferToImage(p_copy_command_buffer, source, destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
                            &region);
@@ -713,20 +777,20 @@ void VulkanCore::TransitionImageLayoutCmd(VkCommandBuffer command_buffer_ptr, Vk
                                           VkImageLayout old_layout, VkImageLayout new_layout, u32 layer_count,
                                           u32 mip_levels)
 {
-    VkImageMemoryBarrier barrier = {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                                    .pNext = nullptr,
-                                    .srcAccessMask = 0,
-                                    .dstAccessMask = 0,
-                                    .oldLayout = old_layout,
-                                    .newLayout = new_layout,
-                                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                    .image = image,
-                                    .subresourceRange = VkImageSubresourceRange{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                                                                                .baseMipLevel = 0,
-                                                                                .levelCount = mip_levels,
-                                                                                .baseArrayLayer = 0,
-                                                                                .layerCount = layer_count}};
+    VkImageMemoryBarrier barrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                                 .pNext = nullptr,
+                                 .srcAccessMask = 0,
+                                 .dstAccessMask = 0,
+                                 .oldLayout = old_layout,
+                                 .newLayout = new_layout,
+                                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                                 .image = image,
+                                 .subresourceRange = VkImageSubresourceRange{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                                                                             .baseMipLevel = 0,
+                                                                             .levelCount = mip_levels,
+                                                                             .baseArrayLayer = 0,
+                                                                             .layerCount = layer_count}};
 
     VkPipelineStageFlags source_stage;
     VkPipelineStageFlags destination_stage;
@@ -854,17 +918,67 @@ void VulkanCore::TransitionImageLayoutCmd(VkCommandBuffer command_buffer_ptr, Vk
     vkCmdPipelineBarrier(command_buffer_ptr, source_stage, destination_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
-void VulkanCore::DestroySwapchain() { vkDestroySwapchainKHR(p_device->GetDevice(), p_swap_chain, nullptr); }
+void VulkanCore::DestroySwapchain()
+{
+    vkDestroySwapchainKHR(p_device->GetDevice(), p_swap_chain, nullptr);
+    p_swap_chain = VK_NULL_HANDLE;
+
+    ENGINE_LOG_INFO("Swapchain destroyed.");
+}
 
 void VulkanCore::DestroySwapchainImageViews()
 {
-    for (size_t i = 0; i < m_image_views.size(); i++) {
-        vkDestroyImageView(p_device->GetDevice(), m_image_views[i], nullptr);
+    for (auto image_view : m_image_views) {
+        vkDestroyImageView(p_device->GetDevice(), image_view, nullptr);
+        image_view = VK_NULL_HANDLE;
     }
 
     m_image_views.clear();
+
+    ENGINE_LOG_DEBUG("Swap chain images destroyed.");
 }
 
+void VulkanCore::CreateDepthResources()
+{
+    int swapchain_image_count{static_cast<int>(m_images.size())};
+    u32 layer_count{1};
+    u32 mip_levels{1};
+
+    m_depth_images.resize(swapchain_image_count);
+
+    for (int i = 0; i < swapchain_image_count; i++) {
+        VkFormat depth_format{p_device->GetSelectedPhysicalDevice().m_depth_format};
+        ASSERT(depth_format != VK_FORMAT_UNDEFINED, "Depth format is not set properly!");
+
+        ImageSize image_size{m_frame_buffer_size};
+        ASSERT(image_size.width > 0 && image_size.height > 0, "Framebuffer size must be greater than 0!");
+
+        CreateDepthImage(m_depth_images[i], image_size, depth_format);
+
+        VkImageLayout old_layout{};
+        VkImageLayout new_layout{VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+        TransitionImageLayout(m_depth_images[i].p_image, depth_format, old_layout, new_layout, layer_count, mip_levels);
+
+        m_depth_images[i].p_view =
+            CreateImageView(p_device->GetDevice(), m_depth_images[i].p_image, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT,
+                            VK_IMAGE_VIEW_TYPE_2D, layer_count, mip_levels);
+    }
+
+    ENGINE_LOG_DEBUG("Depth resources created.");
+}
+
+void VulkanCore::DestroyDepthResources()
+{
+    for (auto depth_image : m_depth_images) {
+        depth_image.Destroy(p_device->GetDevice());
+    }
+
+    m_depth_images.clear();
+
+    ENGINE_LOG_DEBUG("Depth resources destroyed.");
+}
+
+// FIXME: Do we recreate depth stuff here too?
 void VulkanCore::ReCreateSwapchain()
 {
     DestroySwapchainImageViews();
@@ -873,35 +987,35 @@ void VulkanCore::ReCreateSwapchain()
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(p_device->GetPhysicalDevice(), p_instance->GetSurface(),
                                               &surface_capabiltities);
 
-    ENGINE_LOG_DEBUG("Surface capabilities: currentExtent = {}x{}, minImageExtent = {}x{}, maxImageExtent = {}x{}",
+    ENGINE_LOG_DEBUG("Surface capabilities: currentExtent = {}x{}, minImageExtent = {}x{}, maxImageExtent = {}x{}.",
                      surface_capabiltities.currentExtent.width, surface_capabiltities.currentExtent.height,
                      surface_capabiltities.minImageExtent.width, surface_capabiltities.minImageExtent.height,
                      surface_capabiltities.maxImageExtent.width, surface_capabiltities.maxImageExtent.height);
 
-    const u32 number_of_images = ChooseNumImages(surface_capabiltities);
-    const std::vector<VkPresentModeKHR> &present_modes = p_device->GetSelectedPhysicalDevice().m_present_modes;
-    VkPresentModeKHR present_mode = ChoosePresentMode(present_modes, m_vsync_mode);
+    const u32 number_of_images{ChooseNumImages(surface_capabiltities)};
+    const std::vector<VkPresentModeKHR> &present_modes{p_device->GetSelectedPhysicalDevice().m_present_modes};
+    VkPresentModeKHR present_mode{ChoosePresentMode(present_modes, m_vsync_mode)};
 
     m_swap_chain_surface_format =
         ChooseSurfaceFormatAndColorSpace(p_device->GetSelectedPhysicalDevice().m_surface_formats);
 
-    FrameBufferSize framebuffer_size{0, 0};
-    GetFramebufferSize(framebuffer_size.width, framebuffer_size.height);
+    // Update/Cache m_frame_buffer_size for later use
+    CacheFrameBufferSize();
 
     VkExtent2D extent{0, 0};
-    if (surface_capabiltities.currentExtent.width != UINT32_MAX) {
+    if (surface_capabiltities.currentExtent.width != math::max_value<u32>()) {
         extent = surface_capabiltities.currentExtent;
     }
     else {
-        extent.width =
-            std::max(surface_capabiltities.minImageExtent.width,
-                     std::min(surface_capabiltities.maxImageExtent.width, static_cast<u32>(framebuffer_size.width)));
-        extent.height =
-            std::max(surface_capabiltities.minImageExtent.height,
-                     std::min(surface_capabiltities.maxImageExtent.height, static_cast<u32>(framebuffer_size.height)));
+        extent.width = math::max(
+            surface_capabiltities.minImageExtent.width,
+            math::min(surface_capabiltities.maxImageExtent.width, static_cast<u32>(m_frame_buffer_size.width)));
+        extent.height = math::max(
+            surface_capabiltities.minImageExtent.height,
+            math::min(surface_capabiltities.maxImageExtent.height, static_cast<u32>(m_frame_buffer_size.height)));
     }
 
-    ENGINE_LOG_DEBUG("Selected swapchain extent: {}x{}", extent.width, extent.height);
+    ENGINE_LOG_DEBUG("Selected swapchain extent: {}x{}.", extent.width, extent.height);
 
     u32 queue_family_index{p_device->GetQueueFamily()};
 
@@ -927,24 +1041,25 @@ void VulkanCore::ReCreateSwapchain()
     };
 
     VkSwapchainKHR new_swap_chain{VK_NULL_HANDLE};
-    ENGINE_LOG_DEBUG("Old swapchain handle: {}", reinterpret_cast<void *>(p_swap_chain));
+    ENGINE_LOG_DEBUG("Old swapchain handle: {}.", reinterpret_cast<void *>(p_swap_chain));
     VkResult result{vkCreateSwapchainKHR(p_device->GetDevice(), &swap_chain_create_info, nullptr, &new_swap_chain)};
     CHECK_VK_RESULT(result, "vkCreateSwapchainKHR\n");
 
     // Destroy the old swapchain after the new one is created
     if (p_swap_chain != VK_NULL_HANDLE) {
-        ENGINE_LOG_DEBUG("Destroying old swapchain: {}", reinterpret_cast<void *>(p_swap_chain));
+        ENGINE_LOG_DEBUG("Destroying old swapchain: {}.", reinterpret_cast<void *>(p_swap_chain));
         vkDestroySwapchainKHR(p_device->GetDevice(), p_swap_chain, nullptr);
     }
     p_swap_chain = new_swap_chain;
-    ENGINE_LOG_DEBUG("New swapchain handle: {}", reinterpret_cast<void *>(p_swap_chain));
+    ENGINE_LOG_DEBUG("New swapchain handle: {}.", reinterpret_cast<void *>(p_swap_chain));
 
-    ENGINE_LOG_INFO("Swap chain recreated with V-Sync mode: {}", (m_vsync_mode == VSyncMode::ENABLED) ? "ENABLED (FIFO)"
-                                                                 : (m_vsync_mode == VSyncMode::MAILBOX)
-                                                                     ? "DISABLED (MAILBOX)"
-                                                                     : "DISABLED (IMMEDIATE)");
+    ENGINE_LOG_INFO("Swap chain recreated with V-Sync mode: {}.",
+                    (m_vsync_mode == VSyncMode::ENABLED)   ? "ENABLED (FIFO)"
+                    : (m_vsync_mode == VSyncMode::MAILBOX) ? "DISABLED (MAILBOX)"
+                                                           : "DISABLED (IMMEDIATE)");
 
     CreateSwapchainImageViews();
 }
 
-} // end GoudaVK namespace
+} // namespace vk
+} // namespace gouda

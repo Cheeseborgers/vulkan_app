@@ -4,7 +4,8 @@
 #include <iostream>
 #include <thread>
 
-namespace Gouda {
+namespace gouda {
+namespace utils {
 
 using SteadyClock = std::chrono::steady_clock;
 using f32 = float;
@@ -232,4 +233,5 @@ private:
     f32 accumulator;
 };
 
-} // namespace Gouda end
+} // namespace utils end
+} // namespace gouda end

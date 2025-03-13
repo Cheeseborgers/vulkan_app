@@ -4,7 +4,8 @@
 
 #include "gouda_vk_utils.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 VulkanTexture::VulkanTexture()
     : p_image{VK_NULL_HANDLE}, p_memory{VK_NULL_HANDLE}, p_view{VK_NULL_HANDLE}, p_sampler{VK_NULL_HANDLE}
@@ -98,4 +99,5 @@ bool HasStencilComponent(VkFormat Format)
     return ((Format == VK_FORMAT_D32_SFLOAT_S8_UINT) || (Format == VK_FORMAT_D24_UNORM_S8_UINT));
 }
 
-} // end namespace
+} // namespace vk
+} // namespace gouda

@@ -3,11 +3,12 @@
 #include "logger.hpp"
 
 #include "core/types.hpp"
-#include "gouda_assert.hpp"
+#include "debug/assert.hpp"
 
 #include "gouda_vk_utils.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 // TODO: Change these pointer names to ..._ptr
 GraphicsPipeline::GraphicsPipeline(VkDevice device_ptr, GLFWwindow *p_window, VkRenderPass p_render_pass,
@@ -67,6 +68,18 @@ GraphicsPipeline::GraphicsPipeline(VkDevice device_ptr, GLFWwindow *p_window, Vk
     pipeline_multisampler_create_info.sampleShadingEnable = VK_FALSE;
     pipeline_multisampler_create_info.minSampleShading = 1.0f;
 
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_state_create_info{};
+    depth_stencil_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depth_stencil_state_create_info.depthTestEnable = VK_TRUE;
+    depth_stencil_state_create_info.depthWriteEnable = VK_TRUE;
+    depth_stencil_state_create_info.depthCompareOp = VK_COMPARE_OP_LESS;
+    depth_stencil_state_create_info.depthBoundsTestEnable = VK_FALSE;
+    depth_stencil_state_create_info.stencilTestEnable = VK_FALSE;
+    depth_stencil_state_create_info.front = {};
+    depth_stencil_state_create_info.back = {};
+    depth_stencil_state_create_info.minDepthBounds = 0.0f;
+    depth_stencil_state_create_info.maxDepthBounds = 1.0f;
+
     VkPipelineColorBlendAttachmentState blend_attach_state{};
     blend_attach_state.blendEnable = VK_FALSE;
     blend_attach_state.colorWriteMask =
@@ -101,6 +114,7 @@ GraphicsPipeline::GraphicsPipeline(VkDevice device_ptr, GLFWwindow *p_window, Vk
     pipeline_info.pViewportState = &viewport_state_create_info;
     pipeline_info.pRasterizationState = &pipeline_rasterization_state_create_info;
     pipeline_info.pMultisampleState = &pipeline_multisampler_create_info;
+    pipeline_info.pDepthStencilState = &depth_stencil_state_create_info;
     pipeline_info.pColorBlendState = &blend_create_info;
     pipeline_info.pDynamicState = &dynamic_state_info; // Enable dynamic states
     pipeline_info.layout = p_pipeline_layout;
@@ -327,4 +341,5 @@ void GraphicsPipeline::UpdateDescriptorSets(const SimpleMesh *mesh_ptr, int numb
                            nullptr);
 }
 
-} // end namespace
+} // namespace vk
+} // namespace gouda

@@ -11,13 +11,14 @@
 #include "logger.hpp"
 
 #include "core/types.hpp"
-#include "gouda_assert.hpp"
-#include "gouda_throw.hpp"
+#include "debug/assert.hpp"
+#include "debug/throw.hpp"
 #include "gouda_vk_shader.hpp"
 #include "gouda_vk_utils.hpp"
 #include "utility/filesystem.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 struct Shader {
     std::vector<uint> m_SPIRV;
@@ -35,13 +36,13 @@ struct GlslProgramDeleter {
 static void PrintShaderSource(std::string_view text)
 {
     int line{1};
-
+    std::printf("Shader source --------------------------");
     for (auto line_text : std::views::split(text, '\n')) {
+
         std::printf("\n(%3i) ", line++);
         std::cout << std::string_view{line_text.begin(), line_text.end()};
     }
-
-    std::printf("\n");
+    std::printf("--------------------------------------\n");
 }
 
 // TODO: Clean this function up
@@ -98,8 +99,7 @@ static std::size_t CompileShader(VkDevice &device, glslang_stage_t stage, const 
 
     // Print any error messages
     if (const char *spirv_messages = glslang_program_SPIRV_get_messages(program.get()); spirv_messages) {
-        // TODO: Log this better
-        std::cerr << spirv_messages;
+        ENGINE_LOG_ERROR("Shader error message: {}.", spirv_messages);
     }
 
     VkShaderModuleCreateInfo shader_create_info{};
@@ -112,7 +112,9 @@ static std::size_t CompileShader(VkDevice &device, glslang_stage_t stage, const 
     VkResult result{vkCreateShaderModule(device, &shader_create_info, nullptr, &shader_module.m_shader_module)};
     CHECK_VK_RESULT(result, "vkCreateShaderModule\n");
 
-    ASSERT(result == VK_SUCCESS, "Could not complile shader");
+    if (result != VK_SUCCESS) {
+        return 0;
+    }
 
     return shader_module.m_SPIRV.size();
 }
@@ -143,7 +145,6 @@ static glslang_stage_t ShaderStageFromFilename(std::string_view file_name)
         return GLSLANG_STAGE_TESSEVALUATION;
     }
 
-    ENGINE_LOG_FATAL("Unknown shader stage in: {}", file_name);
     ENGINE_THROW("Unknown shader stage in: {}", file_name);
 
     return GLSLANG_STAGE_VERTEX;
@@ -151,38 +152,57 @@ static glslang_stage_t ShaderStageFromFilename(std::string_view file_name)
 
 VkShaderModule CreateShaderModuleFromText(VkDevice device_ptr, std::string_view file_name)
 {
-    const std::string current_path{Gouda::FS::GetCurrentWorkingDirectory()};
-    std::string shader_source;
-
+    const std::string current_path{fs::GetCurrentWorkingDirectory()};
     ENGINE_LOG_INFO("Creating shader from text file: {}", file_name);
 
-    auto file_result = Gouda::FS::ReadFile(file_name);
-    if (file_result) {
-        shader_source = *file_result;
-    }
-    else {
-        ENGINE_LOG_ERROR("Failed to read shader from text file: {}", file_result.error());
-        ENGINE_THROW("Failed to read shader from text file");
+    // Read the shader source file
+    auto file_result = fs::ReadFile(file_name);
+    if (!file_result) {
+        switch (file_result.error()) {
+            case gouda::fs::Error::FileNotFound:
+                ENGINE_LOG_ERROR("Shader file '{}' not found.", file_name);
+                ENGINE_THROW("File not found: {}", file_name);
+                return nullptr;
+            case gouda::fs::Error::FileReadError:
+                ENGINE_LOG_ERROR("Failed to read shader file '{}'.", file_name);
+                ENGINE_THROW("Failed to read file: {}", file_name);
+                return nullptr;
+            default:
+                ENGINE_LOG_ERROR("Unknown error occurred while reading shader file '{}'.", file_name);
+                ENGINE_THROW("Unknown error occurred whilst creating a shader from text: {}", file_name);
+                return nullptr;
+        }
     }
 
+    std::string shader_source = *file_result;
+
+    // Initialize GLSLang
     glslang_initialize_process();
 
+    // Compile Shader
     Shader shader;
     glslang_stage_t shader_stage{ShaderStageFromFilename(file_name)};
     size_t shader_size{CompileShader(device_ptr, shader_stage, shader_source.c_str(), shader)};
-    VkShaderModule shader_module{nullptr};
 
+    VkShaderModule shader_module{nullptr};
     if (shader_size > 0) {
         shader_module = shader.m_shader_module;
 
-        // TODO: Check this saves in the correct place since we no longer save directly in build dir
-        const std::string binary_filename{std::string(file_name) + ".spv"};
-        Gouda::FS::WriteBinaryFile(binary_filename, shader.m_SPIRV);
-
-        ENGINE_LOG_INFO("Created SPIRV shader from text file: {}{} as {}{}.spv", current_path, file_name, current_path,
-                        binary_filename);
+        // Save compiled SPIR-V binary
+        std::string binary_filename{std::string(file_name) + ".spv"};
+        auto write_result = fs::WriteBinaryFile(binary_filename, shader.m_SPIRV);
+        if (!write_result) {
+            ENGINE_LOG_ERROR("Failed to write compiled SPIR-V binary to '{}'", binary_filename);
+        }
+        else {
+            ENGINE_LOG_INFO("Created SPIR-V shader from text file '{}', saved as '{}'", file_name, binary_filename);
+        }
+    }
+    else {
+        ENGINE_LOG_ERROR("Shader compilation failed for '{}'.", file_name);
     }
 
+    // Finalize GLSLang
     glslang_finalize_process();
 
     return shader_module;
@@ -192,30 +212,36 @@ VkShaderModule CreateShaderModuleFromBinary(VkDevice device_ptr, std::string_vie
 {
     VkShaderModule shader_module{nullptr};
 
-    auto file_result = Gouda::FS::ReadBinaryFile(file_name);
-    if (file_result) {
-        std::vector<char> shader_code = *file_result;
-
-        ASSERT(!shader_code.empty(), "Shader code cannot be empty when reading from binary: {}", file_name);
-
-        VkShaderModuleCreateInfo shader_create_info = {.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-                                                       .pNext = nullptr,
-                                                       .flags = 0,
-                                                       .codeSize = shader_code.size() * sizeof(char),
-                                                       .pCode = reinterpret_cast<const u32 *>(shader_code.data())};
-
-        VkResult result{vkCreateShaderModule(device_ptr, &shader_create_info, nullptr, &shader_module)};
-        CHECK_VK_RESULT(result, "vkCreateShaderModule\n");
-
-        ASSERT(result == VK_SUCCESS, "Could not create shader from binary file: {}", file_name);
-
-        ENGINE_LOG_DEBUG("Created shader from binary: {}", file_name);
-    }
-    else {
-        ENGINE_LOG_ERROR("Failed to read file when creating shader from binary: {}", file_name);
+    auto file_result = fs::ReadBinaryFile(file_name);
+    if (!file_result) {
+        ENGINE_LOG_ERROR("Failed to read file '{}' when creating shader from binary. Error: {}", file_name,
+                         static_cast<int>(file_result.error()));
+        return nullptr;
     }
 
+    const std::vector<char> &shader_code = *file_result;
+
+    if (shader_code.empty()) {
+        ENGINE_LOG_ERROR("Shader code is empty when reading from binary: {}", file_name);
+        return nullptr;
+    }
+
+    VkShaderModuleCreateInfo shader_create_info{};
+    shader_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    shader_create_info.pNext = nullptr;
+    shader_create_info.flags = 0;
+    shader_create_info.codeSize = shader_code.size() * sizeof(char);
+    shader_create_info.pCode = reinterpret_cast<const u32 *>(shader_code.data());
+
+    VkResult result{vkCreateShaderModule(device_ptr, &shader_create_info, nullptr, &shader_module)};
+    if (result != VK_SUCCESS) {
+        ENGINE_LOG_ERROR("Failed to create shader module from binary file '{}', VkResult: {}", file_name, result);
+        return nullptr;
+    }
+
+    ENGINE_LOG_DEBUG("Successfully created shader from binary: {}", file_name);
     return shader_module;
 }
 
-} // end namespace
+} // namespace vk
+} // namespace gouda

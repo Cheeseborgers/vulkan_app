@@ -17,7 +17,7 @@ find_package(glslang CONFIG REQUIRED)
 
 find_package(Threads REQUIRED)
 
-# OpenAL
+# Audio
 add_subdirectory(libs/thirdparty/openAL)
 add_subdirectory(libs/thirdparty/libsndfile)
 
@@ -31,9 +31,17 @@ add_subdirectory(libs/thirdparty/stb_image)
 
 # add_subdirectory(libs/local/gouda_image)
 set(PROJECT_SOURCES
-
-    src/gouda_assert.cpp
-
+    src/audio/audio_common.cpp
+    src/audio/audio_manager.cpp
+    src/audio/music_track.cpp
+    src/audio/sound_effect.cpp
+    src/backends/common.cpp
+    src/backends/glfw/window.cpp
+    src/cameras/camera.cpp
+    src/cameras/orthographic_camera.cpp
+    src/cameras/perspective_camera.cpp
+    src/core/input_system.cpp
+    src/debug/assert.cpp
     src/gouda_vk_allocated_buffer.cpp
     src/gouda_vk_core.cpp
     src/gouda_vk_device.cpp
@@ -45,16 +53,12 @@ set(PROJECT_SOURCES
     src/gouda_vk_shader.cpp
     src/gouda_vk_simple_mesh.cpp
     src/gouda_vk_texture.cpp
-
-    src/audio/audio_manager.cpp
-    src/audio/music_track.cpp
-    src/audio/sound_effect.cpp
-
-    src/backends/common.cpp
-    src/backends/glfw_window.cpp
-
+    src/math/random.cpp
+    src/math/matrix4x4.cpp
+    src/math/transform.cpp
+    src/math/vector.cpp
+    src/math/quaternion.cpp
     src/utility/filesystem.cpp
-    src/utility/random.cpp
 )
 
 add_library(${PROJECT_NAME} STATIC ${PROJECT_SOURCES})
@@ -68,9 +72,7 @@ target_include_directories(${PROJECT_NAME}
     # Thirdpart libs
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/openAL>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/libsndfile>
-
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/imgui>
-
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/pcg>
 
     # Project includes

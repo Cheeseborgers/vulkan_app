@@ -1,20 +1,24 @@
-#include "utility/random.hpp"
+/**
+ * @file math/random.cpp
+ * @author GoudaCheeseburgers
+ * @date 2025-03-13
+ * @brief A Threadsafe and non pcg random implementation
+ */
+#include "math/random.hpp"
 
+#include <array>
 #include <numeric> // For std::accumulate
 #include <random>
 
-namespace {
+namespace gouda {
+namespace math {
 
-inline u32 GenerateSeed()
+u32 GenerateSeed()
 {
     std::random_device rd;
     std::array<u32, 4> seeds{rd(), rd(), rd(), rd()};
     return std::accumulate(seeds.begin(), seeds.end(), 0u, std::bit_xor<>());
 }
-
-} // end anonymous namespace
-
-namespace Gouda {
 
 BaseRNG::BaseRNG(u32 seed) : rng(seed) {}
 
@@ -66,4 +70,5 @@ ThreadSafeRNG &GetGlobalThreadSafeRNG()
     return rng;
 }
 
-} // namespace Gouda
+} // namespace math
+} // namespace gouda

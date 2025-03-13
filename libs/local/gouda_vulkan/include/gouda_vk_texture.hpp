@@ -4,7 +4,8 @@
 
 #include "core/types.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 class VulkanTexture {
 public:
@@ -25,4 +26,5 @@ int GetBytesPerTextureFormat(VkFormat Format);
 
 bool HasStencilComponent(VkFormat Format);
 
-} // end GoudaVK namespace
+} // namesapce vk
+} // namespace gouda

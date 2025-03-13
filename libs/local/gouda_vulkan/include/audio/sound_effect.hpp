@@ -2,8 +2,8 @@
 
 #include "audio_common.hpp"
 
-namespace Gouda {
-namespace Audio {
+namespace gouda {
+namespace audio {
 
 /**
  * @class SoundEffect
@@ -74,5 +74,5 @@ private:
     ALuint m_buffer; ///< OpenAL buffer that stores the sound effect data.
 };
 
-} // namespace Audio end
-} // namespace Gouda end
+} // namespace audio end
+} // namespace gouda end

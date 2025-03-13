@@ -4,8 +4,8 @@
 
 #include "core/types.hpp"
 
-namespace Gouda {
-namespace GLFW {
+namespace gouda {
+namespace glfw {
 
 template <typename WindowHandle>
 struct Callbacks {
@@ -15,6 +15,7 @@ struct Callbacks {
     using MouseScrollCallback = std::function<void(WindowHandle, double, double)>;
     using WindowIconifyCallback = std::function<void(WindowHandle, int)>;
     using FramebufferResizedCallback = std::function<void(WindowHandle, FrameBufferSize)>;
+    using WindowResizedCallback = std::function<void(WindowHandle, WindowSize)>;
 
     KeyCallback key_callback;
     MouseMoveCallback mouse_move_callback;
@@ -22,6 +23,7 @@ struct Callbacks {
     MouseScrollCallback mouse_scroll_callback;
     WindowIconifyCallback window_iconify_callback;
     FramebufferResizedCallback framebuffer_resized_callback;
+    WindowResizedCallback window_resized_callback;
 
     static void KeyCallbackTrampoline(GLFWwindow *window, int key, int scancode, int action, int mods)
     {
@@ -70,7 +72,15 @@ struct Callbacks {
             callbacks->framebuffer_resized_callback(window, {width, height});
         }
     }
+
+    static void WindowResizedCallbackTrampoline(GLFWwindow *window, int width, int height)
+    {
+        auto callbacks = static_cast<Callbacks *>(glfwGetWindowUserPointer(window));
+        if (callbacks && callbacks->window_resized_callback) {
+            callbacks->window_resized_callback(window, {width, height});
+        }
+    }
 };
 
-} // namespace GLFW end
-} // namespace Gouda end
+} // namespace glfw end
+} // namespace gouda end

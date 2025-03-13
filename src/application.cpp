@@ -1,8 +1,6 @@
 #include "application.hpp"
 
-#include <glm/ext.hpp> // TODO: Check is this the best way to include glm for vulkan coords
-#include <glm/glm.hpp>
-
+#include "math/vector.hpp"
 #include "utility/timer.hpp"
 
 #include "logger.hpp"
@@ -11,21 +9,25 @@
 
 namespace {
 struct UniformData {
-    glm::mat4 WVP;
+    gouda::math::Mat4 WVP;
 };
 }
 
 Application::Application()
     : p_window{nullptr},
       p_callbacks{nullptr},
+      m_settings_manager{"settings/settings.json", true, true},
       p_vk_queue{nullptr},
       m_number_of_images{},
       p_render_pass{VK_NULL_HANDLE},
+      m_frame_buffer_size{0, 0},
       p_vertex_shader{VK_NULL_HANDLE},
       p_fragment_shader{VK_NULL_HANDLE},
       p_pipeline{nullptr},
       m_is_iconified{false},
-      m_current_frame{0}
+      m_current_frame{0},
+      m_time_settings{},
+      p_ortho_camera{nullptr}
 {
 }
 
@@ -59,15 +61,31 @@ Application::~Application()
     }
 }
 
-void Application::Init(const Gouda::WindowConfig &window_config)
+void Application::Initialize()
 {
     // TODO: Utilize the TimeSettings struct from Application config when make/loaded
     APP_LOG_INFO("Initializing");
 
-    p_window = std::make_unique<Gouda::GLFW::Window>(window_config);
+    const ApplicationSettings settings{m_settings_manager.GetSettings()};
 
-    // TODO: Figure out how we are going to deal with Semvars and such here
-    m_vk_core.Init(p_window->GetWindow(), window_config.title, {1, 3, 0, 0}, m_time_settings.vsync_mode);
+    // Create a window
+    gouda::WindowConfig window_config{};
+    window_config.size = settings.size;
+    window_config.title = "Gouda Renderer";
+    window_config.resizable = true;
+    window_config.fullscreen = settings.fullscreen;
+    window_config.vsync = settings.vsync;
+    window_config.refresh_rate = settings.refresh_rate;
+    window_config.renderer = gouda::Renderer::Vulkan;
+    window_config.platform = gouda::Platform::X11;
+    p_window = std::make_unique<gouda::glfw::Window>(window_config);
+
+    // Get and cache the frame buffer size;
+    m_frame_buffer_size = p_window->GetFramebufferSize();
+
+    // Initialize Vulkan
+    constexpr SemVer vulkan_api_version{1, 3, 0, 0};
+    m_vk_core.Init(p_window->GetWindow(), window_config.title, vulkan_api_version, m_time_settings.vsync_mode);
 
     m_number_of_images = m_vk_core.GetNumberOfImages();
     p_vk_queue = m_vk_core.GetQueue();
@@ -83,6 +101,17 @@ void Application::Init(const Gouda::WindowConfig &window_config)
     CreateFences();
     SetupCallbacks();
 
+    // Initialize orthographic camera
+    f32 aspect{static_cast<float>(m_frame_buffer_size.width) / m_frame_buffer_size.height};
+    p_ortho_camera =
+        std::make_unique<gouda::OrthographicCamera>(-aspect, aspect, -1.0f, 1.0f, 1.0f, 2.0f,
+                                                    0.5f); // left, right, bottom, top, zoom, speed, sensitivity
+
+    // p_ortho_camera = std::make_unique<gouda::PerspectiveCamera>(60.0f, 1.777f, 0.1f, 1000.0f);
+    // p_ortho_camera->SetPosition({0.0f, 0.0f, 5.0f});
+    // p_ortho_camera->SetRotation(glm::vec2(0.0f, 3.1415926535f));
+
+    // Initialize and load audio
     m_audio_manager.Initialize();
     m_laser_1.Load("assets/audio/sound_effects/laser1.wav");
     m_laser_2.Load("assets/audio/sound_effects/laser2.wav");
@@ -96,15 +125,17 @@ void Application::Init(const Gouda::WindowConfig &window_config)
     m_audio_manager.QueueMusic(m_music, false);
     m_audio_manager.ShuffleRemainingTracks();
     m_audio_manager.PlayMusic();
+
+    APP_LOG_DEBUG("Application initialization success");
 }
 
-void Application::Update(f32 delta_time) {}
+void Application::Update(f32 delta_time) { p_ortho_camera->Update(delta_time); }
 
 void Application::RenderScene(f32 delta_time)
 {
     while (!p_vk_queue->IsSwapchainValid()) {
         std::this_thread::yield();
-        ENGINE_LOG_INFO("Rendering paused, waiting for valid swapchain");
+        APP_LOG_INFO("Rendering paused, waiting for valid swapchain");
     }
 
     vkWaitForFences(m_vk_core.GetDevice(), 1, &m_frame_fences[m_current_frame], VK_TRUE, UINT64_MAX);
@@ -125,13 +156,13 @@ void Application::Execute()
     constexpr f64 sleep_duration{0.001}; // Small sleep to reduce CPU usage
     f32 delta_time{0.0f};
 
-    Gouda::FrameTimer frame_timer;
-    Gouda::FixedTimer physics_timer(m_time_settings.fixed_timestep);
-    Gouda::GameClock game_clock;
+    gouda::utils::FrameTimer frame_timer;
+    gouda::utils::FixedTimer physics_timer(m_time_settings.fixed_timestep);
+    gouda::utils::GameClock game_clock;
 
     // Only use FPS limiter if V-Sync is disabled
-    std::optional<Gouda::FrameRateLimiter> fps_limiter;
-    if (m_time_settings.vsync_mode == GoudaVK::VSyncMode::DISABLED) {
+    std::optional<gouda::utils::FrameRateLimiter> fps_limiter;
+    if (m_time_settings.vsync_mode == gouda::vk::VSyncMode::DISABLED) {
         fps_limiter.emplace(m_time_settings.target_fps);
     }
 
@@ -168,7 +199,6 @@ void Application::Execute()
     }
 
     m_vk_core.DeviceWait();
-    p_window->Destroy(); // FIXME: Do we need this
 }
 
 // Private -------------------------------------------------------------------------------------------------------------
@@ -188,14 +218,14 @@ void Application::CreateMesh()
 void Application::CreateVertexBuffer()
 {
     struct Vertex {
-        Vertex(const glm::vec3 &p, const glm::vec2 &t)
+        Vertex(const gouda::math::Vec3 &p, const gouda::math::Vec2 &t)
         {
             Pos = p;
             Tex = t;
         }
 
-        glm::vec3 Pos;
-        glm::vec2 Tex;
+        gouda::math::Vec3 Pos;
+        gouda::math::Vec2 Tex;
     };
 
     std::vector<Vertex> vertices = {
@@ -204,7 +234,11 @@ void Application::CreateVertexBuffer()
         Vertex({1.0f, 1.0f, 0.0f}, {1.0f, 1.0f}),   // Top right
         Vertex({-1.0f, -1.0f, 0.0f}, {0.0f, 0.0f}), // Bottom left
         Vertex({1.0f, 1.0f, 0.0f}, {1.0f, 1.0f}),   // Top right
-        Vertex({1.0f, -1.0f, 0.0f}, {1.0f, 0.0f})   // Bottom right
+        Vertex({1.0f, -1.0f, 0.0f}, {1.0f, 0.0f}),  // Bottom right
+
+        // Vertex({-1.0f, -1.0f, 5.0f}, {0.0f, 0.0f}), // Bottom left
+        // Vertex({-1.0f, 1.0f, 5.0f}, {0.0f, 1.0f}),  // Top left
+        // Vertex({1.0f, 1.0f, 5.0f}, {1.0f, 1.0f})    // Top right
     };
 
     m_mesh.m_vertex_buffer_size = sizeof(vertices[0]) * vertices.size();
@@ -213,7 +247,7 @@ void Application::CreateVertexBuffer()
 
 void Application::LoadTexture()
 {
-    m_mesh.p_texture = new GoudaVK::VulkanTexture;
+    m_mesh.p_texture = new gouda::vk::VulkanTexture;
     m_vk_core.CreateTexture("assets/textures/checkerboard.png", *(m_mesh.p_texture));
 }
 
@@ -222,14 +256,14 @@ void Application::CreateUniformBuffers() { m_uniform_buffers = m_vk_core.CreateU
 void Application::CreateShaders()
 {
     p_vertex_shader =
-        GoudaVK::CreateShaderModuleFromBinary(m_vk_core.GetDevice(), "assets/shaders/compiled/test.vert.spv");
+        gouda::vk::CreateShaderModuleFromBinary(m_vk_core.GetDevice(), "assets/shaders/compiled/test.vert.spv");
     p_fragment_shader =
-        GoudaVK::CreateShaderModuleFromBinary(m_vk_core.GetDevice(), "assets/shaders/compiled/test.frag.spv");
+        gouda::vk::CreateShaderModuleFromBinary(m_vk_core.GetDevice(), "assets/shaders/compiled/test.frag.spv");
 }
 
 void Application::CreatePipeline()
 {
-    p_pipeline = std::make_unique<GoudaVK::GraphicsPipeline>(
+    p_pipeline = std::make_unique<gouda::vk::GraphicsPipeline>(
         m_vk_core.GetDevice(), p_window->GetWindow(), p_render_pass, p_vertex_shader, p_fragment_shader, &m_mesh,
         m_number_of_images, m_uniform_buffers, sizeof(UniformData));
 }
@@ -244,91 +278,90 @@ void Application::CreateFences()
                                      .flags = VK_FENCE_CREATE_SIGNALED_BIT};
 
         for (u32 i = 0; i < p_vk_queue->GetMaxFramesInFlight(); i++) {
-            GoudaVK::CreateFence(m_vk_core.GetDevice(), &fence_info, nullptr, &m_frame_fences[i]);
+            gouda::vk::CreateFence(m_vk_core.GetDevice(), &fence_info, nullptr, &m_frame_fences[i]);
         }
     }
 }
 
 void Application::RecordCommandBuffers()
 {
-    VkClearColorValue clear_colour{1.0f, 0.0f, 0.0f, 0.0f};
-    VkClearValue clear_value;
-    clear_value.color = clear_colour;
+    std::array<VkClearValue, 2> clear_values{};
+    clear_values[0].color = {{1.0f, 0.0f, 0.0f, 1.0f}};
+    clear_values[1].depthStencil = {1.0f, 0};
 
     FrameBufferSize framebuffer_size{p_window->GetFramebufferSize()};
+    VkExtent2D render_area_extent{static_cast<u32>(framebuffer_size.width), static_cast<u32>(framebuffer_size.height)};
 
-    VkRenderPassBeginInfo render_pass_begin_info{
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .pNext = nullptr,
-        .renderPass = p_render_pass,
-        .framebuffer = VK_NULL_HANDLE, // Assigned in loop below
-        .renderArea = {.offset = {.x = 0, .y = 0},
-                       .extent = {.width = static_cast<u32>(framebuffer_size.width),
-                                  .height = static_cast<u32>(framebuffer_size.height)}},
-        .clearValueCount = 1,
-        .pClearValues = &clear_value};
+    VkRenderPassBeginInfo render_pass_begin_info{};
+    render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    render_pass_begin_info.pNext = nullptr;
+    render_pass_begin_info.renderPass = p_render_pass;
+    render_pass_begin_info.framebuffer = VK_NULL_HANDLE; // Assigned in loop below
+    render_pass_begin_info.renderArea = {.offset = {.x = 0, .y = 0}, .extent = render_area_extent};
+    render_pass_begin_info.clearValueCount = static_cast<u32>(clear_values.size());
+    render_pass_begin_info.pClearValues = clear_values.data();
+
+    // Dynamic viewport and scissor
+    VkViewport viewport{.x = 0.0f,
+                        .y = 0.0f,
+                        .width = static_cast<f32>(render_area_extent.width),
+                        .height = static_cast<f32>(render_area_extent.height),
+                        .minDepth = 0.0f,
+                        .maxDepth = 1.0f};
+
+    VkRect2D scissor{.offset = {0, 0}, .extent = render_area_extent};
 
     for (size_t i = 0; i < m_command_buffers.size(); i++) {
-        GoudaVK::BeginCommandBuffer(m_command_buffers[i], VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
+        gouda::vk::BeginCommandBuffer(m_command_buffers[i], VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
 
         render_pass_begin_info.framebuffer = m_frame_buffers[i];
 
         vkCmdBeginRenderPass(m_command_buffers[i], &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 
         // Set viewport
-        VkViewport viewport{.x = 0.0f,
-                            .y = 0.0f,
-                            .width = static_cast<f32>(framebuffer_size.width),
-                            .height = static_cast<f32>(framebuffer_size.height),
-                            .minDepth = 0.0f,
-                            .maxDepth = 1.0f};
-
         vkCmdSetViewport(m_command_buffers[i], 0, 1, &viewport);
 
         // Set scissor
-        VkRect2D scissor{
-            .offset = {0, 0},
-            .extent = {static_cast<u32>(framebuffer_size.width), static_cast<u32>(framebuffer_size.height)}};
-
         vkCmdSetScissor(m_command_buffers[i], 0, 1, &scissor);
 
         p_pipeline->Bind(m_command_buffers[i], i);
 
-        u32 VertexCount = 6;
-        u32 InstanceCount = 1;
-        u32 FirstVertex = 0;
-        u32 FirstInstance = 0;
+        u32 vertex_count = 6;
+        u32 instance_count = 1;
+        u32 first_vertex = 0;
+        u32 first_instance = 0;
 
-        vkCmdDraw(m_command_buffers[i], VertexCount, InstanceCount, FirstVertex, FirstInstance);
+        vkCmdDraw(m_command_buffers[i], vertex_count, instance_count, first_vertex, first_instance);
 
         vkCmdEndRenderPass(m_command_buffers[i]);
 
-        GoudaVK::EndCommandBuffer(m_command_buffers[i]);
+        gouda::vk::EndCommandBuffer(m_command_buffers[i]);
     }
 
     APP_LOG_INFO("Command buffers recorded");
 }
 
-void Application::UpdateUniformBuffer(u32 ImageIndex, f32 delta_time)
+void Application::UpdateUniformBuffer(u32 image_index, f32 delta_time)
 {
-    static f32 rotation_speed{1.0f};
-    static f32 rotation_angle{0.0f};
+    // New rotation with cam
+    /*
+     static float rotation_speed{1.0f};
+     static float rotation_angle{0.0f};
+     rotation_angle = fmod(rotation_angle + rotation_speed * delta_time, 360.0f);
 
-    glm::mat4 rotation_matrix{glm::mat4(1.0f)};
+     glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(rotation_angle), gouda::math::Vec3(0.0f, 0.0f, 1.0f));
+     glm::mat4 wvp = m_camera->GetViewProjectionMatrix() * model;
+     m_uniform_buffers[image_index].Update(m_vk_core.GetDevice(), &wvp, sizeof(wvp));
+    */
 
-    rotation_matrix =
-        glm::rotate(rotation_matrix, glm::radians(rotation_angle), glm::normalize(glm::vec3(0.0f, 0.0f, 1.0f)));
-
-    rotation_angle = fmod(rotation_angle + rotation_speed * delta_time, 360.0f);
-
-    // std::cout << "Frame: " << ImageIndex << " Rotation: " << rotation_angle << std::endl;
-
-    m_uniform_buffers[ImageIndex].Update(m_vk_core.GetDevice(), &rotation_matrix, sizeof(rotation_matrix));
+    // Use camera's view-projection matrix instead of rotating quad
+    gouda::math::Mat4 wvp{p_ortho_camera->GetViewProjectionMatrix()};
+    m_uniform_buffers[image_index].Update(m_vk_core.GetDevice(), &wvp, sizeof(wvp));
 }
 
 void Application::SetupCallbacks()
 {
-    p_callbacks = std::make_unique<Gouda::GLFW::Callbacks<GLFWwindow *>>();
+    p_callbacks = std::make_unique<gouda::glfw::Callbacks<GLFWwindow *>>();
 
     p_callbacks->key_callback = [this](GLFWwindow *window, int key, int scancode, int action, int mods) {
         this->OnKey(window, key, scancode, action, mods);
@@ -354,46 +387,90 @@ void Application::SetupCallbacks()
         this->OnFramebufferResize(window, new_size);
     };
 
+    p_callbacks->window_resized_callback = [this](GLFWwindow *window, WindowSize new_size) {
+        this->OnWindowResize(window, new_size);
+    };
+
     p_window->SetCallbacks(p_callbacks.get());
 }
 
 void Application::OnKey(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
-
     if ((key == GLFW_KEY_ESCAPE) && (action == GLFW_PRESS)) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
-        // TODO: Set close request flag?
     }
 
-    if ((key == GLFW_KEY_W) && (action == GLFW_PRESS)) {
-        m_audio_manager.PlaySoundEffect(m_laser_1,
-                                        {Gouda::Audio::AudioEffectType::Echo, Gouda::Audio::AudioEffectType::Reverb});
+    // Camera controls
+    if (action == GLFW_PRESS) {
+        switch (key) {
+            case GLFW_KEY_A:
+                p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_LEFT);
+                break;
+            case GLFW_KEY_D:
+                p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_RIGHT);
+                break;
+            case GLFW_KEY_W:
+                p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_UP);
+                break;
+            case GLFW_KEY_S:
+                p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_DOWN);
+                break;
+            case GLFW_KEY_Q:
+                p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZOOM_IN);
+                break;
+            case GLFW_KEY_E:
+                p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZOOM_OUT);
+                break;
+            case GLFW_KEY_SPACE:
+                p_ortho_camera->Shake(0.01f, 0.5f);
+                APP_LOG_INFO("Camera shake triggered");
+                break;
+        }
     }
-
-    if ((key == GLFW_KEY_S) && (action == GLFW_PRESS)) {
-        m_audio_manager.PlaySoundEffect(m_laser_2);
+    else if (action == GLFW_RELEASE) {
+        switch (key) {
+            case GLFW_KEY_A:
+                p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_LEFT);
+                break;
+            case GLFW_KEY_D:
+                p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_RIGHT);
+                break;
+            case GLFW_KEY_W:
+                p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_UP);
+                break;
+            case GLFW_KEY_S:
+                p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_DOWN);
+                break;
+            case GLFW_KEY_Q:
+                p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZOOM_IN);
+                break;
+            case GLFW_KEY_E:
+                p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZOOM_OUT);
+                break;
+        }
     }
 
     if (action == GLFW_PRESS) {
-        std::cout << "Key Pressed: " << key << '\n';
+        APP_LOG_DEBUG("Key pressed: {}", key);
     }
 }
-
 void Application::OnMouseMove(GLFWwindow *window, f32 xpos, f32 ypos)
 {
-    // std::cout << "Mouse Moved: (" << xpos << ", " << ypos << ")\n";
+    APP_LOG_DEBUG("Mouse moved: x:={}, y:={}", xpos, ypos);
 }
 
 void Application::OnMouseButton(GLFWwindow *window, int button, int action, int mods)
 {
     if (action == GLFW_PRESS) {
-        // std::cout << "Mouse Button Pressed: " << button << std::endl;
+        APP_LOG_DEBUG("Mouse button pressed: {}", button);
     }
 }
 
 void Application::OnMouseScroll(GLFWwindow *window, f32 x_offset, f32 y_offset)
 {
-    std::cout << "Mouse wheel scrolled: x:=" << x_offset << " y:=" << y_offset << '\n';
+    APP_LOG_INFO("Mouse wheel scrolled: x:={}, y:={}", x_offset, y_offset);
+    f32 zoom_delta = y_offset * 0.1f; // Adjust 0.1f for zoom sensitivity
+    p_ortho_camera->AdjustZoom(zoom_delta);
 }
 
 void Application::OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_size)
@@ -406,9 +483,13 @@ void Application::OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_si
     p_vk_queue->SetSwapchainInvalid(); // Mark swapchain for recreation (stops rendering)
     APP_LOG_INFO("Framebuffer resized: {}x{}, swapchain is now invalid", new_size.width, new_size.height);
 
-    vkDeviceWaitIdle(m_vk_core.GetDevice()); // Ensure no commands are running before destruction
+    // Cache the new frame buffer size
+    m_frame_buffer_size = new_size;
 
-    // Cleanup framebuffers
+    // Ensure no commands are running before destruction
+    vkDeviceWaitIdle(m_vk_core.GetDevice());
+
+    // Cleanup existing framebuffers
     m_vk_core.DestroyFramebuffers(m_frame_buffers);
 
     // Cleanup and Recreate swapchain and swapchain image views
@@ -422,7 +503,17 @@ void Application::OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_si
 
     APP_LOG_DEBUG("Swapchain and framebuffers recreated successfully.");
 
+    // Resume rendering
     p_vk_queue->SetSwapchainValid(); // resume rendering)
+}
+
+void Application::OnWindowResize(GLFWwindow *window, WindowSize new_size)
+{
+    if (new_size.area() != 0) {
+        m_settings_manager.SetWindowSize(new_size);
+    }
+
+    APP_LOG_INFO("Window resized: {}x{}", new_size.width, new_size.height);
 }
 
 void Application::OnWindowIconify(GLFWwindow *window, bool iconified) { m_is_iconified = iconified; }

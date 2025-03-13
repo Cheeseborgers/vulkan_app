@@ -2,13 +2,13 @@
 
 #include <GLFW/glfw3.h>
 
-#include "common.hpp"
+#include "backends/common.hpp"
+#include "backends/glfw/callbacks.hpp"
+#include "backends/window.hpp"
 #include "core/types.hpp"
-#include "glfw_callbacks.hpp"
-#include "window.hpp"
 
-namespace Gouda {
-namespace GLFW {
+namespace gouda {
+namespace glfw {
 
 /**
  * @class Window
@@ -100,9 +100,9 @@ public:
     FrameBufferSize GetFramebufferSize() const;
 
 private:
-    GLFWwindow *p_window;         ///< The GLFW window handle.
-    WindowConfig m_window_config; ///< The configuration used to create the window.
+    GLFWwindow *p_window; ///< The GLFW window handle.
+    Renderer m_renderer;
 };
 
-} // namespace GLFW
-} // namespace Gouda
+} // namespace glfw
+} // namespace gouda

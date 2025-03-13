@@ -3,8 +3,8 @@
 #include <print> // TODO: remove when logging fully implemented
 #include <ranges>
 
-#include "gouda_assert.hpp"
-#include "gouda_throw.hpp"
+#include "debug/assert.hpp"
+#include "debug/throw.hpp"
 
 #include "logger.hpp"
 
@@ -26,12 +26,13 @@ struct std::formatter<VkColorSpaceKHR> : std::formatter<std::string> {
     }
 };
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
-static VkFormat FindDepthFormat(VkPhysicalDevice Device)
+static VkFormat FindDepthFormat(VkPhysicalDevice device_ptr)
 {
     std::vector<VkFormat> candidates{VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
-    VkFormat depth_format{FindSupportedFormat(Device, candidates, VK_IMAGE_TILING_OPTIMAL,
+    VkFormat depth_format{FindSupportedFormat(device_ptr, candidates, VK_IMAGE_TILING_OPTIMAL,
                                               VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)};
 
     return depth_format;
@@ -82,34 +83,34 @@ std::string VkColorSpaceToString(VkColorSpaceKHR color_space)
     return "Unknown VkColorSpace (" + std::to_string(static_cast<u32>(color_space)) + ")";
 }
 
-static void PrintImageUsageFlags(const VkImageUsageFlags &flags)
+static void LogImageUsageFlags(const VkImageUsageFlags &flags)
 {
     if (flags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) {
-        std::cout << "Image usage transfer src is supported\n";
+        ENGINE_LOG_DEBUG("Image usage transfer src is supported");
     }
 
     if (flags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) {
-        std::cout << "Image usage transfer dest is supported\n";
+        ENGINE_LOG_DEBUG("Image usage transfer dest is supported");
     }
 
     if (flags & VK_IMAGE_USAGE_SAMPLED_BIT) {
-        std::cout << "Image usage sampled is supported\n";
+        ENGINE_LOG_DEBUG("Image usage sampled is supported");
     }
 
     if (flags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
-        std::cout << "Image usage color attachment is supported\n";
+        ENGINE_LOG_DEBUG("Image usage color attachment is supported");
     }
 
     if (flags & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
-        std::cout << "Image usage depth stencil attachment is supported\n";
+        ENGINE_LOG_DEBUG("Image usage depth stencil attachment is supported");
     }
 
     if (flags & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT) {
-        std::cout << "Image usage transient attachment is supported\n";
+        ENGINE_LOG_DEBUG("Image usage transient attachment is supported");
     }
 
     if (flags & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT) {
-        std::cout << "Image usage input attachment is supported\n";
+        ENGINE_LOG_DEBUG("Image usage input attachment is supported");
     }
 }
 
@@ -163,7 +164,7 @@ void VulkanPhysicalDevices::Init(const VulkanInstance &instance, const VkSurface
         device_info.m_physical_device = physical_device;
 
         vkGetPhysicalDeviceProperties(physical_device, &device_info.m_device_properties);
-        std::print("Device name: {}\n", device_info.m_device_properties.deviceName);
+        ENGINE_LOG_DEBUG("Device/gpu name: {}", device_info.m_device_properties.deviceName);
 
         u32 api_version{device_info.m_device_properties.apiVersion};
         std::print("    API version: {}.{}.{}.{}\n", VK_API_VERSION_VARIANT(api_version),
@@ -182,11 +183,11 @@ void VulkanPhysicalDevices::Init(const VulkanInstance &instance, const VkSurface
                                                  device_info.m_queue_family_properties.data());
 
         for (auto &&[q, queue_props] : std::views::enumerate(device_info.m_queue_family_properties)) {
-            VkQueueFlags flags{queue_props.queueFlags};
-            std::print("    Family {} Num queues: {} | GFX: {}, Compute: {}, Transfer: {}, Sparse: {}\n", q,
-                       queue_props.queueCount, (flags & VK_QUEUE_GRAPHICS_BIT) ? "Yes" : "No",
-                       (flags & VK_QUEUE_COMPUTE_BIT) ? "Yes" : "No", (flags & VK_QUEUE_TRANSFER_BIT) ? "Yes" : "No",
-                       (flags & VK_QUEUE_SPARSE_BINDING_BIT) ? "Yes" : "No");
+            // VkQueueFlags flags{queue_props.queueFlags};
+            //  std::print("    Family {} Num queues: {} | GFX: {}, Compute: {}, Transfer: {}, Sparse: {}\n", q,
+            //             queue_props.queueCount, (flags & VK_QUEUE_GRAPHICS_BIT) ? "Yes" : "No",
+            //             (flags & VK_QUEUE_COMPUTE_BIT) ? "Yes" : "No", (flags & VK_QUEUE_TRANSFER_BIT) ? "Yes" :
+            //             "No", (flags & VK_QUEUE_SPARSE_BINDING_BIT) ? "Yes" : "No");
 
             result = vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, q, surface,
                                                           &device_info.m_queue_supports_present[q]);
@@ -211,9 +212,9 @@ void VulkanPhysicalDevices::Init(const VulkanInstance &instance, const VkSurface
 
         // Surface Capabilities -----------------------------------------------------------------------------------
         result =
-            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &device_info.m_surface_capabilties);
+            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &device_info.m_surface_capabilities);
         CHECK_VK_RESULT(result, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR\n");
-        PrintImageUsageFlags(device_info.m_surface_capabilties.supportedUsageFlags);
+        LogImageUsageFlags(device_info.m_surface_capabilities.supportedUsageFlags);
 
         // Present Modes -------------------------------------------------------------------------------------------
         u32 present_mode_count{0};
@@ -230,6 +231,8 @@ void VulkanPhysicalDevices::Init(const VulkanInstance &instance, const VkSurface
 
         // Memory Properties --------------------------------------------------------------------------------------
         vkGetPhysicalDeviceMemoryProperties(physical_device, &device_info.m_memory_properties);
+
+        /*
         std::print("Num memory types: {}\n", device_info.m_memory_properties.memoryTypeCount);
 
         for (auto &&[j, mem_type] : std::views::enumerate(std::span{device_info.m_memory_properties.memoryTypes,
@@ -238,7 +241,9 @@ void VulkanPhysicalDevices::Init(const VulkanInstance &instance, const VkSurface
             PrintMemoryProperty(mem_type.propertyFlags);
         }
 
-        std::print("Num heap types: {}\n\n", device_info.m_memory_properties.memoryHeapCount);
+        std::print("Number of heap types: {}\n\n", device_info.m_memory_properties.memoryHeapCount);
+
+        */
 
         // Device Features ---------------------------------------------------------------------------------------
         vkGetPhysicalDeviceFeatures(device_info.m_physical_device, &device_info.m_features);
@@ -278,7 +283,7 @@ const PhysicalDevice &VulkanPhysicalDevices::Selected() const
 {
     if (m_dev_index < 0) {
         ENGINE_LOG_ERROR("No physical device selected");
-        // TODO: Throw here?
+        ENGINE_THROW("No physical device selected");
     }
 
     return m_devices[static_cast<size_t>(m_dev_index)];
@@ -339,4 +344,5 @@ void VulkanDevice::CreateDevice(VkQueueFlags requiredQueueFlags)
     ENGINE_LOG_INFO("Device created with queue family index: {}", m_queue_family);
 }
 
-} // end namespace
+} // namespace vk
+} // namespace gouda

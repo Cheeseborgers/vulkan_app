@@ -6,6 +6,9 @@
 
 #include "core/types.hpp"
 
+namespace gouda {
+namespace vk {
+
 inline void check_vk_result(VkResult res, const char *msg, const char *file, int line)
 {
     if (res != VK_SUCCESS) {
@@ -22,5 +25,8 @@ const char *GetDebugSeverityStr(VkDebugUtilsMessageSeverityFlagBitsEXT Severity)
 
 const char *GetDebugType(VkDebugUtilsMessageTypeFlagsEXT Type);
 
-VkFormat FindSupportedFormat(VkPhysicalDevice Device, const std::vector<VkFormat> &Candidates, VkImageTiling Tiling,
-                             VkFormatFeatureFlags Features);
+VkFormat FindSupportedFormat(VkPhysicalDevice device, const std::vector<VkFormat> &candidates, VkImageTiling tiling,
+                             VkFormatFeatureFlags features);
+
+} // namesapce vk
+} // namespace gouda

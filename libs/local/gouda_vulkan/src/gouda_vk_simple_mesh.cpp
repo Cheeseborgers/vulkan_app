@@ -1,6 +1,7 @@
 #include "gouda_vk_simple_mesh.hpp"
 
-namespace GoudaVK {
+namespace gouda {
+namespace vk {
 
 SimpleMesh::SimpleMesh() : p_texture{nullptr} {}
 
@@ -13,4 +14,5 @@ void SimpleMesh::Destroy(VkDevice device_ptr)
     }
 }
 
-} // end GoudaVk namespace
+} // namespace vk
+} // namespace gouda
