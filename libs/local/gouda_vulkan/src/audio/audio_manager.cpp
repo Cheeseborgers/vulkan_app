@@ -182,9 +182,13 @@ void AudioManager::QueueMusic(MusicTrack &track, bool play_immediately)
     }
 }
 
-void AudioManager::PlayMusic()
+void AudioManager::PlayMusic(bool shuffle)
 {
     if (!p_current_track && !m_music_tracks.empty()) {
+        if (shuffle) {
+            ShuffleTracks();
+        }
+
         PlayNextTrack();
     }
 }
@@ -260,7 +264,7 @@ void AudioManager::StopCurrentTrack()
     }
 }
 
-void AudioManager::ShuffleRemainingTracks()
+void AudioManager::ShuffleTracks()
 {
     if (m_current_index < m_music_tracks.size()) {
         std::shuffle(m_music_tracks.begin() + m_current_index, m_music_tracks.end(), math::GetGlobalRNG());
@@ -376,10 +380,10 @@ void AudioManager::SetMasterMusicVolume(f32 volume)
     if (m_music_source) {
         f32 current_volume{0.0f};
         alGetSourcef(m_music_source, AL_GAIN, &current_volume);
-        alSourcef(m_music_source, AL_GAIN, current_volume * m_master_music_volume);
+        alSourcef(m_music_source, AL_GAIN, current_volume * volume);
     }
 
-    ENGINE_LOG_DEBUG("Set master music volume to {}", m_master_music_volume);
+    ENGINE_LOG_DEBUG("Set master music volume to {} (volume): {}", m_master_music_volume, volume);
 }
 
 void AudioManager::SetMusicLooping(bool loop)

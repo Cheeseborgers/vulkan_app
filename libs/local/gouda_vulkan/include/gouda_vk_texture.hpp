@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 
 #include "core/types.hpp"
+#include "math/vector.hpp"
 
 namespace gouda {
 namespace vk {

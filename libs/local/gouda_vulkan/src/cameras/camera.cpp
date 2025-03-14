@@ -40,6 +40,18 @@ void Camera::ClearMovementFlag(CameraMovement flag)
     m_movement_flags = static_cast<CameraMovement>(static_cast<u32>(m_movement_flags) & ~static_cast<u32>(flag));
 }
 
+void Camera::SetPosition(const Vec3 &position)
+{
+    m_position = position;
+    // m_is_dirty = true;
+}
+
+void Camera::SetRotation(const Vec2 &rotation)
+{
+    m_rotation = rotation;
+    // m_is_dirty = true;
+}
+
 void Camera::Shake(f32 intensity, f32 duration)
 {
     m_shake_intensity = intensity;
@@ -52,16 +64,16 @@ void Camera::SetSway(f32 amplitude, f32 frequency)
     m_sway_frequency = frequency;
 }
 
-void Camera::Follow(const math::Vec3 *target, f32 speed)
+void Camera::Follow(const Vec3 *target, f32 speed)
 {
     p_follow_target = target;
     m_follow_speed = speed;
 }
 
 // Protected functions -------------------------------------------------------------------------------
-math::Vec3 Camera::ApplyEffects(f32 delta_time)
+Vec3 Camera::ApplyEffects(f32 delta_time)
 {
-    math::Vec3 offset{};
+    Vec3 offset{};
 
     // Apply shake if active
     if (m_shake_duration > 0.0f) {

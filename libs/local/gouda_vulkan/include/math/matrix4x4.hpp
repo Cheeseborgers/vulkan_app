@@ -22,9 +22,11 @@
  */
 #include <array>
 #include <cmath>
+#include <immintrin.h>
 
 #include "core/types.hpp"
 #include "debug/assert.hpp"
+#include "math/simd.hpp"
 #include "math/vector.hpp"
 
 namespace gouda::math {
@@ -32,13 +34,15 @@ namespace gouda::math {
 template <NumericT T>
 class Matrix4x4 {
 public:
-    std::array<T, 16> data; // Column-major: data[0-3] = column 0, data[4-7] = column 1, etc.
+    std::array<T, 16> data; // Column-major storage
 
     // Default constructor: Identity matrix
     Matrix4x4() { data = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
 
-    // Constructor with explicit values (column-major order)
+    // Constructor with explicit values
     Matrix4x4(const std::array<T, 16> &values) : data(values) {}
+
+    static Matrix4x4 identity() { return Matrix4x4(); }
 
     // Access element (row, col)
     T operator()(size_t row, size_t col) const
@@ -53,10 +57,23 @@ public:
         return data[col * 4 + row];
     }
 
-    // Matrix multiplication
+    // Matrix multiplication (SIMD optimized)
     Matrix4x4 operator*(const Matrix4x4 &other) const
     {
         Matrix4x4 result;
+
+// TODO: Use sse enum classes
+#if defined(__SSE__)
+        for (size_t col = 0; col < 4; ++col) {
+            __m128 bcol = _mm_load_ps(&other.data[col * 4]);
+            for (size_t row = 0; row < 4; ++row) {
+                __m128 arow = _mm_set_ps(data[row + 12], data[row + 8], data[row + 4], data[row]);
+                __m128 prod = _mm_mul_ps(arow, bcol);
+                result(row, col) = _mm_cvtss_f32(_mm_hadd_ps(_mm_hadd_ps(prod, prod), prod));
+            }
+        }
+#else
+        // Scalar fallback
         for (size_t row = 0; row < 4; ++row) {
             for (size_t col = 0; col < 4; ++col) {
                 T sum = T(0);
@@ -66,13 +83,23 @@ public:
                 result(row, col) = sum;
             }
         }
+#endif
         return result;
     }
 
-    // Transform a Vector<T, 4>
+    // Transform a Vector<T, 4> (SIMD optimized)
     Vector<T, 4> operator*(const Vector<T, 4> &vec) const
     {
         Vector<T, 4> result;
+
+#if defined(__SSE__)
+        __m128 v = _mm_load_ps(vec.data());
+        for (size_t row = 0; row < 4; ++row) {
+            __m128 mrow = _mm_set_ps(data[row + 12], data[row + 8], data[row + 4], data[row]);
+            __m128 prod = _mm_mul_ps(mrow, v);
+            result[row] = _mm_cvtss_f32(_mm_hadd_ps(_mm_hadd_ps(prod, prod), prod));
+        }
+#else
         for (size_t row = 0; row < 4; ++row) {
             T sum = T(0);
             for (size_t col = 0; col < 4; ++col) {
@@ -80,11 +107,12 @@ public:
             }
             result[row] = sum;
         }
+#endif
         return result;
     }
 
     // Common transformation matrices
-    static Matrix4x4 Translation(const Vector<T, 3> &t)
+    static Matrix4x4 translation(const Vector<T, 3> &t)
     {
         Matrix4x4 m;
         m(0, 3) = t[0];
@@ -93,7 +121,7 @@ public:
         return m;
     }
 
-    static Matrix4x4 RotationX(T angle)
+    static Matrix4x4 rotationX(T angle)
     {
         T c = std::cos(angle);
         T s = std::sin(angle);
@@ -102,6 +130,30 @@ public:
         m(1, 2) = -s;
         m(2, 1) = s;
         m(2, 2) = c;
+        return m;
+    }
+
+    static Matrix4x4 rotationY(T angle)
+    {
+        T c = std::cos(angle);
+        T s = std::sin(angle);
+        Matrix4x4 m;
+        m(0, 0) = c;
+        m(0, 2) = s;
+        m(2, 0) = -s;
+        m(2, 2) = c;
+        return m;
+    }
+
+    static Matrix4x4 rotationZ(T angle)
+    {
+        T c = std::cos(angle);
+        T s = std::sin(angle);
+        Matrix4x4 m;
+        m(0, 0) = c;
+        m(0, 1) = -s;
+        m(1, 0) = s;
+        m(1, 1) = c;
         return m;
     }
 
@@ -114,7 +166,7 @@ public:
         return m;
     }
 
-    const T *Data() const { return data.data(); } // For passing to graphics APIs
+    const T *getData() const { return data.data(); } // For passing to graphics APIs
 };
 
 } // namespace gouda::math

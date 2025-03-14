@@ -9,6 +9,7 @@ project(gouda_vulkan
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native") # Use best CPU optimizations
 
 # Find Vulkan
 find_package(Vulkan REQUIRED)
@@ -16,6 +17,13 @@ find_package(Vulkan REQUIRED)
 find_package(glslang CONFIG REQUIRED)
 
 find_package(Threads REQUIRED)
+
+# GLFW ------------------------------
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(GLFW_INSTALL OFF CACHE BOOL "GLFW lib only")
+add_subdirectory("libs/thirdparty/glfw")
 
 # Audio
 add_subdirectory(libs/thirdparty/openAL)
@@ -59,15 +67,13 @@ set(PROJECT_SOURCES
     src/math/vector.cpp
     src/math/quaternion.cpp
     src/utility/filesystem.cpp
+    src/utility/image.cpp
 )
 
 add_library(${PROJECT_NAME} STATIC ${PROJECT_SOURCES})
 
 target_include_directories(${PROJECT_NAME}
     PUBLIC
-
-    # Local libs
-    # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/local/gouda_image>
 
     # Thirdpart libs
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/openAL>
@@ -84,7 +90,6 @@ target_link_libraries(${PROJECT_NAME}
     PUBLIC
     gouda_logger
 
-    # gouda_image
     stb_image
 
     # Sound
@@ -95,6 +100,7 @@ target_link_libraries(${PROJECT_NAME}
 
     pcg
 
+    glfw
     Vulkan::Vulkan
 
     # Shaders

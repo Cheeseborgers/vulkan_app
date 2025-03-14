@@ -235,7 +235,8 @@ VkShaderModule CreateShaderModuleFromBinary(VkDevice device_ptr, std::string_vie
 
     VkResult result{vkCreateShaderModule(device_ptr, &shader_create_info, nullptr, &shader_module)};
     if (result != VK_SUCCESS) {
-        ENGINE_LOG_ERROR("Failed to create shader module from binary file '{}', VkResult: {}", file_name, result);
+        ENGINE_LOG_ERROR("Failed to create shader module from binary file '{}', VkResult: {}", file_name,
+                         VKResultToString(result));
         return nullptr;
     }
 

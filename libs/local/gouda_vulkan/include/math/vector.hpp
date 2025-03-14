@@ -22,62 +22,13 @@
  */
 #include <array>
 #include <cmath>
-#include <immintrin.h>
-
-#if defined(_MSC_VER)
-#include <intrin.h>
-#else // GCC / Clang
-#include <cpuid.h>
-#endif
 
 #include "core/types.hpp"
 #include "debug/assert.hpp"
+#include "math/simd.hpp"
 
 namespace gouda {
 namespace math {
-
-// Enumeration to define available SIMD levels (NONE, SSE2, AVX, AVX2)
-enum class SIMDLevel : uint8_t { NONE, SSE2, AVX, AVX2 };
-
-// Function to detect available SIMD capabilities of the CPU
-inline SIMDLevel DetectSIMD()
-{
-    int cpuInfo[4] = {0};
-
-#if defined(_MSC_VER) // MSVC Version
-    __cpuid(cpuInfo, 0);
-    if (cpuInfo[0] >= 7) {
-        __cpuidex(cpuInfo, 7, 0);
-        if (cpuInfo[1] & (1 << 5))
-            return SIMDLevel::AVX2;
-    }
-    __cpuid(cpuInfo, 1);
-    if (cpuInfo[2] & (1 << 28))
-        return SIMDLevel::AVX;
-    if (cpuInfo[3] & (1 << 26))
-        return SIMDLevel::SSE2;
-
-#elif defined(__GNUC__) || defined(__clang__) // GCC / Clang
-    unsigned int eax, ebx, ecx, edx;
-    if (__get_cpuid(0, &eax, &ebx, &ecx, &edx)) {
-        if (eax >= 7) {
-            __get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx);
-            if (ebx & (1 << 5))
-                return SIMDLevel::AVX2;
-        }
-        __get_cpuid(1, &eax, &ebx, &ecx, &edx);
-        if (ecx & (1 << 28))
-            return SIMDLevel::AVX;
-        if (edx & (1 << 26))
-            return SIMDLevel::SSE2;
-    }
-#endif
-
-    return SIMDLevel::NONE;
-}
-
-// Detect and store the SIMD level at compile-time
-static const SIMDLevel simdLevel = DetectSIMD();
 
 /**
  * @brief Base class for vector operations with static polymorphism (CRTP).
@@ -208,6 +159,13 @@ public:
                 _mm_storeu_ps(this->components.data(), a);
                 return *static_cast<Derived *>(this);
             }
+            else if (simdLevel >= SIMDLevel::SSE2) {
+                __m128 a = _mm_loadu_ps(this->components.data());
+                __m128 b = _mm_loadu_ps(other.components.data());
+                a = _mm_sub_ps(a, b);
+                _mm_storeu_ps(this->components.data(), a);
+                return *static_cast<Derived *>(this);
+            }
         }
         for (size_t i = 0; i < N; ++i) {
             (*this)[i] -= other[i];
@@ -271,10 +229,26 @@ public:
         return result;
     }
 
-    bool operator!=(const Derived &other) const { return !(*this == other); }
+    // Inequality operator, using the derived class's equality operator
+    bool operator!=(const Derived &other) const
+    {
+        return !(*this == other); // Delegates to the operator== implemented in Derived
+    }
+
+    // Equality operator is typically expected to be implemented by the derived class
+    bool operator==(const Derived &other) const
+    {
+        // Base implementation can delegate to the derived class if needed
+        for (size_t i = 0; i < N; ++i) {
+            if (getComponent(i) != other.getComponent(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     // Vector operations
-    T Dot(const Derived &other) const
+    T dot(const Derived &other) const
     {
         T result = T(0);
         if constexpr (N == 4) {
@@ -295,12 +269,12 @@ public:
     }
 
     // Magnitude (length)
-    f64 Magnitude() const { return std::sqrt(static_cast<f64>(Dot(*static_cast<const Derived *>(this)))); }
+    f64 magnitude() const { return std::sqrt(static_cast<f64>(dot(*static_cast<const Derived *>(this)))); }
 
     // Normalized vector
-    Derived Normalized() const
+    Derived normalized() const
     {
-        f64 mag{Magnitude()};
+        f64 mag{magnitude()};
         return (mag > 0.0) ? (*this / static_cast<T>(mag)) : Derived();
     }
 
@@ -310,7 +284,7 @@ public:
      * @param other The other vector.
      * @return The squared distance.
      */
-    T SquaredDistance(const Derived &other) const
+    T squaredDistance(const Derived &other) const
     {
         T sum = T(0);
         for (size_t i = 0; i < N; ++i) {
@@ -326,7 +300,7 @@ public:
      * @param other The other vector.
      * @return The distance.
      */
-    f64 Distance(const Derived &other) const { return std::sqrt(static_cast<f64>(SquaredDistance(other))); }
+    f64 distance(const Derived &other) const { return std::sqrt(static_cast<f64>(SquaredDistance(other))); }
 };
 
 // Primary templated Vector class for N dimensions
@@ -345,7 +319,7 @@ public:
     }
 
     // Cross product (only for 3D vectors)
-    Vector Cross(const Vector &other) const
+    Vector cross(const Vector &other) const
         requires(N == 3)
     {
         return Vector(components[1] * other[2] - components[2] * other[1], // x
@@ -389,7 +363,7 @@ public:
     Vector(T x_, T y_, T z_) : components{x_, y_, z_} {}
 
     // Cross product (specific to 3D)
-    Vector Cross(const Vector &other) const
+    Vector cross(const Vector &other) const
     {
         return Vector(y * other.z - z * other.y, // x
                       z * other.x - x * other.z, // y

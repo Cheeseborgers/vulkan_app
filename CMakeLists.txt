@@ -45,13 +45,6 @@ endif()
 
 find_package(Threads REQUIRED)
 
-# third party libs ------------------------------
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(GLFW_INSTALL OFF CACHE BOOL "GLFW lib only")
-add_subdirectory("libs/thirdparty/glfw")
-
 # gouda logger (currenlty coupled to engine code: rethink this)
 add_subdirectory("libs/local/gouda_logger")
 
@@ -94,7 +87,6 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
     PUBLIC
     gouda_vulkan
-    glfw
     nlohmann_json::nlohmann_json
     Threads::Threads
 )

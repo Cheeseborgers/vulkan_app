@@ -30,7 +30,7 @@ void OrthographicCamera::Update(f32 delta_time)
 
     // Handle movement flags
     if (m_movement_flags != CameraMovement::NONE) {
-        math::Vec2 movement;
+        Vec2 movement;
         f32 zoom_delta{0.0f};
 
         if (m_movement_flags & CameraMovement::MOVE_LEFT)
@@ -68,7 +68,7 @@ void OrthographicCamera::AdjustZoom(float delta)
     m_is_dirty = true;                // Flag to update the projection matrix if needed
 }
 
-math::Mat4 OrthographicCamera::GetViewProjectionMatrix() const
+Mat4 OrthographicCamera::GetViewProjectionMatrix() const
 {
     if (m_is_dirty) {
         UpdateMatrix();
@@ -80,14 +80,14 @@ math::Mat4 OrthographicCamera::GetViewProjectionMatrix() const
 // Private functions ---------------------------------------------------------------------
 void OrthographicCamera::UpdateMatrix() const
 {
-    // Calculate the total camera position
-    math::Vec3 cameraPos = m_position + m_offset;
+    // Calculate the total camera position from the offset
+    Vec3 camera_position = m_position + m_offset;
 
     // Create the view matrix by translating the world opposite to the camera's position
-    math::Mat4 view = math::translate(-cameraPos);
+    Mat4 view = math::translate(-(camera_position));
 
     // Create the projection matrix with zoom scaling
-    math::Mat4 projection = m_base_projection * math::scale(math::Vec3(m_zoom, m_zoom, 1.0f));
+    Mat4 projection = m_base_projection * math::scale(math::Vec3(m_zoom, m_zoom, 1.0f));
 
     // Combine projection and view matrices
     m_view_projection_matrix = projection * view;

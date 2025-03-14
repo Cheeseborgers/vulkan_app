@@ -1,5 +1,6 @@
 #include "application.hpp"
 
+#include "backends/glfw/events.hpp"
 #include "math/vector.hpp"
 #include "utility/timer.hpp"
 
@@ -9,7 +10,7 @@
 
 namespace {
 struct UniformData {
-    gouda::math::Mat4 WVP;
+    gouda::Mat4 WVP;
 };
 }
 
@@ -101,18 +102,15 @@ void Application::Initialize()
     CreateFences();
     SetupCallbacks();
 
-    // Initialize orthographic camera
-    f32 aspect{static_cast<float>(m_frame_buffer_size.width) / m_frame_buffer_size.height};
-    p_ortho_camera =
-        std::make_unique<gouda::OrthographicCamera>(-aspect, aspect, -1.0f, 1.0f, 1.0f, 2.0f,
-                                                    0.5f); // left, right, bottom, top, zoom, speed, sensitivity
-
-    // p_ortho_camera = std::make_unique<gouda::PerspectiveCamera>(60.0f, 1.777f, 0.1f, 1000.0f);
-    // p_ortho_camera->SetPosition({0.0f, 0.0f, 5.0f});
-    // p_ortho_camera->SetRotation(glm::vec2(0.0f, 3.1415926535f));
+    // Initialize orthographic camera (left, right, bottom, top, zoom, speed, sensitivity)
+    f32 aspect{gouda::math::aspect_ratio(m_frame_buffer_size)};
+    p_ortho_camera = std::make_unique<gouda::OrthographicCamera>(-aspect, aspect, -1.0f, 1.0f, 1.0f, 2.0f, 0.5f);
 
     // Initialize and load audio
     m_audio_manager.Initialize();
+    m_audio_manager.SetMasterSoundVolume(settings.audio_settings.sound_volume);
+    m_audio_manager.SetMasterMusicVolume(settings.audio_settings.music_volume);
+
     m_laser_1.Load("assets/audio/sound_effects/laser1.wav");
     m_laser_2.Load("assets/audio/sound_effects/laser2.wav");
 
@@ -123,8 +121,6 @@ void Application::Initialize()
     m_audio_manager.QueueMusic(m_music3, false);
     m_audio_manager.QueueMusic(m_music2, false);
     m_audio_manager.QueueMusic(m_music, false);
-    m_audio_manager.ShuffleRemainingTracks();
-    m_audio_manager.PlayMusic();
 
     APP_LOG_DEBUG("Application initialization success");
 }
@@ -166,10 +162,12 @@ void Application::Execute()
         fps_limiter.emplace(m_time_settings.target_fps);
     }
 
+    m_audio_manager.PlayMusic(true);
+
     while (!p_window->ShouldClose()) {
 
         p_window->PollEvents();
-        m_audio_manager.Update(); // TODO: IS this where we want to update audio? also do we pause audio when minimised?
+        m_audio_manager.Update();
 
         frame_timer.Update();
         delta_time = frame_timer.GetDeltaTime();
@@ -179,8 +177,8 @@ void Application::Execute()
 
         if (m_is_iconified) {
             // TODO: Hide bellow in the event handle when done
-            glfwWaitEventsTimeout(sleep_duration); // Avoid busy waiting
-            continue;                              // Skip rendering while minimized
+            gouda::glfw::wait_events(sleep_duration); // Avoid busy waiting
+            continue;                                 // Skip rendering while minimized
         }
 
         // Update physics at a fixed timestep
@@ -355,7 +353,7 @@ void Application::UpdateUniformBuffer(u32 image_index, f32 delta_time)
     */
 
     // Use camera's view-projection matrix instead of rotating quad
-    gouda::math::Mat4 wvp{p_ortho_camera->GetViewProjectionMatrix()};
+    gouda::Mat4 wvp{p_ortho_camera->GetViewProjectionMatrix()};
     m_uniform_buffers[image_index].Update(m_vk_core.GetDevice(), &wvp, sizeof(wvp));
 }
 
@@ -423,7 +421,6 @@ void Application::OnKey(GLFWwindow *window, int key, int scancode, int action, i
                 break;
             case GLFW_KEY_SPACE:
                 p_ortho_camera->Shake(0.01f, 0.5f);
-                APP_LOG_INFO("Camera shake triggered");
                 break;
         }
     }
@@ -456,7 +453,7 @@ void Application::OnKey(GLFWwindow *window, int key, int scancode, int action, i
 }
 void Application::OnMouseMove(GLFWwindow *window, f32 xpos, f32 ypos)
 {
-    APP_LOG_DEBUG("Mouse moved: x:={}, y:={}", xpos, ypos);
+    // APP_LOG_DEBUG("Mouse moved: x:={}, y:={}", xpos, ypos);
 }
 
 void Application::OnMouseButton(GLFWwindow *window, int button, int action, int mods)
@@ -468,7 +465,7 @@ void Application::OnMouseButton(GLFWwindow *window, int button, int action, int 
 
 void Application::OnMouseScroll(GLFWwindow *window, f32 x_offset, f32 y_offset)
 {
-    APP_LOG_INFO("Mouse wheel scrolled: x:={}, y:={}", x_offset, y_offset);
+    // APP_LOG_DEBUG("Mouse wheel scrolled: x:={}, y:={}", x_offset, y_offset);
     f32 zoom_delta = y_offset * 0.1f; // Adjust 0.1f for zoom sensitivity
     p_ortho_camera->AdjustZoom(zoom_delta);
 }
@@ -492,7 +489,7 @@ void Application::OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_si
     // Cleanup existing framebuffers
     m_vk_core.DestroyFramebuffers(m_frame_buffers);
 
-    // Cleanup and Recreate swapchain and swapchain image views
+    // Cleanup and Recreate swapchain, swapchain image views, and depth resources.
     m_vk_core.ReCreateSwapchain();
 
     // Recreate framebuffers for new swapchain images

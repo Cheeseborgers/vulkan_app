@@ -22,13 +22,25 @@ void from_json(const nlohmann::json &json_data, WindowSize &window_size)
     json_data.at("height").get_to(window_size.height);
 }
 
-// Definition of to_json and from_json for ApplicationSettings
+void to_json(nlohmann::json &json_data, const ApplicationAudioSettings &audio_settings)
+{
+    json_data =
+        nlohmann::json{{"sound_volume", audio_settings.sound_volume}, {"music_volume", audio_settings.music_volume}};
+}
+
+void from_json(const nlohmann::json &json_data, ApplicationAudioSettings &audio_settings)
+{
+    json_data.at("sound_volume").get_to(audio_settings.sound_volume);
+    json_data.at("music_volume").get_to(audio_settings.music_volume);
+}
+
 void to_json(nlohmann::json &json_data, const ApplicationSettings &settings)
 {
     json_data = nlohmann::json{{"size", settings.size},
+                               {"refresh_rate", settings.refresh_rate},
                                {"fullscreen", settings.fullscreen},
                                {"vsync", settings.vsync},
-                               {"refresh_rate", settings.refresh_rate}};
+                               {"audio", settings.audio_settings}};
 }
 
 void from_json(const nlohmann::json &json_data, ApplicationSettings &settings)
@@ -42,6 +54,13 @@ void from_json(const nlohmann::json &json_data, ApplicationSettings &settings)
     settings.fullscreen = json_data.value("fullscreen", false);
     settings.vsync = json_data.value("vsync", false);
     settings.refresh_rate = json_data.value("refresh_rate", 60);
+
+    // Handle the nested WindowSize structure manually
+    if (json_data.contains("audio") && json_data["audio"].is_object()) {
+        settings.audio_settings.sound_volume =
+            json_data["audio"].value("sound_volume", 0.5f); // Default value if missing
+        settings.audio_settings.music_volume = json_data["audio"].value("music_volume", 0.5f);
+    }
 }
 
 SettingsManager::SettingsManager(const std::string &filepath, bool auto_save, bool auto_load)
@@ -61,12 +80,17 @@ SettingsManager::~SettingsManager()
 
 void SettingsManager::Load()
 {
+    // FIXME: create settings dir too if not exist
     // Check if the file exists and is not empty
     if (!gouda::fs::IsFileExists(m_filepath)) {
         APP_LOG_WARNING("Settings file '{}' does not exist, creating with default settings.", m_filepath);
         Save(); // Create the file and save default settings
         return;
     }
+
+    // gouda::fs::GetCurrentWorkingDirectory();
+
+    APP_LOG_WARNING("file path: {}", gouda::fs::GetCurrentWorkingDirectory());
 
     if (gouda::fs::IsFileEmpty(m_filepath)) {
         APP_LOG_WARNING("Settings file '{}' does not exist, creating with default setting.", m_filepath);
@@ -124,7 +148,7 @@ void SettingsManager::SetSettings(const ApplicationSettings &new_settings)
 {
     if (new_settings.size.area() == 0) {
         APP_LOG_ERROR("New window size cannot have zero dimentions: {}x{}.", new_settings.size.width,
-                      new_settings.height);
+                      new_settings.size.height);
         return;
     }
 

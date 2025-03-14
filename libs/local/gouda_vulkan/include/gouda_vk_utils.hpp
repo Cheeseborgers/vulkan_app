@@ -28,5 +28,7 @@ const char *GetDebugType(VkDebugUtilsMessageTypeFlagsEXT Type);
 VkFormat FindSupportedFormat(VkPhysicalDevice device, const std::vector<VkFormat> &candidates, VkImageTiling tiling,
                              VkFormatFeatureFlags features);
 
+std::string_view VKResultToString(VkResult result);
+
 } // namesapce vk
 } // namespace gouda

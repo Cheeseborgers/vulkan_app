@@ -309,19 +309,17 @@ VkImageView CreateImageView(VkDevice device_ptr, VkImage image_ptr, VkFormat for
 
 void VulkanCore::CreateTexture(std::string_view file_name, VulkanTexture &texture)
 {
-    StbiImage image(file_name);
-
-    if (!image.GetData()) {
-        ENGINE_LOG_ERROR("Error loading texture from: {}.", file_name);
-        ENGINE_THROW("Could not load texture image.");
+    auto load_image_result = Image::Load(file_name);
+    if (!load_image_result) {
+        ENGINE_LOG_ERROR("Error loading texture from: {}, error: {}", file_name, load_image_result.error());
+        ENGINE_THROW("Error loading texture from: {}. error:", file_name, load_image_result.error());
     }
+    auto image = load_image_result.value();
 
     u32 layer_count{1};
     VkImageCreateFlags flags{0};
     VkFormat format{VK_FORMAT_R8G8B8A8_UNORM};
-    CreateTextureImageFromData(texture, image.GetData(), image.GetSize(), format, layer_count, flags);
-
-    image.free();
+    CreateTextureImageFromData(texture, image.data().data(), image.GetSize(), format, layer_count, flags);
 
     u32 mip_levels{1};
     VkImageViewType image_view_type{VK_IMAGE_VIEW_TYPE_2D};
@@ -941,27 +939,30 @@ void VulkanCore::DestroySwapchainImageViews()
 void VulkanCore::CreateDepthResources()
 {
     int swapchain_image_count{static_cast<int>(m_images.size())};
-    u32 layer_count{1};
-    u32 mip_levels{1};
 
+    VkFormat depth_format{p_device->GetSelectedPhysicalDevice().m_depth_format};
+    ASSERT(depth_format != VK_FORMAT_UNDEFINED, "Depth format is not set properly!");
+
+    ImageSize image_size{m_frame_buffer_size};
+    ASSERT(image_size.width > 0 && image_size.height > 0, "Framebuffer size must be greater than 0!");
+
+    // Resize depth images vector to match swapchain image count
     m_depth_images.resize(swapchain_image_count);
 
-    for (int i = 0; i < swapchain_image_count; i++) {
-        VkFormat depth_format{p_device->GetSelectedPhysicalDevice().m_depth_format};
-        ASSERT(depth_format != VK_FORMAT_UNDEFINED, "Depth format is not set properly!");
+    // Create depth images and associated resources
+    for (auto &depth_image : m_depth_images) {
 
-        ImageSize image_size{m_frame_buffer_size};
-        ASSERT(image_size.width > 0 && image_size.height > 0, "Framebuffer size must be greater than 0!");
+        // Create the depth image for each swapchain image
+        CreateDepthImage(depth_image, image_size, depth_format);
 
-        CreateDepthImage(m_depth_images[i], image_size, depth_format);
+        // Transition the depth image layout
+        VkImageLayout old_layout = {};
+        VkImageLayout new_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        TransitionImageLayout(depth_image.p_image, depth_format, old_layout, new_layout, 1, 1);
 
-        VkImageLayout old_layout{};
-        VkImageLayout new_layout{VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
-        TransitionImageLayout(m_depth_images[i].p_image, depth_format, old_layout, new_layout, layer_count, mip_levels);
-
-        m_depth_images[i].p_view =
-            CreateImageView(p_device->GetDevice(), m_depth_images[i].p_image, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT,
-                            VK_IMAGE_VIEW_TYPE_2D, layer_count, mip_levels);
+        // Create the depth image view
+        depth_image.p_view = CreateImageView(p_device->GetDevice(), depth_image.p_image, depth_format,
+                                             VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_VIEW_TYPE_2D, 1, 1);
     }
 
     ENGINE_LOG_DEBUG("Depth resources created.");
@@ -978,7 +979,7 @@ void VulkanCore::DestroyDepthResources()
     ENGINE_LOG_DEBUG("Depth resources destroyed.");
 }
 
-// FIXME: Do we recreate depth stuff here too?
+// FIXME: Do we recreate depth stuff here too? currently yes
 void VulkanCore::ReCreateSwapchain()
 {
     DestroySwapchainImageViews();
@@ -1053,12 +1054,15 @@ void VulkanCore::ReCreateSwapchain()
     p_swap_chain = new_swap_chain;
     ENGINE_LOG_DEBUG("New swapchain handle: {}.", reinterpret_cast<void *>(p_swap_chain));
 
-    ENGINE_LOG_INFO("Swap chain recreated with V-Sync mode: {}.",
-                    (m_vsync_mode == VSyncMode::ENABLED)   ? "ENABLED (FIFO)"
-                    : (m_vsync_mode == VSyncMode::MAILBOX) ? "DISABLED (MAILBOX)"
-                                                           : "DISABLED (IMMEDIATE)");
+    ENGINE_LOG_DEBUG("Swap chain recreated with V-Sync mode: {}.",
+                     (m_vsync_mode == VSyncMode::ENABLED)   ? "ENABLED (FIFO)"
+                     : (m_vsync_mode == VSyncMode::MAILBOX) ? "DISABLED (MAILBOX)"
+                                                            : "DISABLED (IMMEDIATE)");
 
     CreateSwapchainImageViews();
+
+    DestroyDepthResources();
+    CreateDepthResources();
 }
 
 } // namespace vk

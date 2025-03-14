@@ -21,8 +21,8 @@ void PerspectiveCamera::Update(f32 delta_time)
 
     // Handle movement flags
     if (m_movement_flags != CameraMovement::NONE) {
-        math::Vec3 movement{0.0f, 0.0f, 0.0f};
-        math::Vec2 rotation_delta{0.0f, 0.0f};
+        Vec3 movement{0.0f, 0.0f, 0.0f};
+        Vec2 rotation_delta{0.0f, 0.0f};
 
         if (m_movement_flags & CameraMovement::MOVE_LEFT)
             movement.x -= m_speed * delta_time;
@@ -51,7 +51,7 @@ void PerspectiveCamera::Update(f32 delta_time)
     }
 }
 
-math::Mat4 PerspectiveCamera::GetViewProjectionMatrix() const
+Mat4 PerspectiveCamera::GetViewProjectionMatrix() const
 {
     if (m_is_dirty) {
         UpdateMatrix();
@@ -70,19 +70,19 @@ void PerspectiveCamera::SetFOV(f32 fov)
 void PerspectiveCamera::UpdateMatrix() const
 {
     // Compute total position with offset
-    math::Vec3 total_position{m_position + m_offset};
+    Vec3 total_position{m_position + m_offset};
 
     // Compute forward direction from pitch (x) and yaw (y)
     f32 pitch{m_rotation.x};
     f32 yaw{m_rotation.y};
-    math::Vec3 forward = math::Vec3(cos(pitch) * sin(yaw), sin(pitch), cos(pitch) * cos(yaw));
+    Vec3 forward = Vec3(cos(pitch) * sin(yaw), sin(pitch), cos(pitch) * cos(yaw));
 
     // Define up vector (world y-axis)
-    math::Vec3 up{math::Vec3(0.0f, 1.0f, 0.0f)};
+    Vec3 up{Vec3(0.0f, 1.0f, 0.0f)};
 
     // Construct view matrix using lookAt
-    math::Mat4 view{math::lookAt(total_position, total_position + forward, up)};
-    math::Mat4 projection{math::perspective(math::radians(m_fov), m_aspect, m_near, m_far)};
+    Mat4 view{math::lookAt(total_position, total_position + forward, up)};
+    Mat4 projection{math::perspective(math::radians(m_fov), m_aspect, m_near, m_far)};
     m_view_projection_matrix = projection * view;
     m_is_dirty = false;
 }

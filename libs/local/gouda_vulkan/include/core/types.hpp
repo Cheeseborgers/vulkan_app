@@ -6,16 +6,9 @@
 
 #include <chrono>
 #include <concepts>
-#include <cstdint>
 #include <expected>
 #include <filesystem>
 #include <functional>
-#include <sstream>
-#include <string>
-
-// #include <glm/mat4x4.hpp> // For glm::mat4
-// #include <glm/vec3.hpp>   // For glm::vec3
-// #include <glm/vec4.hpp>   // For glm::vec4
 
 using uint = unsigned int;
 using ushort = unsigned short;
@@ -51,26 +44,8 @@ using FilePath = std::filesystem::path;
 template <typename A, typename B>
 using Expect = std::expected<A, B>;
 
-// TODO: This is for input do we keep here?
-using KeyCode = int16_t;
-
 template <typename... Args>
 using CallbackFunction = std::function<void(Args...)>;
-
-// GLM type definitions
-// using Vec2 = glm::vec2;
-// using Vec3 = glm::vec3;
-// using Vec4 = glm::vec4;
-// using Mat4 = glm::mat4;
-
-// const glm::mat4 IdentityMatrix = glm::mat4(1.0f);
-
-// Containers --------------------------------
-template <typename T>
-using Vector = std::vector<T>;
-
-template <typename T, std::size_t N>
-using Array = std::array<T, N>;
 
 /**
  * @brief Concept that checks if a type is a floating-point type.

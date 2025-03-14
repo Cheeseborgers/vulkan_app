@@ -132,12 +132,12 @@ public:
      * @param track The music track to queue.
      * @param play_immediately Whether the music should start playing immediately (default is true).
      */
-    void QueueMusic(MusicTrack &track, bool play_immediately = true);
+    void QueueMusic(MusicTrack &track, bool play_immediately = false);
 
     /**
      * @brief Starts playing the queued music track.
      */
-    void PlayMusic();
+    void PlayMusic(bool shuffle = false);
 
     /**
      * @brief Pauses the currently playing music.
@@ -162,7 +162,7 @@ public:
     /**
      * @brief Shuffles the remaining music tracks in the queue.
      */
-    void ShuffleRemainingTracks();
+    void ShuffleTracks();
 
     /**
      * @brief Updates the audio system (should be called every frame).
