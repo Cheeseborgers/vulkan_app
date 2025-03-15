@@ -8,6 +8,7 @@
 #include "AL/efx-presets.h"
 
 #include "debug/assert.hpp"
+#include "debug/throw.hpp"
 #include "logger.hpp"
 
 #include "math/random.hpp"
@@ -59,12 +60,12 @@ AudioManager::~AudioManager()
     ENGINE_LOG_DEBUG("Audio manager destroyed");
 }
 
-void AudioManager::Initialize()
+void AudioManager::Initialize(f32 sound_volume, f32 music_volume)
 {
     p_device = alcOpenDevice(nullptr); // Default device
     if (!p_device) {
         ENGINE_LOG_ERROR("Failed to open audio device");
-        throw std::runtime_error("Failed to open audio device");
+        ENGINE_THROW("Failed to open audio device");
     }
 
     p_context = alcCreateContext(p_device, nullptr);
@@ -72,7 +73,7 @@ void AudioManager::Initialize()
         alcDestroyContext(p_context);
         alcCloseDevice(p_device);
         ENGINE_LOG_ERROR("Failed to create or set audio context");
-        throw std::runtime_error("Failed to create or set audio context");
+        ENGINE_THROW("Failed to create or set audio context");
     }
 
     InitializeSources();
@@ -92,6 +93,9 @@ void AudioManager::Initialize()
             InitializeAudioEffects();
         }
     }
+
+    SetMasterSoundVolume(sound_volume);
+    SetMasterMusicVolume(music_volume);
 
     ENGINE_LOG_DEBUG("Audio manager initialized");
 }

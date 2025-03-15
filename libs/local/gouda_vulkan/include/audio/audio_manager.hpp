@@ -95,7 +95,7 @@ public:
      * This function sets up the OpenAL device and context, prepares audio sources, and initializes buffers for music
      * streaming.
      */
-    void Initialize();
+    void Initialize(f32 sound_volume = 1.0f, f32 music_volume = 1.0f);
 
     /**
      * @brief Plays a sound effect.

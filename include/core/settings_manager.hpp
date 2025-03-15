@@ -54,7 +54,7 @@ void from_json(const nlohmann::json &json_data, ApplicationSettings &settings);
 
 class SettingsManager {
 public:
-    explicit SettingsManager(const std::string &filepath, bool auto_save = false, bool auto_load = true);
+    explicit SettingsManager(FilePath filepath, bool auto_save = false, bool auto_load = true);
     ~SettingsManager();
 
     void Load();
@@ -71,6 +71,7 @@ public:
 
 private:
     ApplicationSettings m_settings;
-    std::string m_filepath;
+    FilePath m_filepath;
     bool m_auto_save;
+    bool m_is_valid;
 };
