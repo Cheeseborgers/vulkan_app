@@ -28,7 +28,7 @@
 
 #include "core/types.hpp"
 
-#include "gouda_vk_allocated_buffer.hpp"
+#include "gouda_vk_buffer_manager.hpp"
 #include "gouda_vk_device.hpp"
 #include "gouda_vk_instance.hpp"
 #include "gouda_vk_queue.hpp"
@@ -63,11 +63,11 @@ public:
     void CreateCommandBuffers(u32 count, VkCommandBuffer *command_buffers_ptr);
     void FreeCommandBuffers(u32 count, const VkCommandBuffer *command_buffers_ptr);
 
-    AllocatedBuffer CreateVertexBuffer(const void *vertices_ptr, size_t data_size);
+    Buffer CreateVertexBuffer(const void *vertices_ptr, size_t data_size);
 
     // TODO: Remove one of these functions
-    void CreateUniformBuffers(std::vector<AllocatedBuffer> &uniform_buffers, size_t data_size);
-    std::vector<AllocatedBuffer> CreateUniformBuffers(size_t data_size);
+    void CreateUniformBuffers(std::vector<Buffer> &uniform_buffers, size_t data_size);
+    std::vector<Buffer> CreateUniformBuffers(size_t data_size);
 
     void CreateTexture(std::string_view file_name, VulkanTexture &texture);
 
@@ -92,14 +92,6 @@ private:
     void CreateDepthResources();
     void DestroyDepthResources();
     void CreateCommandBufferPool();
-    AllocatedBuffer CreateUniformBuffer(size_t size);
-
-    Expect<u32, std::string> GetMemoryTypeIndex(u32 memory_type_bits,
-                                                VkMemoryPropertyFlags required_memory_property_flags);
-
-    void CopyBufferToBuffer(VkBuffer destination, VkBuffer source, VkDeviceSize size);
-    AllocatedBuffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
-
     void CreateTextureImageFromData(VulkanTexture &texture, const void *pixels_ptr, ImageSize image_size,
                                     VkFormat texture_format, u32 layer_count, VkImageCreateFlags create_flags);
     void CreateImage(VulkanTexture &texture, ImageSize image_size, VkFormat texture_format, VkImageTiling image_tiling,
@@ -119,12 +111,12 @@ private:
     void SubmitCopyCommand();
 
 private:
-    // TODO: Think about storing and updating the current framebuffer size;
     bool m_is_initialized;
     VSyncMode m_vsync_mode;
 
     std::unique_ptr<VulkanInstance> p_instance;
     std::unique_ptr<VulkanDevice> p_device;
+    std::unique_ptr<BufferManager> p_buffer_manager;
 
     GLFWwindow *p_window;
 

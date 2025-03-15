@@ -1,6 +1,7 @@
 #include "application.hpp"
 
-#include "backends/glfw/events.hpp"
+#include "backends/event_types.hpp"
+#include "backends/glfw/glfw_backend.hpp"
 #include "math/vector.hpp"
 #include "utility/timer.hpp"
 
@@ -16,7 +17,7 @@ struct UniformData {
 
 Application::Application()
     : p_window{nullptr},
-      p_callbacks{nullptr},
+      p_input_handler{nullptr},
       m_settings_manager{"settings/settings.json", true, true},
       p_vk_queue{nullptr},
       m_number_of_images{},
@@ -85,7 +86,7 @@ void Application::Initialize()
     m_frame_buffer_size = p_window->GetFramebufferSize();
 
     // Initialize Vulkan
-    constexpr SemVer vulkan_api_version{1, 3, 0, 0};
+    const SemVer vulkan_api_version{1, 3, 0, 0};
     m_vk_core.Init(p_window->GetWindow(), window_config.title, vulkan_api_version, m_time_settings.vsync_mode);
 
     m_number_of_images = m_vk_core.GetNumberOfImages();
@@ -100,16 +101,14 @@ void Application::Initialize()
     CreateCommandBuffers();
     RecordCommandBuffers();
     CreateFences();
-    SetupCallbacks();
+    SetupInputSystem();
 
     // Initialize orthographic camera (left, right, bottom, top, zoom, speed, sensitivity)
     f32 aspect{gouda::math::aspect_ratio(m_frame_buffer_size)};
     p_ortho_camera = std::make_unique<gouda::OrthographicCamera>(-aspect, aspect, -1.0f, 1.0f, 1.0f, 2.0f, 0.5f);
 
     // Initialize and load audio
-    m_audio_manager.Initialize();
-    m_audio_manager.SetMasterSoundVolume(settings.audio_settings.sound_volume);
-    m_audio_manager.SetMasterMusicVolume(settings.audio_settings.music_volume);
+    m_audio_manager.Initialize(settings.audio_settings.sound_volume, settings.audio_settings.music_volume);
 
     m_laser_1.Load("assets/audio/sound_effects/laser1.wav");
     m_laser_2.Load("assets/audio/sound_effects/laser2.wav");
@@ -118,9 +117,20 @@ void Application::Initialize()
     m_music.Load("assets/audio/music_tracks/track.mp3");
     m_music3.Load("assets/audio/music_tracks/blondie.mp3");
 
-    m_audio_manager.QueueMusic(m_music3, false);
-    m_audio_manager.QueueMusic(m_music2, false);
-    m_audio_manager.QueueMusic(m_music, false);
+    m_audio_manager.QueueMusic(m_music3);
+    m_audio_manager.QueueMusic(m_music2);
+    m_audio_manager.QueueMusic(m_music);
+
+    // void *data = m_allocator.Allocate(2048);
+    // std::cout << "Allocated 256 bytes at: " << data << "\n";
+
+    // Simulate frame logic
+    // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // Reset the allocator at the end of a frame
+    // gouda::MemoryTracker::Get().PrintStats();
+    // m_allocator.Reset();
+    // gouda::MemoryTracker::Get().PrintStats();
 
     APP_LOG_DEBUG("Application initialization success");
 }
@@ -166,20 +176,19 @@ void Application::Execute()
 
     while (!p_window->ShouldClose()) {
 
-        p_window->PollEvents();
+        if (m_is_iconified) {
+            gouda::glfw::wait_events(sleep_duration); // Avoid busy waiting
+            p_input_handler->Update();
+            m_audio_manager.Update();
+            continue; // Skip rendering while minimized
+        }
+
+        p_input_handler->Update();
         m_audio_manager.Update();
 
         frame_timer.Update();
         delta_time = frame_timer.GetDeltaTime();
-
-        // Apply time scaling
-        delta_time = game_clock.ApplyTimeScale(delta_time);
-
-        if (m_is_iconified) {
-            // TODO: Hide bellow in the event handle when done
-            gouda::glfw::wait_events(sleep_duration); // Avoid busy waiting
-            continue;                                 // Skip rendering while minimized
-        }
+        delta_time = game_clock.ApplyTimeScale(delta_time); // Apply time scaling
 
         // Update physics at a fixed timestep
         physics_timer.UpdateAccumulator(delta_time);
@@ -234,9 +243,9 @@ void Application::CreateVertexBuffer()
         Vertex({1.0f, 1.0f, 0.0f}, {1.0f, 1.0f}),   // Top right
         Vertex({1.0f, -1.0f, 0.0f}, {1.0f, 0.0f}),  // Bottom right
 
-        // Vertex({-1.0f, -1.0f, 5.0f}, {0.0f, 0.0f}), // Bottom left
-        // Vertex({-1.0f, 1.0f, 5.0f}, {0.0f, 1.0f}),  // Top left
-        // Vertex({1.0f, 1.0f, 5.0f}, {1.0f, 1.0f})    // Top right
+        Vertex({-1.0f, -1.0f, 15.0f}, {1.0f, 1.0f}), // Bottom left
+        Vertex({1.0f, 1.0f, 15.0f}, {0.0f, 1.0f}),   // Top right
+        Vertex({1.0f, -1.0f, 15.0f}, {1.0f, 0.0f})   // Bottom right
     };
 
     m_mesh.m_vertex_buffer_size = sizeof(vertices[0]) * vertices.size();
@@ -324,7 +333,7 @@ void Application::RecordCommandBuffers()
 
         p_pipeline->Bind(m_command_buffers[i], i);
 
-        u32 vertex_count = 6;
+        u32 vertex_count = 9;
         u32 instance_count = 1;
         u32 first_vertex = 0;
         u32 first_instance = 0;
@@ -357,117 +366,87 @@ void Application::UpdateUniformBuffer(u32 image_index, f32 delta_time)
     m_uniform_buffers[image_index].Update(m_vk_core.GetDevice(), &wvp, sizeof(wvp));
 }
 
-void Application::SetupCallbacks()
+void Application::SetupInputSystem()
 {
-    p_callbacks = std::make_unique<gouda::glfw::Callbacks<GLFWwindow *>>();
+    auto backend = std::make_unique<gouda::glfw::GLFWBackend>([this](gouda::Event e) {
+        p_input_handler->QueueEvent(e); // Queue raw events directly
+    });
 
-    p_callbacks->key_callback = [this](GLFWwindow *window, int key, int scancode, int action, int mods) {
-        this->OnKey(window, key, scancode, action, mods);
+    p_input_handler = std::make_unique<gouda::InputHandler>(std::move(backend), p_window->GetWindow());
+
+    std::vector<gouda::InputHandler::ActionBinding> game_bindings = {
+        {gouda::Key::Escape, gouda::ActionState::Pressed,
+         [this]() { glfwSetWindowShouldClose(p_window->GetWindow(), GLFW_TRUE); }},
+        {gouda::Key::A, gouda::ActionState::Pressed,
+         [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_LEFT); }},
+        {gouda::Key::A, gouda::ActionState::Released,
+         [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_LEFT); }},
+        {gouda::Key::D, gouda::ActionState::Pressed,
+         [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_RIGHT); }},
+        {gouda::Key::D, gouda::ActionState::Released,
+         [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_RIGHT); }},
+        {gouda::Key::W, gouda::ActionState::Pressed,
+         [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_UP); }},
+        {gouda::Key::W, gouda::ActionState::Released,
+         [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_UP); }},
+        {gouda::Key::S, gouda::ActionState::Pressed,
+         [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_DOWN); }},
+        {gouda::Key::S, gouda::ActionState::Released,
+         [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_DOWN); }},
+        {gouda::Key::Q, gouda::ActionState::Pressed,
+         [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZOOM_IN); }},
+        {gouda::Key::Q, gouda::ActionState::Released,
+         [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZOOM_IN); }},
+        {gouda::Key::E, gouda::ActionState::Pressed,
+         [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZOOM_OUT); }},
+        {gouda::Key::E, gouda::ActionState::Released,
+         [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZOOM_OUT); }},
+        {gouda::Key::Space, gouda::ActionState::Pressed, [this]() { p_ortho_camera->Shake(0.01f, 0.5f); }},
+        {gouda::MouseButton::Left, gouda::ActionState::Pressed, []() { APP_LOG_DEBUG("Left Mouse Pressed"); }},
     };
 
-    p_callbacks->mouse_move_callback = [this](GLFWwindow *window, f32 x_position, f32 y_position) {
-        this->OnMouseMove(window, x_position, y_position);
-    };
+    p_input_handler->LoadStateBindings("Game", game_bindings);
+    p_input_handler->SetActiveState("Game");
 
-    p_callbacks->mouse_button_callback = [this](GLFWwindow *window, int button, int action, int mods) {
-        this->OnMouseButton(window, button, action, mods);
-    };
+    // Scroll callback
+    p_input_handler->SetScrollCallback([this](double xOffset, double yOffset) {
+        f32 zoomDelta = static_cast<f32>(yOffset) * 0.1f; // Match original sensitivity
+        p_ortho_camera->AdjustZoom(zoomDelta);
+        APP_LOG_DEBUG("Mouse wheel scrolled: xOffset={}, yOffset={}, zoomDelta={}", xOffset, yOffset, zoomDelta);
+    });
 
-    p_callbacks->mouse_scroll_callback = [this](GLFWwindow *window, f32 x_offset, f32 y_offset) {
-        this->OnMouseScroll(window, x_offset, y_offset);
-    };
+    // Character input callback
+    p_input_handler->SetCharCallback([](unsigned int codepoint) {
+        // char c = static_cast<char>(codepoint); // Simple ASCII cast for demo
+        // APP_LOG_DEBUG("Character typed: {} (codepoint={})", c, codepoint);
+    });
 
-    p_callbacks->window_iconify_callback = [this](GLFWwindow *window, bool iconified) {
-        this->OnWindowIconify(window, iconified);
-    };
+    // Cursor enter/leave callback
+    p_input_handler->SetCursorEnterCallback(
+        [](bool entered) { // APP_LOG_DEBUG("Cursor {} window", entered ? "entered" : "left");
+        });
 
-    p_callbacks->framebuffer_resized_callback = [this](GLFWwindow *window, FrameBufferSize new_size) {
-        this->OnFramebufferResize(window, new_size);
-    };
+    // Window focus callback
+    p_input_handler->SetWindowFocusCallback([this](bool focused) {
+        m_is_iconified = !focused; // Align with your existing logic
+        // APP_LOG_DEBUG("Window {} focus", focused ? "gained" : "lost");
+    });
 
-    p_callbacks->window_resized_callback = [this](GLFWwindow *window, WindowSize new_size) {
-        this->OnWindowResize(window, new_size);
-    };
+    // Framebuffer resized
+    p_input_handler->SetFramebufferSizeCallback([this](int width, int height) {
+        FrameBufferSize new_size{width, height};
+        OnFramebufferResize(p_window->GetWindow(), new_size);
+    });
 
-    p_window->SetCallbacks(p_callbacks.get());
-}
+    // Window resized
+    p_input_handler->SetWindowSizeCallback([this](int width, int height) {
+        WindowSize new_size{width, height};
+        OnWindowResize(p_window->GetWindow(), new_size);
+    });
 
-void Application::OnKey(GLFWwindow *window, int key, int scancode, int action, int mods)
-{
-    if ((key == GLFW_KEY_ESCAPE) && (action == GLFW_PRESS)) {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-    }
-
-    // Camera controls
-    if (action == GLFW_PRESS) {
-        switch (key) {
-            case GLFW_KEY_A:
-                p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_LEFT);
-                break;
-            case GLFW_KEY_D:
-                p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_RIGHT);
-                break;
-            case GLFW_KEY_W:
-                p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_UP);
-                break;
-            case GLFW_KEY_S:
-                p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_DOWN);
-                break;
-            case GLFW_KEY_Q:
-                p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZOOM_IN);
-                break;
-            case GLFW_KEY_E:
-                p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZOOM_OUT);
-                break;
-            case GLFW_KEY_SPACE:
-                p_ortho_camera->Shake(0.01f, 0.5f);
-                break;
-        }
-    }
-    else if (action == GLFW_RELEASE) {
-        switch (key) {
-            case GLFW_KEY_A:
-                p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_LEFT);
-                break;
-            case GLFW_KEY_D:
-                p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_RIGHT);
-                break;
-            case GLFW_KEY_W:
-                p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_UP);
-                break;
-            case GLFW_KEY_S:
-                p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_DOWN);
-                break;
-            case GLFW_KEY_Q:
-                p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZOOM_IN);
-                break;
-            case GLFW_KEY_E:
-                p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZOOM_OUT);
-                break;
-        }
-    }
-
-    if (action == GLFW_PRESS) {
-        APP_LOG_DEBUG("Key pressed: {}", key);
-    }
-}
-void Application::OnMouseMove(GLFWwindow *window, f32 xpos, f32 ypos)
-{
-    // APP_LOG_DEBUG("Mouse moved: x:={}, y:={}", xpos, ypos);
-}
-
-void Application::OnMouseButton(GLFWwindow *window, int button, int action, int mods)
-{
-    if (action == GLFW_PRESS) {
-        APP_LOG_DEBUG("Mouse button pressed: {}", button);
-    }
-}
-
-void Application::OnMouseScroll(GLFWwindow *window, f32 x_offset, f32 y_offset)
-{
-    // APP_LOG_DEBUG("Mouse wheel scrolled: x:={}, y:={}", x_offset, y_offset);
-    f32 zoom_delta = y_offset * 0.1f; // Adjust 0.1f for zoom sensitivity
-    p_ortho_camera->AdjustZoom(zoom_delta);
+    // Window iconified
+    p_input_handler->SetWindowIconifyCallback(
+        [this](bool iconified) { OnWindowIconify(p_window->GetWindow(), iconified); });
 }
 
 void Application::OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_size)

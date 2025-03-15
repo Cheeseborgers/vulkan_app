@@ -2,15 +2,15 @@
 
 #include "audio/audio_manager.hpp"
 #include "backends/common.hpp"
-#include "backends/glfw/window.hpp"
+#include "backends/glfw/glfw_window.hpp"
+#include "backends/input_handler.hpp"
 #include "cameras/orthographic_camera.hpp"
+#include "core/settings_manager.hpp"
 #include "gouda_vk_wrapper.hpp"
 #include "utility/timer.hpp"
 
-#include "core/settings_manager.hpp" #
-
-// TESTING REMOVE
-#include "cameras/perspective_camera.hpp"
+#include "memory/allocators/arena_allocator.hpp"
+#include "memory/memory_tracker.hpp"
 
 // TODO: Figure how this will work with settings and the present mode settings
 struct TimeSettings {
@@ -51,21 +51,15 @@ private:
     void CreateFences();
     void RecordCommandBuffers();
     void UpdateUniformBuffer(u32 image_index, f32 delta_time);
-    void SetupCallbacks();
+    void SetupInputSystem();
 
-    // Callback handlers
-    void OnKey(GLFWwindow *window, int key, int scancode, int action, int mods);
-    void OnMouseMove(GLFWwindow *window, f32 xpos, f32 ypos);
-    void OnMouseButton(GLFWwindow *window, int button, int action, int mods);
-    void OnMouseScroll(GLFWwindow *window, f32 x_offset, f32 y_offset);
     void OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_size);
     void OnWindowResize(GLFWwindow *window, WindowSize new_size);
     void OnWindowIconify(GLFWwindow *window, bool iconified);
 
 private:
     std::unique_ptr<gouda::glfw::Window> p_window;
-    std::unique_ptr<gouda::glfw::Callbacks<GLFWwindow *>> p_callbacks; // TODO: Create an input handler to hide this
-
+    std::unique_ptr<gouda::InputHandler> p_input_handler;
     SettingsManager m_settings_manager;
 
     gouda::vk::VulkanCore m_vk_core;
@@ -82,7 +76,7 @@ private:
     std::unique_ptr<gouda::vk::GraphicsPipeline> p_pipeline;
 
     gouda::vk::SimpleMesh m_mesh;
-    std::vector<gouda::vk::AllocatedBuffer> m_uniform_buffers;
+    std::vector<gouda::vk::Buffer> m_uniform_buffers;
 
     bool m_is_iconified;
 
@@ -92,7 +86,6 @@ private:
     TimeSettings m_time_settings;
 
     std::unique_ptr<gouda::OrthographicCamera> p_ortho_camera;
-    // std::unique_ptr<Gouda::PerspectiveCamera> p_ortho_camera;
 
     // Audio
     gouda::audio::AudioManager m_audio_manager;
@@ -101,4 +94,6 @@ private:
     gouda::audio::MusicTrack m_music;
     gouda::audio::MusicTrack m_music2;
     gouda::audio::MusicTrack m_music3;
+
+    gouda::memory::ArenaAllocator m_allocator;
 };

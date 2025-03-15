@@ -1,9 +1,9 @@
 #pragma once
 
 /**
- * @file input_event.hpp
+ * @file gouda_vk_buffer.hpp
  * @author GoudaCheeseburgers
- * @date 2025-03-11
+ * @date 2025-03-15
  * @brief Engine module
  *
  * Copyright (c) 2025 GoudaCheeseburgers <https://github.com/Cheeseborgers>
@@ -21,15 +21,18 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+#include <vulkan/vulkan.h>
 
-namespace gouda {
+namespace gouda::vk {
 
-class InputEvent {
-public:
-    InputEvent();
-    ~InputEvent();
+struct Buffer {
+    VkBuffer p_buffer;
+    VkDeviceMemory p_memory;
+    VkDeviceSize m_allocation_size;
 
-private:
+    Buffer();
+    void Update(VkDevice device_ptr, const void *data_ptr, size_t size);
+    void Destroy(VkDevice device_ptr);
 };
 
-} // namespace gouda
+} // namespace gouda::vk

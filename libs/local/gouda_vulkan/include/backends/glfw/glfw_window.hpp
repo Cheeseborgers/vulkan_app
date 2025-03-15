@@ -3,7 +3,6 @@
 #include <GLFW/glfw3.h>
 
 #include "backends/common.hpp"
-#include "backends/glfw/callbacks.hpp"
 #include "backends/window.hpp"
 #include "core/types.hpp"
 
@@ -20,13 +19,8 @@ namespace glfw {
  *
  * @tparam WindowHandle The type of the window handle (GLFWwindow* in this case).
  */
-class Window : public IWindow<Callbacks<GLFWwindow *>> {
+class Window : public IWindow {
 public:
-    /**
-     * @brief Type alias for the callback function structure specific to GLFW.
-     */
-    using GLFWCallbacks = Callbacks<GLFWwindow *>;
-
     /**
      * @brief Constructor that initializes the window based on the given configuration.
      *
@@ -57,15 +51,6 @@ public:
      * @return True if the window should close, false otherwise.
      */
     bool ShouldClose() const override { return glfwWindowShouldClose(p_window); }
-
-    /**
-     * @brief Sets the callback functions for input events such as keyboard, mouse, etc.
-     *
-     * The provided callback pointer should be initialized with the necessary callbacks.
-     *
-     * @param callbacks_ptr A pointer to the callback functions structure.
-     */
-    void SetCallbacks(GLFWCallbacks *callbacks_ptr) override;
 
     /**
      * @brief Sets the vsync (vertical synchronization) for the window.

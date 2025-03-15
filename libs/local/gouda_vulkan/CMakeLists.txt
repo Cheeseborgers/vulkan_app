@@ -44,13 +44,15 @@ set(PROJECT_SOURCES
     src/audio/music_track.cpp
     src/audio/sound_effect.cpp
     src/backends/common.cpp
-    src/backends/glfw/window.cpp
+    src/backends/input_handler.cpp
+    src/backends/glfw/glfw_backend.cpp
+    src/backends/glfw/glfw_window.cpp
     src/cameras/camera.cpp
     src/cameras/orthographic_camera.cpp
     src/cameras/perspective_camera.cpp
-    src/core/input_system.cpp
     src/debug/assert.cpp
-    src/gouda_vk_allocated_buffer.cpp
+    src/gouda_vk_buffer.cpp
+    src/gouda_vk_buffer_manager.cpp
     src/gouda_vk_core.cpp
     src/gouda_vk_device.cpp
     src/gouda_vk_graphics_pipeline.cpp

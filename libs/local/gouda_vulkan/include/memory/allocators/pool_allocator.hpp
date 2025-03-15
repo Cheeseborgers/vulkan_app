@@ -4,10 +4,10 @@
 #include <stdexcept>
 #include <vector>
 
-#include "memory_tracker.hpp"
+#include "memory/memory_tracker.hpp"
 
-namespace Gouda {
-namespace Memory {
+namespace gouda {
+namespace memory {
 
 /**
  * @brief PoolAllocator is a memory allocator for fixed-size objects.
@@ -82,5 +82,5 @@ void PoolDealloc(PoolAllocator<int> &allocator, void *ptr, size_t size)
     MemoryTracker::Get().RegisterDeallocation("PoolAllocator", size);
 }
 
-} // namespace Memory end
-} // namespace Gouda end
+} // namespace memory end
+} // namespace gouda end

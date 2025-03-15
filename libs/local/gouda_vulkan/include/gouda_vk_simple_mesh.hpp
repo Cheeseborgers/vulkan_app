@@ -9,7 +9,7 @@ namespace gouda {
 namespace vk {
 
 struct SimpleMesh {
-    AllocatedBuffer m_vertex_buffer;
+    Buffer m_vertex_buffer;
     std::size_t m_vertex_buffer_size;
     VulkanTexture *p_texture;
 

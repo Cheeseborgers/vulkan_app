@@ -15,7 +15,7 @@ class GraphicsPipeline {
 public:
     GraphicsPipeline(VkDevice device_ptr, GLFWwindow *window_ptr, VkRenderPass render_pass_ptr,
                      VkShaderModule vertex_shader_ptr, VkShaderModule fragment_shader_ptr, const SimpleMesh *mesh_ptr,
-                     int number_of_images, std::vector<AllocatedBuffer> &uniform_buffers, int uniform_data_size);
+                     int number_of_images, std::vector<Buffer> &uniform_buffers, int uniform_data_size);
 
     ~GraphicsPipeline();
 
@@ -24,13 +24,13 @@ public:
 
 private:
     void CreateDescriptorPool(int number_of_images);
-    void CreateDescriptorSets(const SimpleMesh *mesh_ptr, int number_of_images,
-                              std::vector<AllocatedBuffer> &uniform_buffers, int uniform_data_size);
-    void CreateDescriptorSetLayout(std::vector<AllocatedBuffer> &uniform_buffers, int uniform_data_size,
+    void CreateDescriptorSets(const SimpleMesh *mesh_ptr, int number_of_images, std::vector<Buffer> &uniform_buffers,
+                              int uniform_data_size);
+    void CreateDescriptorSetLayout(std::vector<Buffer> &uniform_buffers, int uniform_data_size,
                                    VulkanTexture *texture_ptr);
     void AllocateDescriptorSets(int number_of_images);
-    void UpdateDescriptorSets(const SimpleMesh *mesh_ptr, int number_of_images,
-                              std::vector<AllocatedBuffer> &uniform_buffers, int uniform_data_size);
+    void UpdateDescriptorSets(const SimpleMesh *mesh_ptr, int number_of_images, std::vector<Buffer> &uniform_buffers,
+                              int uniform_data_size);
 
 private:
     VkDevice p_device;

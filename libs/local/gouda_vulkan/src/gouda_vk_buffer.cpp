@@ -1,4 +1,4 @@
-#include "gouda_vk_allocated_buffer.hpp"
+#include "gouda_vk_buffer.hpp"
 
 #include <cstring> // For memcpy
 
@@ -7,9 +7,9 @@
 namespace gouda {
 namespace vk {
 
-AllocatedBuffer::AllocatedBuffer() : p_buffer{nullptr}, p_memory{nullptr}, m_allocation_size{0} {}
+Buffer::Buffer() : p_buffer{nullptr}, p_memory{nullptr}, m_allocation_size{0} {}
 
-void AllocatedBuffer::Update(VkDevice device_ptr, const void *data_ptr, std::size_t size)
+void Buffer::Update(VkDevice device_ptr, const void *data_ptr, std::size_t size)
 {
     void *memory_ptr{nullptr};
     VkResult result = vkMapMemory(device_ptr, p_memory, 0, size, 0, &memory_ptr);
@@ -18,7 +18,7 @@ void AllocatedBuffer::Update(VkDevice device_ptr, const void *data_ptr, std::siz
     vkUnmapMemory(device_ptr, p_memory);
 }
 
-void AllocatedBuffer::Destroy(VkDevice device_ptr)
+void Buffer::Destroy(VkDevice device_ptr)
 {
     if (p_buffer != VK_NULL_HANDLE) {
         vkDestroyBuffer(device_ptr, p_buffer, nullptr);

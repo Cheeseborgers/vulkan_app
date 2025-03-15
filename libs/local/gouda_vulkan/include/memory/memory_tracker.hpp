@@ -6,7 +6,7 @@
 
 #include "logger.hpp"
 
-namespace Gouda {
+namespace gouda {
 
 class MemoryTracker {
 public:
@@ -55,4 +55,4 @@ private:
     MemoryTracker() = default;
 };
 
-} // namespace Gouda end
+} // namespace gouda end

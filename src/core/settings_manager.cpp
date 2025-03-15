@@ -63,8 +63,8 @@ void from_json(const nlohmann::json &json_data, ApplicationSettings &settings)
     }
 }
 
-SettingsManager::SettingsManager(const std::string &filepath, bool auto_save, bool auto_load)
-    : m_settings{}, m_filepath{filepath}, m_auto_save{auto_save}
+SettingsManager::SettingsManager(FilePath filepath, bool auto_save, bool auto_load)
+    : m_settings{}, m_filepath{filepath}, m_auto_save{auto_save}, m_is_valid{false}
 {
     if (auto_load) {
         Load();
@@ -80,28 +80,33 @@ SettingsManager::~SettingsManager()
 
 void SettingsManager::Load()
 {
-    // FIXME: create settings dir too if not exist
-    // Check if the file exists and is not empty
-    if (!gouda::fs::IsFileExists(m_filepath)) {
-        APP_LOG_WARNING("Settings file '{}' does not exist, creating with default settings.", m_filepath);
-        Save(); // Create the file and save default settings
+    // Ensure the directory exists
+    std::filesystem::path settings_dir = m_filepath.parent_path();
+    std::error_code ec;
+    if (!std::filesystem::exists(settings_dir, ec)) {
+        if (!std::filesystem::create_directories(settings_dir, ec)) {
+            APP_LOG_ERROR("Failed to create settings directory '{}'. Error: {}", settings_dir.string(), ec.message());
+            return;
+        }
+    }
+
+    // Check if the settings file exists
+    if (!std::filesystem::exists(m_filepath, ec)) {
+        APP_LOG_WARNING("Settings file '{}' does not exist, creating with default settings.", m_filepath.string());
+        Save();
         return;
     }
 
-    // gouda::fs::GetCurrentWorkingDirectory();
-
-    APP_LOG_WARNING("file path: {}", gouda::fs::GetCurrentWorkingDirectory());
-
-    if (gouda::fs::IsFileEmpty(m_filepath)) {
-        APP_LOG_WARNING("Settings file '{}' does not exist, creating with default setting.", m_filepath);
+    // Check if the settings file is empty
+    if (std::filesystem::file_size(m_filepath, ec) == 0) {
+        APP_LOG_WARNING("Settings file '{}' is empty, using default settings.", m_filepath.string());
         Save();
         return;
     }
 
     std::ifstream file(m_filepath);
     if (!file.is_open()) {
-        APP_LOG_WARNING("Settings file '{}' does not exist, creating with default settings.", m_filepath);
-        Save();
+        APP_LOG_ERROR("Failed to open settings file '{}'.", m_filepath.string());
         return;
     }
 
@@ -109,25 +114,26 @@ void SettingsManager::Load()
         nlohmann::json json_data;
         file >> json_data;
 
-        // Check if JSON is an object before attempting to deserialize
         if (!json_data.is_object()) {
-            throw std::runtime_error("Expected JSON object but found array or other type.");
+            throw std::runtime_error("Invalid JSON format (not an object).");
         }
 
-        json_data.get_to(m_settings); // Deserialize to m_settings
+        json_data.get_to(m_settings);
     }
     catch (const std::exception &e) {
-        APP_LOG_INFO("Failed to parse settings file '{}' reason: {}, using default setting.", m_filepath, e.what());
+        APP_LOG_WARNING("Failed to parse settings file '{}'. Error: {}, using default settings.", m_filepath.string(),
+                        e.what());
+        Save(); // Overwrite with default settings if parsing fails
     }
 
-    APP_LOG_DEBUG("Settings loaded from '{}'.", m_filepath);
+    APP_LOG_DEBUG("Settings loaded from '{}'.", m_filepath.string());
 }
 
 void SettingsManager::Save() const
 {
     std::ofstream file(m_filepath);
     if (!file.is_open()) {
-        APP_LOG_ERROR("Could not open settings file '{}' for saving.", m_filepath);
+        APP_LOG_ERROR("Could not open settings file '{}' for saving.", m_filepath.string());
         return;
     }
 
@@ -136,10 +142,10 @@ void SettingsManager::Save() const
         file << json_data.dump(4);             // Pretty print with indentation
     }
     catch (const std::exception &e) {
-        APP_LOG_ERROR("Failed to save settings file '{}' reason: {}.", m_filepath, e.what());
+        APP_LOG_ERROR("Failed to save settings file '{}' reason: {}.", m_filepath.string(), e.what());
     }
 
-    APP_LOG_DEBUG("Settings saved to '{}", m_filepath);
+    APP_LOG_DEBUG("Settings saved to '{}", m_filepath.string());
 }
 
 ApplicationSettings SettingsManager::GetSettings() const { return m_settings; }

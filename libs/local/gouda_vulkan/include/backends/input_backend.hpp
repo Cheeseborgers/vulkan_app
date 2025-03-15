@@ -1,9 +1,8 @@
 #pragma once
-
 /**
- * @file input_system.hpp
+ * @file backends/input_backend.hpp
  * @author GoudaCheeseburgers
- * @date 2025-03-11
+ * @date 2025-03-14
  * @brief Engine module
  *
  * Copyright (c) 2025 GoudaCheeseburgers <https://github.com/Cheeseborgers>
@@ -21,26 +20,17 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-#include <functional>
-#include <string>
-#include <unordered_map>
+#include "backends/event_types.hpp"
 
-#include "input_event.hpp"
+struct GLFWwindow;
 
 namespace gouda {
-class InputSystem {
+
+class InputBackend {
 public:
-    using Callback = std::function<void(const InputEvent &)>;
-
-    void BindAction(const std::string &state, const InputEvent &event, Callback callback);
-    void UnbindState(const std::string &state);
-    void ProcessEvent(const InputEvent &event, const std::string &currentState);
-
-    void SaveToJson(const std::string &filename) const;
-    void LoadFromJson(const std::string &filename);
-
-private:
-    std::unordered_map<std::string, std::unordered_map<InputEvent, Callback>> stateBindings_;
+    virtual ~InputBackend() = default;
+    virtual void RegisterCallbacks(GLFWwindow *window) = 0;
+    virtual void PollEvents() = 0;
 };
 
 } // namespace gouda

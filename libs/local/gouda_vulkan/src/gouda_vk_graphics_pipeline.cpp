@@ -14,7 +14,7 @@ namespace vk {
 GraphicsPipeline::GraphicsPipeline(VkDevice device_ptr, GLFWwindow *p_window, VkRenderPass p_render_pass,
                                    VkShaderModule p_vertex_shader, VkShaderModule p_fragment_shader,
                                    const SimpleMesh *mesh_ptr, int number_of_images,
-                                   std::vector<AllocatedBuffer> &uniform_buffers, int uniform_data_size)
+                                   std::vector<Buffer> &uniform_buffers, int uniform_data_size)
     : p_device{device_ptr},
       p_pipeline{VK_NULL_HANDLE},
       p_pipeline_layout{VK_NULL_HANDLE},
@@ -25,7 +25,7 @@ GraphicsPipeline::GraphicsPipeline(VkDevice device_ptr, GLFWwindow *p_window, Vk
         CreateDescriptorSets(mesh_ptr, number_of_images, uniform_buffers, uniform_data_size);
     }
 
-    std::array<VkPipelineShaderStageCreateInfo, 2> ShaderStageCreateInfo = {
+    std::array<VkPipelineShaderStageCreateInfo, 2> shader_stage_create_info = {
         VkPipelineShaderStageCreateInfo{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0,
                                         VK_SHADER_STAGE_VERTEX_BIT, p_vertex_shader, "main", nullptr},
         VkPipelineShaderStageCreateInfo{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0,
@@ -107,8 +107,8 @@ GraphicsPipeline::GraphicsPipeline(VkDevice device_ptr, GLFWwindow *p_window, Vk
 
     VkGraphicsPipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipeline_info.stageCount = std::size(ShaderStageCreateInfo);
-    pipeline_info.pStages = &ShaderStageCreateInfo[0];
+    pipeline_info.stageCount = std::size(shader_stage_create_info);
+    pipeline_info.pStages = &shader_stage_create_info[0];
     pipeline_info.pVertexInputState = &vertex_input_info;
     pipeline_info.pInputAssemblyState = &pipeline_input_assembly_state_create_info;
     pipeline_info.pViewportState = &viewport_state_create_info;
@@ -195,7 +195,7 @@ void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
 }
 
 void GraphicsPipeline::CreateDescriptorSets(const SimpleMesh *mesh_ptr, int number_of_images,
-                                            std::vector<AllocatedBuffer> &uniform_buffers, int uniform_data_size)
+                                            std::vector<Buffer> &uniform_buffers, int uniform_data_size)
 {
     CreateDescriptorPool(number_of_images);
 
@@ -206,7 +206,7 @@ void GraphicsPipeline::CreateDescriptorSets(const SimpleMesh *mesh_ptr, int numb
     UpdateDescriptorSets(mesh_ptr, number_of_images, uniform_buffers, uniform_data_size);
 }
 
-void GraphicsPipeline::CreateDescriptorSetLayout(std::vector<AllocatedBuffer> &uniform_buffers, int uniform_data_size,
+void GraphicsPipeline::CreateDescriptorSetLayout(std::vector<Buffer> &uniform_buffers, int uniform_data_size,
                                                  VulkanTexture *texture_ptr)
 {
     std::vector<VkDescriptorSetLayoutBinding> layout_bindings;
@@ -272,7 +272,7 @@ void GraphicsPipeline::AllocateDescriptorSets(int number_of_images)
 }
 
 void GraphicsPipeline::UpdateDescriptorSets(const SimpleMesh *mesh_ptr, int number_of_images,
-                                            std::vector<AllocatedBuffer> &uniform_buffers, int uniform_data_size)
+                                            std::vector<Buffer> &uniform_buffers, int uniform_data_size)
 {
     VkDescriptorBufferInfo descriptor_buffer_info_vertex = {
         .buffer = mesh_ptr->m_vertex_buffer.p_buffer,

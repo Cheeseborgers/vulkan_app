@@ -54,11 +54,11 @@ enum class Error : u8 {
 
 /**
  * @brief Ensures a directory exists, creating it if necessary.
- * @param directory_path Path to the directory.
+ * @param path Path to the directory.
  * @param create_if_missing Whether to create the directory if missing.
  * @return Success or an Error code.
  */
-Expect<void, Error> EnsureDirectoryExists(const FilePath &directory_path, bool create_if_missing);
+Expect<void, Error> EnsureDirectoryExists(const FilePath &path, bool create_if_missing);
 
 /**
  * @brief Reads an entire file into a string.

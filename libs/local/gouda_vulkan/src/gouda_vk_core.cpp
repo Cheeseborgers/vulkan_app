@@ -21,6 +21,7 @@ VulkanCore::VulkanCore()
       m_vsync_mode{VSyncMode::DISABLED},
       p_instance{nullptr},
       p_device{nullptr},
+      p_buffer_manager{nullptr},
       p_window{nullptr},
       m_frame_buffer_size{0, 0},
       m_swap_chain_surface_format{},
@@ -69,6 +70,9 @@ void VulkanCore::Init(GLFWwindow *window_ptr, std::string_view app_name, SemVer 
     p_device = std::make_unique<VulkanDevice>(*p_instance, VK_QUEUE_GRAPHICS_BIT);
     ENGINE_LOG_DEBUG("VulkanDevice initialized.");
 
+    p_buffer_manager = std::make_unique<BufferManager>(p_device.get());
+    ENGINE_LOG_DEBUG("Buffer manager initialized.");
+
     CreateSwapchain();
     CreateSwapchainImageViews();
     CreateCommandBufferPool();
@@ -114,6 +118,15 @@ VkRenderPass VulkanCore::CreateSimpleRenderPass()
     VkAttachmentReference depth_attachment_reference = {.attachment = 1,
                                                         .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
 
+    std::vector<VkSubpassDependency> subpass_dependencies = {
+        {.srcSubpass = VK_SUBPASS_EXTERNAL,
+         .dstSubpass = 0,
+         .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+         .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+         .srcAccessMask = 0,
+         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+         .dependencyFlags = 0}};
+
     VkSubpassDescription subpass_description{};
     subpass_description.flags = 0;
     subpass_description.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -138,8 +151,8 @@ VkRenderPass VulkanCore::CreateSimpleRenderPass()
     render_pass_create_info.pAttachments = attachment_descriptions.data();
     render_pass_create_info.subpassCount = 1;
     render_pass_create_info.pSubpasses = &subpass_description;
-    render_pass_create_info.dependencyCount = 0;
-    render_pass_create_info.pDependencies = nullptr;
+    render_pass_create_info.dependencyCount = static_cast<u32>(subpass_dependencies.size());
+    render_pass_create_info.pDependencies = subpass_dependencies.data();
 
     VkRenderPass render_pass;
 
@@ -223,55 +236,24 @@ void VulkanCore::FreeCommandBuffers(u32 count, const VkCommandBuffer *command_bu
     ENGINE_LOG_INFO("Command buffer(s) freed: {}.", count);
 }
 
-AllocatedBuffer VulkanCore::CreateVertexBuffer(const void *vertices_ptr, size_t size)
+Buffer VulkanCore::CreateVertexBuffer(const void *vertices_ptr, size_t size)
 {
-    // Create a staging buffer with host-visible memory
-    AllocatedBuffer staging_vertex_buffer =
-        CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    // Map memory and copy data
-    void *memory_ptr{nullptr};
-    VkDeviceSize offset{0};
-    VkMemoryMapFlags flags{0};
-    VkResult result{vkMapMemory(p_device->GetDevice(), staging_vertex_buffer.p_memory, offset,
-                                staging_vertex_buffer.m_allocation_size, flags, &memory_ptr)};
-    CHECK_VK_RESULT(result, "vkMapMemory\n");
-
-    memcpy(memory_ptr, vertices_ptr, size);
-    vkUnmapMemory(p_device->GetDevice(), staging_vertex_buffer.p_memory);
-
-    // Create the actual GPU vertex buffer (device local)
-    AllocatedBuffer vertex_buffer{CreateBuffer(size,
-                                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)};
-
-    // Copy to buffer (this is asynchronous)
-    CopyBufferToBuffer(vertex_buffer.p_buffer, staging_vertex_buffer.p_buffer, size);
-
-    // Ensure the copy operation completes before destroying the staging buffer
-    m_queue.WaitIdle();
-
-    // Now it is safe to destroy the staging buffer
-    vkDestroyBuffer(p_device->GetDevice(), staging_vertex_buffer.p_buffer, nullptr);
-    vkFreeMemory(p_device->GetDevice(), staging_vertex_buffer.p_memory, nullptr);
-
-    return vertex_buffer;
+    return p_buffer_manager->CreateVertexBuffer(vertices_ptr, size);
 }
 
-void VulkanCore::CreateUniformBuffers(std::vector<AllocatedBuffer> &uniform_buffers, size_t data_size)
+void VulkanCore::CreateUniformBuffers(std::vector<Buffer> &uniform_buffers, size_t data_size)
 {
     uniform_buffers.clear();                  // Clear the existing vector before filling it
     uniform_buffers.reserve(m_images.size()); // Reserve space to avoid reallocations
 
     for (const auto &image : m_images) {
-        uniform_buffers.emplace_back(CreateUniformBuffer(data_size));
+        uniform_buffers.emplace_back(p_buffer_manager->CreateUniformBuffer(data_size));
     }
 }
 
-std::vector<AllocatedBuffer> VulkanCore::CreateUniformBuffers(size_t data_size)
+std::vector<Buffer> VulkanCore::CreateUniformBuffers(size_t data_size)
 {
-    std::vector<AllocatedBuffer> uniform_buffers;
+    std::vector<Buffer> uniform_buffers;
 
     CreateUniformBuffers(uniform_buffers, data_size);
 
@@ -526,98 +508,6 @@ void VulkanCore::CreateCommandBufferPool()
     ENGINE_LOG_INFO("Command buffer pool created.");
 }
 
-Expect<u32, std::string> VulkanCore::GetMemoryTypeIndex(u32 memory_type_bits,
-                                                        VkMemoryPropertyFlags required_memory_property_flags)
-{
-    const VkPhysicalDeviceMemoryProperties &memory_properties{
-        p_device->GetSelectedPhysicalDevice().m_memory_properties};
-
-    for (uint i = 0; i < memory_properties.memoryTypeCount; i++) {
-        if ((memory_type_bits & (1 << i)) && ((memory_properties.memoryTypes[i].propertyFlags &
-                                               required_memory_property_flags) == required_memory_property_flags)) {
-            return i; // Found a valid memory type, return it.
-        }
-    }
-
-    std::string error_msg = "Cannot find memory type for type: " + std::to_string(memory_type_bits) +
-                            ", requested memory properties: " + std::to_string(required_memory_property_flags);
-
-    ENGINE_LOG_ERROR("{}", error_msg);
-
-    return std::unexpected(error_msg); // Return error message.
-}
-
-void VulkanCore::CopyBufferToBuffer(VkBuffer destination, VkBuffer source, VkDeviceSize size)
-{
-    BeginCommandBuffer(p_copy_command_buffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
-    VkBufferCopy buffer_copy{};
-    buffer_copy.srcOffset = 0;
-    buffer_copy.dstOffset = 0;
-    buffer_copy.size = size;
-
-    vkCmdCopyBuffer(p_copy_command_buffer, source, destination, 1, &buffer_copy);
-
-    SubmitCopyCommand();
-}
-
-AllocatedBuffer VulkanCore::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties)
-{
-    VkBufferCreateInfo vertex_buffer_create_info{};
-    vertex_buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    vertex_buffer_create_info.size = size;
-    vertex_buffer_create_info.usage = usage;
-    vertex_buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    AllocatedBuffer buffer{};
-
-    // Create a buffer
-    VkResult result{vkCreateBuffer(p_device->GetDevice(), &vertex_buffer_create_info, nullptr, &buffer.p_buffer)};
-    CHECK_VK_RESULT(result, "vkCreateBuffer\n");
-
-    // Get the buffer memory requirements
-    VkMemoryRequirements memory_requirements{};
-    vkGetBufferMemoryRequirements(p_device->GetDevice(), buffer.p_buffer, &memory_requirements);
-
-    buffer.m_allocation_size = memory_requirements.size;
-
-    // Get the memory type index
-    auto memory_type_index = GetMemoryTypeIndex(memory_requirements.memoryTypeBits, properties);
-    if (!memory_type_index) {
-        ENGINE_THROW("Memory type selection failed: {}", memory_type_index.error());
-    }
-
-    VkMemoryAllocateInfo memory_allocate_info{};
-    memory_allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    memory_allocate_info.pNext = nullptr;
-    memory_allocate_info.allocationSize = memory_requirements.size;
-    memory_allocate_info.memoryTypeIndex = *memory_type_index;
-
-    result = vkAllocateMemory(p_device->GetDevice(), &memory_allocate_info, nullptr, &buffer.p_memory);
-    CHECK_VK_RESULT(result, "vkAllocateMemory error %d\n");
-
-    // Bind memory
-    result = vkBindBufferMemory(p_device->GetDevice(), buffer.p_buffer, buffer.p_memory, 0);
-    CHECK_VK_RESULT(result, "vkBindBufferMemory error %d\n");
-
-    return buffer;
-}
-
-AllocatedBuffer VulkanCore::CreateUniformBuffer(size_t size)
-{
-    VkBufferUsageFlags usage{VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT};
-    VkMemoryPropertyFlags memory_properties{VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
-
-    AllocatedBuffer buffer{CreateBuffer(size, usage, memory_properties)};
-
-    if (buffer.p_buffer == VK_NULL_HANDLE) {
-        ENGINE_LOG_ERROR("Failed to create uniform buffer.");
-        ENGINE_THROW("Failed to create uniform buffer.");
-    }
-
-    return buffer;
-}
-
 void VulkanCore::CreateTextureImageFromData(VulkanTexture &texture, const void *pixels_data_ptr, ImageSize image_size,
                                             VkFormat texture_format, u32 layer_count, VkImageCreateFlags create_flags)
 {
@@ -647,27 +537,7 @@ void VulkanCore::CreateImage(VulkanTexture &texture, ImageSize image_size, VkFor
         .pQueueFamilyIndices = nullptr,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED};
 
-    VkResult result{vkCreateImage(p_device->GetDevice(), &image_create_info, nullptr, &texture.p_image)};
-    CHECK_VK_RESULT(result, "vkCreateImage error");
-
-    VkMemoryRequirements memory_requirements{};
-    vkGetImageMemoryRequirements(p_device->GetDevice(), texture.p_image, &memory_requirements);
-
-    auto memory_type_index = GetMemoryTypeIndex(memory_requirements.memoryTypeBits, memory_property_flags);
-    if (!memory_type_index) {
-        ENGINE_THROW("Memory type selection failed: {}", memory_type_index.error());
-    }
-
-    VkMemoryAllocateInfo memory_allocate_info{};
-    memory_allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    memory_allocate_info.pNext = nullptr;
-    memory_allocate_info.allocationSize = memory_requirements.size;
-    memory_allocate_info.memoryTypeIndex = *memory_type_index;
-
-    result = vkAllocateMemory(p_device->GetDevice(), &memory_allocate_info, nullptr, &texture.p_memory);
-    CHECK_VK_RESULT(result, "vkAllocateMemory error");
-
-    vkBindImageMemory(p_device->GetDevice(), texture.p_image, texture.p_memory, 0);
+    p_buffer_manager->CreateImage(texture, image_create_info, memory_property_flags);
 }
 
 void VulkanCore::CreateTextureImage(VulkanTexture &texture, ImageSize size, VkFormat format, u32 mip_levels,
@@ -709,7 +579,8 @@ void VulkanCore::UpdateTextureImage(VulkanTexture &texture, ImageSize image_size
     VkMemoryPropertyFlags memory_property_flags{VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
 
-    AllocatedBuffer staging_texture{CreateBuffer(final_memory_size, buffer_usage_flags, memory_property_flags)};
+    Buffer staging_texture{
+        p_buffer_manager->CreateBuffer(final_memory_size, buffer_usage_flags, memory_property_flags)};
 
     staging_texture.Update(p_device->GetDevice(), pixels_data_ptr, final_memory_size);
 
@@ -956,7 +827,7 @@ void VulkanCore::CreateDepthResources()
         CreateDepthImage(depth_image, image_size, depth_format);
 
         // Transition the depth image layout
-        VkImageLayout old_layout = {};
+        VkImageLayout old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
         VkImageLayout new_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         TransitionImageLayout(depth_image.p_image, depth_format, old_layout, new_layout, 1, 1);
 

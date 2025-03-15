@@ -14,7 +14,6 @@ namespace gouda {
  *
  * @tparam CallbackType The type of the callback functions used for window events.
  */
-template <typename CallbackType>
 class IWindow {
 public:
     /**
@@ -42,13 +41,6 @@ public:
      * @return True if the window should close, otherwise false.
      */
     virtual bool ShouldClose() const = 0;
-
-    /**
-     * @brief Sets the callback functions for handling window-related events (e.g., key presses, mouse movements).
-     *
-     * @param callbacks A pointer to the callback functions to handle the window events.
-     */
-    virtual void SetCallbacks(CallbackType *callbacks) = 0;
 
     /**
      * @brief Sets the vertical synchronization (vsync) for the window.

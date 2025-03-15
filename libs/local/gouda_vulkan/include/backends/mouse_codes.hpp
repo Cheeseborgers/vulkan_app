@@ -1,6 +1,7 @@
 #pragma once
+
 /**
- * @file backends/glfw/events.hpp
+ * @file mouse_code.hpp
  * @author GoudaCheeseburgers
  * @date 2025-03-14
  * @brief Engine module
@@ -20,14 +21,21 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-#include <GLFW/glfw3.h>
-
-#include "core/types.hpp"
+#include <cstdint>
 
 namespace gouda {
-namespace glfw {
 
-void wait_events(f64 timeout) { glfwWaitEventsTimeout(static_cast<f64>(timeout)); }
+// Enum class for mouse buttons
+enum class MouseButton : uint8_t {
+    Left = 0,   // GLFW_MOUSE_BUTTON_LEFT
+    Right = 1,  // GLFW_MOUSE_BUTTON_RIGHT
+    Middle = 2, // GLFW_MOUSE_BUTTON_MIDDLE
+    Button3 = 3,
+    Button4 = 4,
+    Button5 = 5,
+    Button6 = 6,
+    Button7 = 7,
+    None,
+};
 
-} // namespace glfw
 } // namespace gouda

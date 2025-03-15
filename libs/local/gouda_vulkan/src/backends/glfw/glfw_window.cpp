@@ -1,7 +1,9 @@
-#include "backends/glfw/window.hpp"
+#include "backends/glfw/glfw_window.hpp"
 
 #include "debug/debug.hpp"
 #include "logger.hpp"
+
+#include <optional>
 
 namespace gouda {
 namespace glfw {
@@ -160,25 +162,6 @@ void Window::Destroy()
     }
 
     glfwTerminate();
-}
-
-void Window::SetCallbacks(GLFWCallbacks *callbacks_ptr)
-{
-    // TODO: Create event system and move all of these there
-    if (!p_window || !callbacks_ptr)
-        return;
-
-    // Store the callbacks in GLFW's user pointer storage
-    glfwSetWindowUserPointer(p_window, callbacks_ptr);
-
-    // Set the callback functions using the trampoline method
-    glfwSetKeyCallback(p_window, &GLFWCallbacks::KeyCallbackTrampoline);
-    glfwSetCursorPosCallback(p_window, &GLFWCallbacks::MouseMoveCallbackTrampoline);
-    glfwSetMouseButtonCallback(p_window, &GLFWCallbacks::MouseButtonCallbackTrampoline);
-    glfwSetScrollCallback(p_window, &GLFWCallbacks::MouseScrollCallbackTrampoline);
-    glfwSetWindowIconifyCallback(p_window, &GLFWCallbacks::WindowIconifyCallbackTrampoline);
-    glfwSetFramebufferSizeCallback(p_window, &GLFWCallbacks::FramebufferResizedCallbackTrampoline);
-    glfwSetWindowSizeCallback(p_window, &GLFWCallbacks::WindowResizedCallbackTrampoline);
 }
 
 void Window::SetVsync(bool enabled)

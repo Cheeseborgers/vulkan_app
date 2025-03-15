@@ -9,8 +9,21 @@
 namespace gouda {
 namespace fs {
 
-Expect<void, Error> EnsureDirectoryExists(const FilePath &directory_path, bool create_if_missing)
+Expect<void, Error> EnsureDirectoryExists(const FilePath &path, bool create_if_missing)
 {
+    std::filesystem::path directory_path = path;
+
+    // Ensure we're working with a directory, trimming off the filename if necessary
+    if (std::filesystem::exists(directory_path)) {
+        if (std::filesystem::is_regular_file(directory_path)) {
+            directory_path = directory_path.parent_path(); // Trim to parent directory
+        }
+        else if (!std::filesystem::is_directory(directory_path)) {
+            return std::unexpected(Error::PathNotDirectory);
+        }
+    }
+
+    // Ensure the directory exists or create it
     if (std::filesystem::exists(directory_path)) {
         if (std::filesystem::is_directory(directory_path)) {
             return {}; // Success
@@ -19,8 +32,9 @@ Expect<void, Error> EnsureDirectoryExists(const FilePath &directory_path, bool c
     }
 
     if (create_if_missing) {
-        if (std::filesystem::create_directories(directory_path)) {
-            return {};
+        std::error_code ec;
+        if (std::filesystem::create_directories(directory_path, ec)) {
+            return {}; // Success
         }
         return std::unexpected(Error::DirectoryCreationFailed);
     }

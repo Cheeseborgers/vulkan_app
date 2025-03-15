@@ -31,6 +31,7 @@ namespace gouda {
 // Type defs for Vector and Matrix types
 using Vec2 = math::Vector<float, 2>;
 using Vec3 = math::Vector<float, 3>;
+using Vec4 = math::Vector<float, 4>;
 using Mat4 = math::Matrix4x4<float>;
 
 namespace math {
