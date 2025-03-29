@@ -45,9 +45,6 @@ endif()
 
 find_package(Threads REQUIRED)
 
-# gouda logger (currenlty coupled to engine code: rethink this)
-add_subdirectory("libs/local/gouda_logger")
-
 # Include the Vulkan core stuff
 add_subdirectory("libs/local/gouda_vulkan")
 
@@ -140,32 +137,34 @@ else()
 endif()
 
 # Compiler flags -------------------------------------------------------------------------------------------------------
-# Function to set compiler flags
 function(set_common_compiler_flags target)
     target_compile_options(${target} PRIVATE
-        -Wall -Wextra -Werror -Wshadow -Wnon-virtual-dtor -pedantic
-        -Wold-style-cast -Wpedantic -Wconversion -Wsign-conversion
-        -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches
-        -Wlogical-op -Wnull-dereference -Wuseless-cast -Wdouble-promotion
-        -Wunused-variable -Wuninitialized)
+        -Wall -Wextra -Werror -Wshadow -Wnon-virtual-dtor -Wformat=2 -Woverloaded-virtual -Wcast-align -Wold-style-cast
+        -Wpedantic -Wconversion -Wsign-conversion -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches
+        -Wlogical-op -Wnull-dereference -Wuseless-cast -Wdouble-promotion -Wunused-variable -Wuninitialized -g)
 endfunction()
 
 # Apply flags based on compiler
-if(CMAKE_CXX_COMPILER_ID STREQUAL " Clang ")
-    if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL " GNU ")
-        message(STATUS " ${PROJECT_NAME}: Compiling with Clang(GNU Frontend) ")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
+        message(STATUS "${PROJECT_NAME}: Compiling with Clang (GNU Frontend)")
         set_common_compiler_flags(${PROJECT_NAME})
-    elseif(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL " MSVC ")
-        message(STATUS " ${PROJECT_NAME}: Compiling with Clang(MSVC Frontend) ")
+    elseif(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        message(STATUS "${PROJECT_NAME}: Compiling with Clang (MSVC Frontend)")
     endif()
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL " GNU ")
-    message(STATUS " ${PROJECT_NAME}: Compiling with GCC ")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    message(STATUS "${PROJECT_NAME}: Compiling with GCC")
     set_common_compiler_flags(${PROJECT_NAME})
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL " Intel ")
-    message(STATUS " ${PROJECT_NAME}: Compiling with Intel C++ ")
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL " MSVC ")
-    message(STATUS " ${PROJECT_NAME}: Compiling with MSVC ")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+    message(STATUS "${PROJECT_NAME}: Compiling with Intel C++")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    message(STATUS "${PROJECT_NAME}: Compiling with MSVC")
     target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
+endif()
+
+# Define USE_IMGUI only for Debug builds
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(USE_IMGUI ON CACHE INTERNAL "Use ImGui in engine")
 endif()
 
 # Logging compile definitions

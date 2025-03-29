@@ -6,11 +6,8 @@
 #include "backends/input_handler.hpp"
 #include "cameras/orthographic_camera.hpp"
 #include "core/settings_manager.hpp"
-#include "gouda_vk_wrapper.hpp"
-#include "utility/timer.hpp"
-
-#include "memory/allocators/arena_allocator.hpp"
-#include "memory/memory_tracker.hpp"
+#include "renderers/vulkan/vk_renderer.hpp"
+#include "utils/timer.hpp"
 
 // TODO: Figure how this will work with settings and the present mode settings
 struct TimeSettings {
@@ -41,16 +38,13 @@ public:
     void Execute();
 
 private:
-    void CreateCommandBuffers();
+    void SetupTimerSettings(const ApplicationSettings &settings);
+    void SetupWindow(const ApplicationSettings &settings);
+    void SetupRenderer();
+    void SetupAudio(const ApplicationSettings &settings);
+    void SetupCamera();
     void CreateMesh();
-    void CreateVertexBuffer();
     void LoadTexture();
-    void CreateUniformBuffers();
-    void CreateShaders();
-    void CreatePipeline();
-    void CreateFences();
-    void RecordCommandBuffers();
-    void UpdateUniformBuffer(u32 image_index, f32 delta_time);
     void SetupInputSystem();
 
     void OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_size);
@@ -61,39 +55,26 @@ private:
     std::unique_ptr<gouda::glfw::Window> p_window;
     std::unique_ptr<gouda::InputHandler> p_input_handler;
     SettingsManager m_settings_manager;
+    gouda::vk::VulkanRenderer m_renderer;
 
-    gouda::vk::VulkanCore m_vk_core;
-    gouda::vk::VulkanQueue *p_vk_queue;
-    int m_number_of_images;
-    std::vector<VkCommandBuffer> m_command_buffers;
-    VkRenderPass p_render_pass;
-    std::vector<VkFramebuffer> m_frame_buffers;
-    FrameBufferSize m_frame_buffer_size;
+    gouda::vk::Mesh m_mesh;
 
-    VkShaderModule p_vertex_shader;
-    VkShaderModule p_fragment_shader;
-
-    std::unique_ptr<gouda::vk::GraphicsPipeline> p_pipeline;
-
-    gouda::vk::SimpleMesh m_mesh;
-    std::vector<gouda::vk::Buffer> m_uniform_buffers;
+    std::vector<gouda::vk::InstanceData> m_instances;
 
     bool m_is_iconified;
-
-    std::vector<VkFence> m_frame_fences;
-    u32 m_current_frame;
 
     TimeSettings m_time_settings;
 
     std::unique_ptr<gouda::OrthographicCamera> p_ortho_camera;
 
+    gouda::vk::UniformData m_uniform_data;
+
     // Audio
     gouda::audio::AudioManager m_audio_manager;
+    // TODO: Think about storing these objects somewhere in the audio manager
     gouda::audio::SoundEffect m_laser_1;
     gouda::audio::SoundEffect m_laser_2;
     gouda::audio::MusicTrack m_music;
     gouda::audio::MusicTrack m_music2;
     gouda::audio::MusicTrack m_music3;
-
-    gouda::memory::ArenaAllocator m_allocator;
 };

@@ -11,14 +11,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native") # Use best CPU optimizations
 
-# Find Vulkan
 find_package(Vulkan REQUIRED)
-
 find_package(glslang CONFIG REQUIRED)
-
 find_package(Threads REQUIRED)
 
-# GLFW ------------------------------
+# GLFW
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -29,47 +26,58 @@ add_subdirectory("libs/thirdparty/glfw")
 add_subdirectory(libs/thirdparty/openAL)
 add_subdirectory(libs/thirdparty/libsndfile)
 
+# ImGUI
 add_subdirectory(libs/thirdparty/imgui)
 
 # pcg random
 add_subdirectory(libs/thirdparty/pcg)
 
-# Add stb_image for texture creation
+# stb_image
 add_subdirectory(libs/thirdparty/stb_image)
 
-# add_subdirectory(libs/local/gouda_image)
 set(PROJECT_SOURCES
     src/audio/audio_common.cpp
     src/audio/audio_manager.cpp
     src/audio/music_track.cpp
     src/audio/sound_effect.cpp
+
     src/backends/common.cpp
     src/backends/input_handler.cpp
     src/backends/glfw/glfw_backend.cpp
     src/backends/glfw/glfw_window.cpp
+
     src/cameras/camera.cpp
     src/cameras/orthographic_camera.cpp
     src/cameras/perspective_camera.cpp
+
     src/debug/assert.cpp
-    src/gouda_vk_buffer.cpp
-    src/gouda_vk_buffer_manager.cpp
-    src/gouda_vk_core.cpp
-    src/gouda_vk_device.cpp
-    src/gouda_vk_graphics_pipeline.cpp
-    src/gouda_vk_instance.cpp
-    src/gouda_vk_utils.cpp
-    src/gouda_vk_wrapper.cpp
-    src/gouda_vk_queue.cpp
-    src/gouda_vk_shader.cpp
-    src/gouda_vk_simple_mesh.cpp
-    src/gouda_vk_texture.cpp
+    src/debug/profiler.cpp
+
+    src/renderers/vulkan/gouda_vk_wrapper.cpp
+    src/renderers/vulkan/vk_buffer.cpp
+    src/renderers/vulkan/vk_buffer_manager.cpp
+    src/renderers/vulkan/vk_command_buffer_manager.cpp
+    src/renderers/vulkan/vk_depth_resources.cpp
+    src/renderers/vulkan/vk_device.cpp
+    src/renderers/vulkan/vk_graphics_pipeline.cpp
+    src/renderers/vulkan/vk_instance.cpp
+    src/renderers/vulkan/vk_renderer.cpp
+    src/renderers/vulkan/vk_swapchain.cpp
+    src/renderers/vulkan/vk_utils.cpp
+    src/renderers/vulkan/vk_queue.cpp
+    src/renderers/vulkan/vk_shader.cpp
+    src/renderers/vulkan/vk_shader_manager.cpp
+    src/renderers/vulkan/vk_mesh.cpp
+    src/renderers/vulkan/vk_texture.cpp
+
     src/math/random.cpp
     src/math/matrix4x4.cpp
     src/math/transform.cpp
     src/math/vector.cpp
     src/math/quaternion.cpp
-    src/utility/filesystem.cpp
-    src/utility/image.cpp
+
+    src/utils/filesystem.cpp
+    src/utils/image.cpp
 )
 
 add_library(${PROJECT_NAME} STATIC ${PROJECT_SOURCES})
@@ -82,6 +90,7 @@ target_include_directories(${PROJECT_NAME}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/libsndfile>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/imgui>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/pcg>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/stb_image>
 
     # Project includes
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -90,20 +99,13 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
     PUBLIC
-    gouda_logger
-
-    stb_image
-
-    # Sound
-    OpenAL
-    sndfile
-
-    imgui
-
-    pcg
-
     glfw
     Vulkan::Vulkan
+    stb_image
+    OpenAL
+    sndfile
+    imgui
+    pcg
 
     # Shaders
     glslang::glslang
@@ -111,21 +113,15 @@ target_link_libraries(${PROJECT_NAME}
     glslang::glslang-default-resource-limits
 )
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    $<$<CONFIG:Debug>:GOUDA_DEBUG=1>
-    $<$<CONFIG:MinSizeRel>:GOUDA_DEBUG=0>
-    $<$<CONFIG:Release>:GOUDA_DEBUG=0>
-    $<$<CONFIG:RelWithDebInfo>:GOUDA_DEBUG=0>
-    $<$<NOT:$<OR:$<CONFIG:Debug>,$<CONFIG:Release>>>:GOUDA_DEBUG=0>
-)
+if(USE_IMGUI)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE USE_IMGUI)
+endif()
 
 # Compile options --------------------------------------------
 target_compile_options(${PROJECT_NAME} PRIVATE
-    -Wall -Wextra -Werror -Wshadow -Wnon-virtual-dtor -pedantic
-    -Wold-style-cast -Wpedantic -Wconversion -Wsign-conversion
-    -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches
-    -Wlogical-op -Wnull-dereference -Wuseless-cast -Wdouble-promotion
-    -Wunused-variable -Wuninitialized)
+    -Wall -Wextra -Werror -Wshadow -Wnon-virtual-dtor -Wformat=2 -Woverloaded-virtual -Wcast-align -Wold-style-cast
+    -Wpedantic -Wconversion -Wsign-conversion -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches
+    -Wlogical-op -Wnull-dereference -Wuseless-cast -Wdouble-promotion -Wunused-variable -Wuninitialized -g)
 
 message(STATUS "${PROJECT_NAME}: Build type: " ${CMAKE_BUILD_TYPE})
 message(STATUS "${PROJECT_NAME}: Version " ${PROJECT_VERSION})

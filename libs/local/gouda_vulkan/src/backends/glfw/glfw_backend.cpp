@@ -6,16 +6,23 @@
  */
 #include "backends/glfw/glfw_backend.hpp"
 
+#include "imgui.h"             // Core ImGui functionality
+#include "imgui_impl_glfw.h"   // GLFW backend (if using GLFW for windowing)
+#include "imgui_impl_vulkan.h" // Vulkan backend for ImGui
+
 namespace gouda {
 namespace glfw {
 
-GLFWBackend::GLFWBackend(std::function<void(Event)> eventCallback) : p_callback(std::move(eventCallback)) {}
+GLFWBackend::GLFWBackend(std::function<void(Event)> event_callback) : p_callback(std::move(event_callback)) {}
 
 void GLFWBackend::RegisterCallbacks(GLFWwindow *window)
 {
     glfwSetWindowUserPointer(window, this);
 
-    glfwSetKeyCallback(window, [](GLFWwindow *win, int key, int, int action, int mods) {
+    glfwSetKeyCallback(window, [](GLFWwindow *win, int key, int scancode, int action, int mods) {
+#ifdef USE_IMGUI
+        ImGui_ImplGlfw_KeyCallback(win, key, scancode, action, mods);
+#endif
         auto *backend = static_cast<GLFWBackend *>(glfwGetWindowUserPointer(win));
         ActionState state = (action == GLFW_PRESS)     ? ActionState::Pressed
                             : (action == GLFW_RELEASE) ? ActionState::Released
@@ -24,6 +31,10 @@ void GLFWBackend::RegisterCallbacks(GLFWwindow *window)
     });
 
     glfwSetMouseButtonCallback(window, [](GLFWwindow *win, int button, int action, int mods) {
+#ifdef USE_IMGUI
+        ImGui_ImplGlfw_MouseButtonCallback(win, button, action, mods);
+#endif
+
         auto *backend = static_cast<GLFWBackend *>(glfwGetWindowUserPointer(win));
         ActionState state = (action == GLFW_PRESS)     ? ActionState::Pressed
                             : (action == GLFW_RELEASE) ? ActionState::Released
@@ -32,11 +43,17 @@ void GLFWBackend::RegisterCallbacks(GLFWwindow *window)
     });
 
     glfwSetCursorPosCallback(window, [](GLFWwindow *win, double x, double y) {
+#ifdef USE_IMGUI
+        ImGui_ImplGlfw_CursorPosCallback(win, x, y);
+#endif
         auto *backend = static_cast<GLFWBackend *>(glfwGetWindowUserPointer(win));
         backend->p_callback(MouseMoveEvent{x, y});
     });
 
     glfwSetScrollCallback(window, [](GLFWwindow *win, double xOffset, double yOffset) {
+#ifdef USE_IMGUI
+        ImGui_ImplGlfw_ScrollCallback(win, xOffset, yOffset);
+#endif
         auto *backend = static_cast<GLFWBackend *>(glfwGetWindowUserPointer(win));
         backend->p_callback(MouseScrollEvent{xOffset, yOffset});
     });
@@ -47,16 +64,25 @@ void GLFWBackend::RegisterCallbacks(GLFWwindow *window)
     });
 
     glfwSetCharCallback(window, [](GLFWwindow *win, unsigned int codepoint) {
+#ifdef USE_IMGUI
+        ImGui_ImplGlfw_CharCallback(win, codepoint);
+#endif
         auto *backend = static_cast<GLFWBackend *>(glfwGetWindowUserPointer(win));
         backend->p_callback(CharEvent{codepoint});
     });
 
     glfwSetCursorEnterCallback(window, [](GLFWwindow *win, int entered) {
+#ifdef USE_IMGUI
+        ImGui_ImplGlfw_CursorEnterCallback(win, entered);
+#endif
         auto *backend = static_cast<GLFWBackend *>(glfwGetWindowUserPointer(win));
         backend->p_callback(CursorEnterEvent{entered == GLFW_TRUE});
     });
 
     glfwSetWindowFocusCallback(window, [](GLFWwindow *win, int focused) {
+#ifdef USE_IMGUI
+        ImGui_ImplGlfw_WindowFocusCallback(win, focused);
+#endif
         auto *backend = static_cast<GLFWBackend *>(glfwGetWindowUserPointer(win));
         backend->p_callback(WindowFocusEvent{focused == GLFW_TRUE});
     });

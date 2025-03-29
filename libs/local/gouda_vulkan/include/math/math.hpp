@@ -138,23 +138,7 @@ template <typename T>
 template <NumericT T>
 [[nodiscard]] inline T clamp(T value, T min_val, T max_val) noexcept
 {
-    if constexpr (std::same_as<T, float> && simdLevel >= SIMDLevel::AVX) {
-        const auto val = _mm256_set1_ps(value);
-        const auto min_v = _mm256_set1_ps(min_val);
-        const auto max_v = _mm256_set1_ps(max_val);
-        const auto result = _mm256_min_ps(_mm256_max_ps(val, min_v), max_v);
-        return _mm256_cvtss_f32(result);
-    }
-    else if constexpr (std::same_as<T, float> && simdLevel >= SIMDLevel::SSE2) {
-        const auto val = _mm_set1_ps(value);
-        const auto min_v = _mm_set1_ps(min_val);
-        const auto max_v = _mm_set1_ps(max_val);
-        const auto result = _mm_min_ps(_mm_max_ps(val, min_v), max_v);
-        return _mm_cvtss_f32(result);
-    }
-    else {
-        return std::clamp(value, min_val, max_val);
-    }
+    return std::clamp(value, min_val, max_val);
 }
 
 template <FloatingPointT T>
@@ -390,4 +374,4 @@ template <NumericT T>
 }
 
 } // namespade math
-} // namespace gouda
+} // namespace gouda::math

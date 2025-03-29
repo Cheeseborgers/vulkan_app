@@ -60,6 +60,34 @@ public:
     void SetVsync(bool enabled) override;
 
     /**
+     * @brief Sets the icon for the window.
+     *
+     * @param filepath The file path for the window decoration icon
+     */
+    void SetIcon(std::string_view filepath) override;
+
+    /**
+     * @brief Loads the mouse cursor for the window.
+     *
+     * @param filepath The file path for the mouse cursor image
+     * @param identifier The identifier for the mouse cursor
+     */
+    void LoadCursor(std::string_view filepath, std::string_view identifier) override;
+
+    /**
+     * @brief Sets the mouse cursor for the window.
+     *
+     * @param filepath The identifier for the loaded cursor
+     */
+    void SetCursor(std::string_view filepath) override;
+
+    /**
+     * @brief Destroys any stored and loaded mouse cursors.
+     *
+     */
+    void ClearCursors() override;
+
+    /**
      * @brief Retrieves the GLFW window handle.
      *
      * @return A pointer to the GLFW window object.
@@ -86,7 +114,9 @@ public:
 
 private:
     GLFWwindow *p_window; ///< The GLFW window handle.
-    Renderer m_renderer;
+    Renderer m_renderer;  ///< The Renderer type.
+
+    std::unordered_map<std::string, GLFWcursor *> m_cursors; ///< Current loaded cursors
 };
 
 } // namespace glfw

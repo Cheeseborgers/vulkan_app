@@ -1,14 +1,13 @@
 /**
- * @file settings_manager.cpp
+ * @file core/settings_manager.cpp
  * @author GoudaCheeseburgers
  * @date 2025-03-11
  * @brief Application settings manager
  */
-
 #include "core/settings_manager.hpp"
 
-#include "logger.hpp"
-#include "utility/filesystem.hpp"
+#include "debug/logger.hpp"
+#include "utils/filesystem.hpp"
 
 // Definition of to_json and from_json for WindowSize
 void to_json(nlohmann::json &json_data, const WindowSize &window_size)
@@ -145,7 +144,7 @@ void SettingsManager::Save() const
         APP_LOG_ERROR("Failed to save settings file '{}' reason: {}.", m_filepath.string(), e.what());
     }
 
-    APP_LOG_DEBUG("Settings saved to '{}", m_filepath.string());
+    APP_LOG_INFO("Settings saved to '{}", m_filepath.string());
 }
 
 ApplicationSettings SettingsManager::GetSettings() const { return m_settings; }

@@ -1,9 +1,7 @@
 #include "backends/glfw/glfw_window.hpp"
 
 #include "debug/debug.hpp"
-#include "logger.hpp"
-
-#include <optional>
+#include "utils/image.hpp"
 
 namespace gouda {
 namespace glfw {
@@ -156,6 +154,8 @@ Window::~Window() { Destroy(); }
 void Window::Destroy()
 {
     if (p_window) {
+        ClearCursors();
+
         glfwDestroyWindow(p_window);
         p_window = nullptr;
         ENGINE_LOG_DEBUG("Window Destroyed");
@@ -193,6 +193,100 @@ void Window::SetVsync(bool enabled)
     }
     else {
         ENGINE_LOG_WARNING("Renderer not supported for vsync toggle.");
+    }
+}
+
+void Window::SetIcon(std::string_view filepath)
+{
+    auto image_result = Image::Load(filepath);
+    if (!image_result) {
+        ENGINE_LOG_ERROR("Could not load window icon image: {}", image_result.error());
+        return;
+    }
+
+    Image original = std::move(image_result.value());
+
+    // Resize to 32x32
+    auto small_icon_result = original.Resize(32, 32);
+    if (!small_icon_result) {
+        ENGINE_LOG_ERROR("Failed to resize window icon to 32x32: {}", small_icon_result.error());
+        return;
+    }
+
+    Image small_icon = std::move(small_icon_result.value());
+    GLFWimage icons[2];
+
+    // 64x64 original image
+    icons[0].width = original.GetWidth();
+    icons[0].height = original.GetHeight();
+    icons[0].pixels = const_cast<stbi_uc *>(original.data().data());
+
+    // 32x32 resized image
+    icons[1].width = small_icon.GetWidth();
+    icons[1].height = small_icon.GetHeight();
+    icons[1].pixels = const_cast<stbi_uc *>(small_icon.data().data());
+
+    // Set the window icons
+    glfwSetWindowIcon(p_window, 2, icons);
+
+    ENGINE_LOG_INFO("Window icon set successfully.");
+}
+
+void Window::LoadCursor(std::string_view filepath, std::string_view identifier)
+{
+    auto image_result = Image::Load(filepath);
+    if (!image_result) {
+        ENGINE_LOG_ERROR("Could not load mouse cursor image: {}", image_result.error());
+        return;
+    }
+
+    Image image{std::move(image_result.value())};
+    GLFWimage cursor_image{};
+    cursor_image.width = image.GetWidth();
+    cursor_image.height = image.GetHeight();
+    cursor_image.pixels = const_cast<stbi_uc *>(image.data().data());
+
+    // Create the GLFW cursor
+    GLFWcursor *cursor{glfwCreateCursor(&cursor_image, 0, 0)};
+    if (!cursor) {
+        ENGINE_LOG_ERROR("Failed to create cursor from image: {}", filepath);
+        return;
+    }
+
+    m_cursors.emplace(std::string(identifier), cursor);
+}
+
+void Window::SetCursor(std::string_view identifier)
+{
+    ASSERT(p_window, "Window is not initialized or invalid!");
+
+    if (!p_window) {
+        ENGINE_LOG_ERROR("Window is not initialized, cannot set cursor.");
+        return;
+    }
+
+    // Find the cursor by its identifier in the map
+    auto it = m_cursors.find(std::string(identifier));
+    if (it != m_cursors.end() && it->second) {
+        // Set the cursor if it exists
+        glfwSetCursor(p_window, it->second);
+    }
+    else {
+        ENGINE_LOG_ERROR("Cursor '{}' not found.", identifier);
+    }
+}
+
+void Window::ClearCursors()
+{
+    if (p_window) {
+        for (auto &[key, cursor] : m_cursors) {
+            glfwDestroyCursor(static_cast<GLFWcursor *>(cursor));
+        }
+        m_cursors.clear();
+
+        glfwSetCursor(p_window, nullptr);
+
+        ENGINE_LOG_DEBUG("GLFW cursors cleared.");
     }
 }
 

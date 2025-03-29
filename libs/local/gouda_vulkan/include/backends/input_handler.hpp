@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "backends/input_backend.hpp"
+#include "core/types.hpp"
 
 struct GLFWwindow;
 
@@ -121,8 +122,8 @@ private:
     // Input state tracking
     std::unordered_map<Key, bool> m_key_states;           // True if key is pressed
     std::unordered_map<MouseButton, bool> m_mouse_states; // True if button is pressed
-    double m_mouse_x;                                     // Current mouse X position
-    double m_mouse_y;
+    f64 m_mouse_x;                                        // Current mouse X position
+    f64 m_mouse_y;
 };
 
 } // namespace gouda

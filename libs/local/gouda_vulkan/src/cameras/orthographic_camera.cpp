@@ -9,6 +9,8 @@
 #include "math/matrix4x4.hpp"
 #include "math/vector.hpp"
 
+#include "debug/logger.hpp"
+
 namespace gouda {
 
 OrthographicCamera::OrthographicCamera(f32 left, f32 right, f32 bottom, f32 top, f32 zoom, f32 speed, f32 sensitivity)
@@ -87,7 +89,7 @@ void OrthographicCamera::UpdateMatrix() const
     Mat4 view = math::translate(-(camera_position));
 
     // Create the projection matrix with zoom scaling
-    Mat4 projection = m_base_projection * math::scale(math::Vec3(m_zoom, m_zoom, 1.0f));
+    Mat4 projection = m_base_projection * math::scale(Vec3(m_zoom, m_zoom, 1.0f));
 
     // Combine projection and view matrices
     m_view_projection_matrix = projection * view;

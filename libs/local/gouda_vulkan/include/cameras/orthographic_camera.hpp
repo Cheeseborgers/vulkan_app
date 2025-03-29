@@ -90,6 +90,17 @@ public:
      */
     Mat4 GetViewProjectionMatrix() const override;
 
+    void SetProjection(f32 left, f32 right, f32 bottom, f32 top)
+    {
+        m_left = left;
+        m_right = right;
+        m_bottom = bottom;
+        m_top = top;
+        m_base_projection = math::ortho(left, right, bottom, top, -1.0f, 1.0f);
+
+        m_is_dirty = true;
+    }
+
 private:
     /**
      * @brief Updates the camera's projection matrix.

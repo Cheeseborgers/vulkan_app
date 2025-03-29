@@ -1,5 +1,6 @@
 #include "debug/assert.hpp"
 
+#ifndef NDEBUG
 namespace assert_internal {
 
 void assert_print(const std::source_location &location)
@@ -23,3 +24,4 @@ void assert_impl(const std::source_location &location, bool check)
 }
 
 } // namespace assert_internal
+#endif

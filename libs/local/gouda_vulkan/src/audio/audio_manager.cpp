@@ -7,10 +7,7 @@
 #include "AL/alext.h"
 #include "AL/efx-presets.h"
 
-#include "debug/assert.hpp"
-#include "debug/throw.hpp"
-#include "logger.hpp"
-
+#include "debug/debug.hpp"
 #include "math/random.hpp"
 
 namespace gouda {

@@ -6,7 +6,7 @@
  */
 #include "cameras/camera.hpp"
 
-#include "logger.hpp"
+#include "debug/logger.hpp"
 
 namespace gouda {
 

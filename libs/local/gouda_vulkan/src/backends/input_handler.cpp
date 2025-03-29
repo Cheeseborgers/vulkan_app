@@ -7,7 +7,10 @@
 
 #include "backends/input_handler.hpp"
 
-#include "logger.hpp"
+#include "debug/logger.hpp"
+
+// TODO: Remove this!
+#include <GLFW/glfw3.h>
 
 namespace gouda {
 

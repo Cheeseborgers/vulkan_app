@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-#include "logger.hpp"
+#include "debug/logger.hpp"
 
 namespace gouda {
 namespace audio {

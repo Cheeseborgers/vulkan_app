@@ -1,9 +1,17 @@
 #version 460
 
-layout(location = 0) in vec2 uv;
+// Inputs from vertex shader
+layout(location = 0) in vec2 texCoord;
+layout(location = 1) in vec4 colour;
 
-layout(location = 0) out vec4 out_Color;
+// Output color
+layout(location = 0) out vec4 outColour;
 
-layout(binding = 2) uniform sampler2D texSampler;
+// Texture sampler
+layout(binding = 3) uniform sampler2D texSampler;
 
-void main() { out_Color = texture(texSampler, uv); }
+void main()
+{
+    vec4 texColor = texture(texSampler, texCoord);
+    outColour = texColor * colour;
+}

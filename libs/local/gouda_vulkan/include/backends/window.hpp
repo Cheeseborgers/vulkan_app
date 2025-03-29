@@ -48,6 +48,34 @@ public:
      * @param enabled A boolean flag indicating whether to enable (true) or disable (false) vsync.
      */
     virtual void SetVsync(bool enabled) = 0;
+
+    /**
+     * @brief Sets the icon for the window.
+     *
+     * @param filepath The file path for the window decoration icon image
+     */
+    virtual void SetIcon(std::string_view filepath) = 0;
+
+    /**
+     * @brief Loads the mouse cursor for the window.
+     *
+     * @param filepath The file path for the mouse cursor image
+     * @param identifier The identifier for the mouse cursor
+     */
+    virtual void LoadCursor(std::string_view filepath, std::string_view identifier) = 0;
+
+    /**
+     * @brief Sets the mouse cursor for the window.
+     *
+     * @param identifier The identifier for the loaded cursor
+     */
+    virtual void SetCursor(std::string_view identifier) = 0;
+
+    /**
+     * @brief Destroys any stored and loaded mouse cursors.
+     *
+     */
+    virtual void ClearCursors() = 0;
 };
 
 } // namespace gouda

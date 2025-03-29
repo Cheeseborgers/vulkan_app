@@ -6,9 +6,9 @@
 
 #include <sndfile.h>
 
-#include "logger.hpp"
+#include "debug/logger.hpp"
 #include "math/math.hpp"
-#include "utility/filesystem.hpp"
+#include "utils/filesystem.hpp"
 
 namespace gouda {
 namespace audio {
