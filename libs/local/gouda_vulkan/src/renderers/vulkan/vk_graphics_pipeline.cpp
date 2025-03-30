@@ -76,10 +76,11 @@ GraphicsPipeline::GraphicsPipeline(VulkanRenderer &renderer, GLFWwindow *p_windo
 
     VkPipelineInputAssemblyStateCreateInfo pipeline_input_assembly_state_create_info{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+        //.topology = PrimitiveTopologyToVulkan(mesh_ptr->m_topology),
         .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
         .primitiveRestartEnable = VK_FALSE};
 
-    VkDynamicState dynamic_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+    VkDynamicState dynamic_states[]{VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dynamic_state_info{.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
                                                         .dynamicStateCount = 2,
                                                         .pDynamicStates = dynamic_states};

@@ -130,6 +130,7 @@ private:
     std::unique_ptr<CommandBufferManager> p_command_buffer_manager;
     std::unique_ptr<GraphicsPipeline> p_pipeline;
     std::unique_ptr<Buffer> p_static_vertex_buffer;
+    std::unique_ptr<Buffer> p_static_index_buffer;
 
     GLFWwindow *p_window;
     VkRenderPass p_render_pass;

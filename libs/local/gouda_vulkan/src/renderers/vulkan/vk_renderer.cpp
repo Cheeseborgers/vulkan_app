@@ -25,6 +25,7 @@ VulkanRenderer::VulkanRenderer()
       p_command_buffer_manager{nullptr},
       p_pipeline{nullptr},
       p_static_vertex_buffer{nullptr},
+      p_static_index_buffer{nullptr},
 
       p_window{nullptr},
       p_render_pass{VK_NULL_HANDLE},
@@ -74,6 +75,11 @@ VulkanRenderer::~VulkanRenderer()
         if (p_static_vertex_buffer != nullptr) {
             p_static_vertex_buffer->Destroy(p_device->GetDevice());
             ENGINE_LOG_DEBUG("Static vertex buffer destroyed.");
+        }
+
+        if (p_static_index_buffer != nullptr) {
+            p_static_index_buffer->Destroy(p_device->GetDevice());
+            ENGINE_LOG_DEBUG("Static index buffer destroyed.");
         }
 
         for (auto &fence : m_frame_fences) {
@@ -134,16 +140,27 @@ void VulkanRenderer::Initialize(GLFWwindow *window_ptr, std::string_view app_nam
     m_queue.Initialize(p_device->GetDevice(), p_swapchain->GetHandle(), p_device->GetQueueFamily(), 0);
 
     std::vector<Vertex> quad_vertices = {
-        {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},     // Top-left
-        {{100.0f, 0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},   // Top-right
-        {{100.0f, 100.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}, // Bottom-right
-        {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},     // Top-left
-        {{100.0f, 100.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}, // Bottom-right
-        {{0.0f, 100.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}    // Bottom-left
+        {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}}, // Top-left
+        {{0.5f, 0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}}, // Top-right
+        {{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}, // Bottom-right
+        {{0.0f, 0.5f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}  // Bottom-left
     };
     VkDeviceSize vertex_buffer_size{sizeof(Vertex) * quad_vertices.size()};
     Buffer static_buffer{p_buffer_manager->CreateVertexBuffer(quad_vertices.data(), vertex_buffer_size)};
     p_static_vertex_buffer = std::make_unique<Buffer>(std::move(static_buffer));
+
+    std::vector<uint32_t> quad_indices = {
+        0, 1, 2, // First triangle
+        0, 2, 3  // Second triangle
+    };
+
+    VkDeviceSize index_buffer_size{sizeof(u32) * quad_indices.size()};
+    Buffer index_buffer{p_buffer_manager->CreateIndexBuffer(quad_indices.data(), index_buffer_size)};
+    p_static_index_buffer = std::make_unique<Buffer>(std::move(index_buffer));
+
+    // Set flags and counts for indexed drawing
+    m_use_indexed_drawing = true;
+    m_index_count = static_cast<u32>(quad_indices.size()); // 6 indices
 
     // Instance rendering
     CreateInstanceBuffers();
@@ -205,11 +222,17 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer command_buffer, u32 ima
     vkCmdSetScissor(command_buffer, 0, 1, &scissor);
     p_pipeline->Bind(command_buffer, image_index);
 
-    VkBuffer buffers[] = {p_static_vertex_buffer.get()->p_buffer, m_instance_buffers[image_index].p_buffer};
-    VkDeviceSize offsets[] = {0, 0};
+    VkBuffer buffers[]{p_static_vertex_buffer.get()->p_buffer, m_instance_buffers[image_index].p_buffer};
+    VkDeviceSize offsets[]{0, 0};
     vkCmdBindVertexBuffers(command_buffer, 0, 2, buffers, offsets);
 
-    vkCmdDraw(command_buffer, 6, instance_count, 0, 0); // 6 vertices per quad
+    if (m_use_indexed_drawing) {
+        vkCmdBindIndexBuffer(command_buffer, p_static_index_buffer->p_buffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdDrawIndexed(command_buffer, m_index_count, instance_count, 0, 0, 0);
+    }
+    else {
+        vkCmdDraw(command_buffer, 6, instance_count, 0, 0); // Fallback for non-indexed drawing
+    }
 
     // Render ImGui if draw data is available
     if (draw_data != nullptr) {

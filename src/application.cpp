@@ -38,9 +38,10 @@ void Application::Initialize()
 
     // Set up instance data for two quads
     m_instances = {
-        {{0.0f, 0.0f, -0.9f}, 1.0f, 0.0f},    // First quad at top-left
-        {{200.0f, 200.0f, 0.0f}, 1.5f, 3.0f}, // Second quad offset by 200x200 pixels
-        {{500.0f, 700.0f, 0.0f}, 2.5f, 6.0f}  // Second quad offset by 200x200 pixels
+        {{0.0f, 0.0f, -0.9f}, 100.0f, 0.0f},
+        {{300.0f, 300.0f, 0.0f}, 300.0f, 0.0f},
+        {{1300.0f, 300.0f, 0.0f}, 300.0f, 0.0f},
+        {{2300.0f, 300.0f, 0.0f}, 300.0f, 0.0f},
     };
 
     SetupInputSystem();
@@ -230,9 +231,8 @@ void Application::SetupInputSystem()
 
     // Scroll callback
     p_input_handler->SetScrollCallback([this](double xOffset, double yOffset) {
-        f32 zoomDelta = static_cast<f32>(yOffset) * 0.1f; // Match original sensitivity
-        p_ortho_camera->AdjustZoom(zoomDelta);
-        APP_LOG_DEBUG("Mouse wheel scrolled: xOffset={}, yOffset={}, zoomDelta={}", xOffset, yOffset, zoomDelta);
+        f32 zoom_delta{static_cast<f32>(yOffset) * 0.1f};
+        p_ortho_camera->AdjustZoom(zoom_delta);
     });
 
     // Character input callback
