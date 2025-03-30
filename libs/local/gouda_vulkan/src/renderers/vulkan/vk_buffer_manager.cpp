@@ -102,7 +102,7 @@ Buffer BufferManager::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
     return buffer;
 }
 
-Buffer BufferManager::CreateVertexBuffer(const void *vertices_ptr, size_t size)
+Buffer BufferManager::CreateVertexBuffer(const void *vertices_ptr, VkDeviceSize size)
 {
     Buffer staging_buffer{CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
@@ -131,6 +131,24 @@ Buffer BufferManager::CreateUniformBuffer(size_t size)
 {
     return CreateBuffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+}
+
+Buffer BufferManager::CreateIndexBuffer(const void *data, VkDeviceSize size)
+{
+    Buffer staging_buffer{CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
+    staging_buffer.Update(p_device->GetDevice(), data, size);
+
+    Buffer index_buffer{CreateBuffer(size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
+
+    CopyBufferToBuffer(index_buffer.p_buffer, staging_buffer.p_buffer, size, p_copy_command_buffer);
+
+    // Wait for the copy to complete
+    vkWaitForFences(p_device->GetDevice(), 1, &p_copy_fence, VK_TRUE, UINT64_MAX);
+
+    staging_buffer.Destroy(p_device->GetDevice());
+    return index_buffer;
 }
 
 void BufferManager::CreateImage(VulkanTexture &texture, VkImageCreateInfo &image_info,

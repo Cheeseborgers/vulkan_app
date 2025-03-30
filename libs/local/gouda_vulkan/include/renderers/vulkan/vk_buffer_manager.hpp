@@ -36,7 +36,6 @@ class VulkanTexture;
 class VulkanDevice;
 class VulkanQueue;
 
-// TODO: Change to VulkanBufferManager
 class BufferManager {
 public:
     BufferManager(VulkanDevice *device, VulkanQueue *queue);
@@ -46,12 +45,15 @@ public:
     Buffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
 
     // Create a vertex buffer with staging
-    Buffer CreateVertexBuffer(const void *vertices, size_t size);
+    Buffer CreateVertexBuffer(const void *data, VkDeviceSize size);
 
     Buffer CreateDynamicVertexBuffer(VkDeviceSize size);
 
     // Create a uniform buffer
     Buffer CreateUniformBuffer(size_t size);
+
+    // Create a index buffer
+    Buffer CreateIndexBuffer(const void *data, VkDeviceSize size);
 
     // Create and allocate memory for an image
     void CreateImage(VulkanTexture &texture, VkImageCreateInfo &image_info, VkMemoryPropertyFlags memory_properties);
