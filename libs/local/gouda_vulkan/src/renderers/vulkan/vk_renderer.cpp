@@ -155,7 +155,9 @@ void VulkanRenderer::Initialize(GLFWwindow *window_ptr, std::string_view app_nam
     };
 
     VkDeviceSize index_buffer_size{sizeof(u32) * quad_indices.size()};
+
     Buffer index_buffer{p_buffer_manager->CreateIndexBuffer(quad_indices.data(), index_buffer_size)};
+
     p_static_index_buffer = std::make_unique<Buffer>(std::move(index_buffer));
 
     // Set flags and counts for indexed drawing

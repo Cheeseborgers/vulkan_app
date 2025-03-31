@@ -179,21 +179,22 @@ void GraphicsPipeline::Destroy()
 
 void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
 {
+    // Account for all possible descriptors for each image
     std::vector<VkDescriptorPoolSize> pool_sizes = {
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, static_cast<u32>(number_of_images)},        // Static vertex buffer
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, static_cast<u32>(number_of_images)},        // Instance buffer
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<u32>(number_of_images)},        // Uniform buffer
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<u32>(number_of_images)} // Texture sampler
-    };
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2 * static_cast<u32>(number_of_images)},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2 * static_cast<u32>(number_of_images)},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<u32>(number_of_images)}};
 
+    // Multiply number_of_images by the number of bindings per set
     VkDescriptorPoolCreateInfo descriptor_pool_create_info{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-                                                           .maxSets = static_cast<u32>(number_of_images),
+                                                           .maxSets =
+                                                               static_cast<u32>(number_of_images), // One set per image
                                                            .poolSizeCount = static_cast<u32>(pool_sizes.size()),
                                                            .pPoolSizes = pool_sizes.data()};
 
     VkResult result = vkCreateDescriptorPool(p_device, &descriptor_pool_create_info, nullptr, &p_descriptor_pool);
     CHECK_VK_RESULT(result, "vkCreateDescriptorPool");
-    ENGINE_LOG_DEBUG("Descriptor pool created");
+    ENGINE_LOG_DEBUG("Descriptor pool created successfully");
 }
 
 void GraphicsPipeline::CreateDescriptorSets(const Mesh *mesh_ptr, int number_of_images,
