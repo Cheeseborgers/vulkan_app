@@ -140,9 +140,13 @@ GraphicsPipeline::GraphicsPipeline(VulkanRenderer &renderer, GLFWwindow *p_windo
                                                .subpass = 0};
 
     result = vkCreateGraphicsPipelines(p_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &p_pipeline);
-    CHECK_VK_RESULT(result, "vkCreateGraphicsPipelines\n");
-
-    ENGINE_LOG_DEBUG("Graphics pipeline created");
+    if (result != VK_SUCCESS) {
+        ENGINE_LOG_ERROR("Failed to create graphics pipeline. Error code: {}", VKResultToString(result));
+        CHECK_VK_RESULT(result, "vkCreateGraphicsPipelines");
+    }
+    else {
+        ENGINE_LOG_DEBUG("Graphics pipeline created");
+    }
 }
 
 GraphicsPipeline::~GraphicsPipeline() { Destroy(); }
@@ -180,7 +184,7 @@ void GraphicsPipeline::Destroy()
 void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
 {
     // Account for all possible descriptors for each image
-    std::vector<VkDescriptorPoolSize> pool_sizes = {
+    std::vector<VkDescriptorPoolSize> pool_sizes{
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2 * static_cast<u32>(number_of_images)},
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2 * static_cast<u32>(number_of_images)},
         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<u32>(number_of_images)}};
@@ -192,9 +196,14 @@ void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
                                                            .poolSizeCount = static_cast<u32>(pool_sizes.size()),
                                                            .pPoolSizes = pool_sizes.data()};
 
-    VkResult result = vkCreateDescriptorPool(p_device, &descriptor_pool_create_info, nullptr, &p_descriptor_pool);
-    CHECK_VK_RESULT(result, "vkCreateDescriptorPool");
-    ENGINE_LOG_DEBUG("Descriptor pool created successfully");
+    VkResult result{vkCreateDescriptorPool(p_device, &descriptor_pool_create_info, nullptr, &p_descriptor_pool)};
+    if (result != VK_SUCCESS) {
+        ENGINE_LOG_ERROR("Failed to create descriptor pool. Error code: {}", VKResultToString(result));
+        CHECK_VK_RESULT(result, "vkCreateDescriptorPool");
+    }
+    else {
+        ENGINE_LOG_DEBUG("Descriptor pool created successfully");
+    }
 }
 
 void GraphicsPipeline::CreateDescriptorSets(const Mesh *mesh_ptr, int number_of_images,
@@ -209,7 +218,7 @@ void GraphicsPipeline::CreateDescriptorSets(const Mesh *mesh_ptr, int number_of_
 void GraphicsPipeline::CreateDescriptorSetLayout(std::vector<Buffer> &uniform_buffers, int uniform_data_size,
                                                  VulkanTexture *texture_ptr)
 {
-    std::vector<VkDescriptorSetLayoutBinding> layout_bindings = {
+    std::vector<VkDescriptorSetLayoutBinding> layout_bindings{
         // Binding 0: Static vertex buffer (storage buffer)
         VkDescriptorSetLayoutBinding{.binding = 0,
                                      .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -239,7 +248,10 @@ void GraphicsPipeline::CreateDescriptorSetLayout(std::vector<Buffer> &uniform_bu
                                                 .pBindings = layout_bindings.data()};
 
     VkResult result = vkCreateDescriptorSetLayout(p_device, &layout_info, nullptr, &p_descriptor_set_layout);
-    CHECK_VK_RESULT(result, "vkCreateDescriptorSetLayout");
+    if (result != VK_SUCCESS) {
+        ENGINE_LOG_ERROR("Failed to create descriptor set layout. Error code: {}", VKResultToString(result));
+        CHECK_VK_RESULT(result, "vkCreateDescriptorSetLayout");
+    }
 }
 
 void GraphicsPipeline::AllocateDescriptorSets(int number_of_images)
@@ -251,8 +263,12 @@ void GraphicsPipeline::AllocateDescriptorSets(int number_of_images)
                                                                .pSetLayouts = descriptor_set_layouts.data()};
 
     m_descriptor_sets.resize(number_of_images);
+
     VkResult result = vkAllocateDescriptorSets(p_device, &descriptor_set_allocation_info, m_descriptor_sets.data());
-    CHECK_VK_RESULT(result, "vkAllocateDescriptorSets");
+    if (result != VK_SUCCESS) {
+        ENGINE_LOG_ERROR("Failed to allocate descriptor sets. Error code: {}", VKResultToString(result));
+        CHECK_VK_RESULT(result, "vkAllocateDescriptorSets");
+    }
 }
 
 void GraphicsPipeline::UpdateDescriptorSets(const Mesh *mesh_ptr, int number_of_images,
