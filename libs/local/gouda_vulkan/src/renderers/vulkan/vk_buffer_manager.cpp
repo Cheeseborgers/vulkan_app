@@ -139,8 +139,8 @@ Buffer BufferManager::CreateIndexBuffer(const void *data, VkDeviceSize size)
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
     staging_buffer.Update(p_device->GetDevice(), data, size);
 
-    Buffer index_buffer{CreateBuffer(size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
+    Buffer index_buffer{CreateBuffer(size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)};
 
     CopyBufferToBuffer(index_buffer.p_buffer, staging_buffer.p_buffer, size, p_copy_command_buffer);
 
