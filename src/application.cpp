@@ -3,19 +3,23 @@
 #include "backends/event_types.hpp"
 #include "backends/glfw/glfw_backend.hpp"
 #include "debug/logger.hpp"
+#include "math/collision.hpp"
 #include "math/vector.hpp"
 #include "renderers/vulkan/gouda_vk_wrapper.hpp"
-#include "renderers/vulkan/vk_uniform_data.hpp"
 #include "utils/timer.hpp"
+
+#include "core/constants.hpp"
 
 Application::Application()
     : p_window{nullptr},
       p_input_handler{nullptr},
       m_settings_manager{"config/settings.json", true, true},
       m_is_iconified{false},
+      m_framebuffer_size{0, 0},
       m_time_settings{},
       p_ortho_camera{nullptr},
-      m_uniform_data{}
+      m_uniform_data{},
+      p_current_scene{nullptr}
 {
 }
 
@@ -24,7 +28,6 @@ Application::~Application()
     APP_LOG_INFO("Cleaning up application");
 
     m_renderer.DeviceWait(); // Ensure GPU is idle before cleanup
-    m_mesh.Destroy(m_renderer.GetDevice());
 }
 
 void Application::Initialize()
@@ -36,28 +39,20 @@ void Application::Initialize()
     SetupWindow(settings);
     SetupRenderer();
 
-    // Set up instance data for two quads
-    m_instances = {
-        {{0.0f, 0.0f, -0.9f}, 100.0f, 0.0f},
-        {{300.0f, 300.0f, 0.0f}, 300.0f, 0.0f},
-        {{1300.0f, 300.0f, 0.0f}, 300.0f, 0.0f},
-        {{2300.0f, 300.0f, 0.0f}, 300.0f, 0.0f},
-    };
+    m_framebuffer_size = m_renderer.GetFramebufferSize();
 
     SetupInputSystem();
     SetupCamera();
     SetupAudio(settings);
 
+    p_current_scene = std::make_unique<Scene>(p_ortho_camera.get());
+
     APP_LOG_DEBUG("Application initialization success");
 }
 
-void Application::Update(f32 delta_time) { p_ortho_camera->Update(delta_time); }
+void Application::Update(f32 delta_time) { p_current_scene->Update(delta_time); }
 
-void Application::RenderScene(f32 delta_time)
-{
-    m_uniform_data.WVP = p_ortho_camera->GetViewProjectionMatrix();
-    m_renderer.Render(delta_time, m_uniform_data, m_instances);
-}
+void Application::RenderScene(f32 delta_time) { p_current_scene->Render(delta_time, m_renderer, m_uniform_data); }
 
 void Application::Execute()
 {
@@ -72,7 +67,7 @@ void Application::Execute()
 
     // Only use FPS limiter if V-Sync is disabled
     std::optional<gouda::utils::FrameRateLimiter> fps_limiter;
-    if (m_time_settings.vsync_mode == gouda::vk::VSyncMode::DISABLED) {
+    if (m_time_settings.vsync_mode == gouda::vk::VSyncMode::Disabled) {
         fps_limiter.emplace(m_time_settings.target_fps);
     }
 
@@ -112,12 +107,13 @@ void Application::Execute()
     m_renderer.DeviceWait();
 }
 
-// Private -------------------------------------------------------------------------------------------------------------
+// Private
+// -------------------------------------------------------------------------------------------------------------
 void Application::SetupTimerSettings(const ApplicationSettings &settings)
 {
     m_time_settings.target_fps = settings.refresh_rate;
     m_time_settings.fixed_timestep = 1.0f / settings.refresh_rate;
-    m_time_settings.vsync_mode = settings.vsync ? gouda::vk::VSyncMode::ENABLED : gouda::vk::VSyncMode::DISABLED;
+    m_time_settings.vsync_mode = settings.vsync ? gouda::vk::VSyncMode::Enabled : gouda::vk::VSyncMode::Disabled;
 }
 
 void Application::SetupWindow(const ApplicationSettings &settings)
@@ -140,12 +136,14 @@ void Application::SetupWindow(const ApplicationSettings &settings)
 void Application::SetupRenderer()
 {
     // Initialize Vulkan
-    const SemVer vulkan_api_version{1, 3, 0, 0};
-    m_renderer.Initialize(p_window->GetWindow(), "Gouda renderer", vulkan_api_version, m_time_settings.vsync_mode);
+    m_renderer.Initialize(p_window->GetWindow(), "Gouda renderer", {1, 3, 0, 0}, m_time_settings.vsync_mode);
 
-    CreateMesh();
+    LoadTextures();
     m_renderer.CreateUniformBuffers(sizeof(gouda::vk::UniformData));
-    m_renderer.SetupPipeline(&m_mesh, "assets/shaders/compiled/test.vert.spv", "assets/shaders/compiled/test.frag.spv");
+
+    m_renderer.SetupPipelines(quad_vertex_shader_path, quad_frag_shader_path, text_vertex_shader_path,
+                              text_frag_shader_path, particle_vertex_shader_path, particle_frag_shader_path,
+                              particle_compute_shader_path);
 }
 
 void Application::SetupAudio(const ApplicationSettings &settings)
@@ -170,15 +168,18 @@ void Application::SetupCamera()
     p_ortho_camera = std::make_unique<gouda::OrthographicCamera>(
         0.0f, static_cast<f32>(framebuffer_size.width),  // left = 0, right = width
         static_cast<f32>(framebuffer_size.height), 0.0f, // bottom = height, top = 0
-        1.0f, 100.0f, 1.0f                               // zoom, speed, sensitivity
+        -1.0f, 1.0f, 1.0f, 100.0f, 1.0f                  // zoom, speed, sensitivity
     );
 }
 
-void Application::CreateMesh() { LoadTexture(); }
-
-void Application::LoadTexture()
+void Application::LoadTextures()
 {
-    m_mesh.p_texture = m_renderer.GetBufferManager()->CreateTexture("assets/textures/checkerboard.png");
+    m_renderer.LoadTexture("assets/textures/checkerboard.png");
+    m_renderer.LoadTexture("assets/textures/checkerboard2.png");
+    m_renderer.LoadTexture("assets/textures/checkerboard3.png");
+    m_renderer.LoadTexture("assets/textures/checkerboard4.png");
+
+    u32 font_id = m_renderer.LoadMSDFFont("assets/fonts/atlas.png", "assets/fonts/atlas.json");
 }
 
 void Application::SetupInputSystem()
@@ -193,10 +194,7 @@ void Application::SetupInputSystem()
         {gouda::Key::Escape, gouda::ActionState::Pressed,
          [this]() { glfwSetWindowShouldClose(p_window->GetWindow(), GLFW_TRUE); }},
         {gouda::Key::A, gouda::ActionState::Pressed,
-         [this]() {
-             APP_LOG_DEBUG("Left");
-             p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_LEFT);
-         }},
+         [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_LEFT); }},
         {gouda::Key::A, gouda::ActionState::Released,
          [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_LEFT); }},
         {gouda::Key::D, gouda::ActionState::Pressed,
@@ -219,10 +217,44 @@ void Application::SetupInputSystem()
          [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZOOM_OUT); }},
         {gouda::Key::E, gouda::ActionState::Released,
          [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZOOM_OUT); }},
+        {gouda::Key::Left, gouda::ActionState::Pressed,
+         [this]() { p_current_scene->GetPlayer().velocity.x = -p_current_scene->GetPlayer().speed; }},
+        {gouda::Key::Left, gouda::ActionState::Released,
+         [this]() {
+             if (p_current_scene->GetPlayer().velocity.x < 0)
+                 p_current_scene->GetPlayer().velocity.x = 0;
+         }},
+        {gouda::Key::Right, gouda::ActionState::Pressed,
+         [this]() { p_current_scene->GetPlayer().velocity.x = p_current_scene->GetPlayer().speed; }},
+        {gouda::Key::Right, gouda::ActionState::Released,
+         [this]() {
+             if (p_current_scene->GetPlayer().velocity.x > 0)
+                 p_current_scene->GetPlayer().velocity.x = 0;
+         }},
+        {gouda::Key::Up, gouda::ActionState::Pressed,
+         [this]() { p_current_scene->GetPlayer().velocity.y = p_current_scene->GetPlayer().speed; }},
+        {gouda::Key::Up, gouda::ActionState::Released,
+         [this]() {
+             if (p_current_scene->GetPlayer().velocity.y > 0)
+                 p_current_scene->GetPlayer().velocity.y = 0;
+         }},
+        {gouda::Key::Down, gouda::ActionState::Pressed,
+         [this]() { p_current_scene->GetPlayer().velocity.y = -p_current_scene->GetPlayer().speed; }},
+        {gouda::Key::Down, gouda::ActionState::Released,
+         [this]() {
+             if (p_current_scene->GetPlayer().velocity.y < 0)
+                 p_current_scene->GetPlayer().velocity.y = 0;
+         }},
         {gouda::Key::Space, gouda::ActionState::Pressed, [this]() { p_ortho_camera->Shake(10.0f, 0.5f); }},
+        {gouda::Key::C, gouda::ActionState::Pressed, [this]() { m_renderer.ToggleComputeParticles(); }},
         {gouda::MouseButton::Left, gouda::ActionState::Pressed,
-         []() {
+         [this]() {
              // APP_LOG_DEBUG("Left Mouse Pressed");
+             p_current_scene->SpawnParticle({0, 0, -0.1f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1});
+             p_current_scene->SpawnParticle({0, 100, -0.1f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1});
+             p_current_scene->SpawnParticle({0, 200, -0.1f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1});
+             p_current_scene->SpawnParticle({0, 350, -0.1f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1});
+             p_current_scene->SpawnParticle({0, 500, -0.1f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1});
          }},
     };
 
@@ -254,8 +286,8 @@ void Application::SetupInputSystem()
 
     // Framebuffer resized
     p_input_handler->SetFramebufferSizeCallback([this](int width, int height) {
-        FrameBufferSize new_size{width, height};
-        OnFramebufferResize(p_window->GetWindow(), new_size);
+        m_framebuffer_size = {width, height};
+        OnFramebufferResize(p_window->GetWindow(), m_framebuffer_size);
     });
 
     // Window resized

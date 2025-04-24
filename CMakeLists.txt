@@ -11,12 +11,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+
 option(ENABLE_WARNINGS "Enable warnings" ON)
 option(COMPILE_SHADERS "Compile shaders to SPIR-V during build" ON)
 option(COPY_SHADER_SOURCE "Copy shader source files during build" ON)
 option(COPY_TEXTURES "Copy texture image files during build" ON)
 option(COPY_AUDIO "Copy audio files during build" ON)
+option(COPY_LEVELS "Copy level files during build" ON)
 option(USE_CCACHE "Enable ccache" ON)
+option(GENERATE_FONTS "Generate msdf fonts on build" ON)
+option(COPY_FONTS "Copy msdf fonts on build" ON)
 
 # Logging options
 option(ENABLE_ENGINE_LOGGING "Enable engine logging" ON)
@@ -45,8 +50,7 @@ endif()
 
 find_package(Threads REQUIRED)
 
-# Include the Vulkan core stuff
-add_subdirectory("libs/local/gouda_vulkan")
+add_subdirectory("libs/local/gouda_engine")
 
 # nlohmann_json
 add_subdirectory(libs/thirdparty/nlohmann_json)
@@ -62,7 +66,11 @@ target_sources(${PROJECT_NAME}
     src/application.cpp
     src/main.cpp
 
+    src/core/entity.cpp
+    src/core/player.cpp
     src/core/settings_manager.cpp
+
+    src/scenes/scene.cpp
 )
 
 # Include directories
@@ -72,7 +80,7 @@ target_include_directories(${PROJECT_NAME}
     PUBLIC
 
     # Local libs
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/local/gouda_vulkan>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/local/gouda_engine>
 
     # Third party libs
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/thirdparty/nlohmann_json>
@@ -83,7 +91,7 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
     PUBLIC
-    gouda_vulkan
+    gouda_engine
     nlohmann_json::nlohmann_json
     Threads::Threads
 )
@@ -169,7 +177,7 @@ endif()
 
 # Logging compile definitions
 if(ENABLE_ENGINE_LOGGING)
-    target_compile_definitions(gouda_vulkan PRIVATE ENABLE_ENGINE_LOGGING)
+    target_compile_definitions(gouda_engine PRIVATE ENABLE_ENGINE_LOGGING)
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_ENGINE_LOGGING)
 endif()
 
@@ -178,27 +186,27 @@ if(ENABLE_APP_LOGGING)
 endif()
 
 if(ENGINE_LOG_LEVEL_DEBUG)
-    target_compile_definitions(gouda_vulkan PRIVATE ENGINE_LOG_LEVEL_DEBUG)
+    target_compile_definitions(gouda_engine PRIVATE ENGINE_LOG_LEVEL_DEBUG)
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_LOG_LEVEL_DEBUG)
 endif()
 
 if(ENGINE_LOG_LEVEL_INFO)
-    target_compile_definitions(gouda_vulkan PRIVATE ENGINE_LOG_LEVEL_INFO)
+    target_compile_definitions(gouda_engine PRIVATE ENGINE_LOG_LEVEL_INFO)
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_LOG_LEVEL_INFO)
 endif()
 
 if(ENGINE_LOG_LEVEL_WARNING)
-    target_compile_definitions(gouda_vulkan PRIVATE ENGINE_LOG_LEVEL_WARNING)
+    target_compile_definitions(gouda_engine PRIVATE ENGINE_LOG_LEVEL_WARNING)
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_LOG_LEVEL_WARNING)
 endif()
 
 if(ENGINE_LOG_LEVEL_ERROR)
-    target_compile_definitions(gouda_vulkan PRIVATE ENGINE_LOG_LEVEL_ERROR)
+    target_compile_definitions(gouda_engine PRIVATE ENGINE_LOG_LEVEL_ERROR)
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_LOG_LEVEL_ERROR)
 endif()
 
 if(ENGINE_LOG_LEVEL_FATAL)
-    target_compile_definitions(gouda_vulkan PRIVATE ENGINE_LOG_LEVEL_FATAL)
+    target_compile_definitions(gouda_engine PRIVATE ENGINE_LOG_LEVEL_FATAL)
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_LOG_LEVEL_FATAL)
 endif()
 
@@ -236,8 +244,7 @@ if(COMPILE_SHADERS)
     file(GLOB SHADER_SOURCES
         ${SHADER_SOURCE_DIR}/*.vert
         ${SHADER_SOURCE_DIR}/*.frag
-
-        # ${SHADER_SOURCE_DIR}/*.comp
+        ${SHADER_SOURCE_DIR}/*.comp
     )
 
     foreach(SHADER ${SHADER_SOURCES})
@@ -283,6 +290,36 @@ if(COPY_AUDIO)
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${AUDIO_SOURCE_DIR} ${AUDIO_DEST_DIR}
     )
     add_dependencies(${CMAKE_PROJECT_NAME} copy_audio)
+endif()
+
+message(STATUS " ${PROJECT_NAME}: Build type: ${CMAKE_BUILD_TYPE} Version: ${PROJECT_VERSION} ")
+
+# Copy audio on levels:
+if(COPY_LEVELS)
+    set(LEVELS_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/assets/levels)
+    set(LEVELS_DEST_DIR ${CMAKE_CURRENT_BINARY_DIR}/assets/levels)
+    add_custom_target(copy_levels
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${LEVELS_SOURCE_DIR} ${LEVELS_DEST_DIR}
+    )
+    add_dependencies(${CMAKE_PROJECT_NAME} copy_levels)
+endif()
+
+if(GENERATE_FONTS)
+    include(GenerateMSDFFont)
+
+    # generate_msdf_font("${CMAKE_SOURCE_DIR}/assets/fonts/Roboto.ttf" "roboto")
+
+    # generate_msdf_font("${CMAKE_SOURCE_DIR}/assets/fonts/OpenSans-Bold.ttf" "opensans")
+endif()
+
+# Copy audio on levels:
+if(COPY_FONTS)
+    set(FONTS_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/assets/fonts)
+    set(FONTS_DEST_DIR ${CMAKE_CURRENT_BINARY_DIR}/assets/fonts)
+    add_custom_target(copy_fonts
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${FONTS_SOURCE_DIR} ${FONTS_DEST_DIR}
+    )
+    add_dependencies(${CMAKE_PROJECT_NAME} copy_fonts)
 endif()
 
 message(STATUS " ${PROJECT_NAME}: Build type: ${CMAKE_BUILD_TYPE} Version: ${PROJECT_VERSION} ")
