@@ -20,7 +20,9 @@ public:
     ~Scene() = default;
 
     void Update(f32 delta_time);
-    void Render(f32 delta_time, gouda::vk::VulkanRenderer &renderer, gouda::vk::UniformData &uniform_data);
+    void Render(f32 delta_time, gouda::vk::Renderer &renderer, gouda::vk::UniformData &uniform_data);
+
+    void DrawUI(gouda::vk::Renderer &renderer);
 
     void LoadFromJSON(std::string_view filepath);
     void SaveToJSON(std::string_view filepath);
@@ -45,7 +47,7 @@ private:
     std::vector<Entity> m_entities;
 
     std::vector<gouda::vk::InstanceData> m_visible_quad_instances;
-    std::vector<gouda::vk::InstanceData> m_text_instances;
+    std::vector<gouda::vk::TextData> m_text_instances;
     std::vector<gouda::vk::ParticleData> m_particles_instances;
     bool m_instances_dirty;
 

@@ -180,6 +180,8 @@ void Application::LoadTextures()
     m_renderer.LoadTexture("assets/textures/checkerboard4.png");
 
     u32 font_id = m_renderer.LoadMSDFFont("assets/fonts/atlas.png", "assets/fonts/atlas.json");
+
+    APP_LOG_DEBUG("font texture id: {}", font_id);
 }
 
 void Application::SetupInputSystem()

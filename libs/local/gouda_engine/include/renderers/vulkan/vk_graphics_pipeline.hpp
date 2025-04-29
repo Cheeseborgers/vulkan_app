@@ -21,14 +21,14 @@ struct GLFWwindow;
 namespace gouda::vk {
 
 class Buffer;
-class VulkanRenderer;
+class Renderer;
 class Shader;
 
 enum class PipelineType : u8 { Quad, Text, Particle };
 
 class GraphicsPipeline {
 public:
-    GraphicsPipeline(VulkanRenderer &renderer, GLFWwindow *window_ptr, VkRenderPass render_pass, Shader *vertex_shader,
+    GraphicsPipeline(Renderer &renderer, GLFWwindow *window_ptr, VkRenderPass render_pass, Shader *vertex_shader,
                      Shader *fragment_shader, int number_of_images, std::vector<Buffer> &uniform_buffers,
                      int uniform_data_size, PipelineType type);
 
@@ -53,7 +53,7 @@ private:
     void UpdateDescriptorSets(int number_of_images, std::vector<Buffer> &uniform_buffers, int uniform_data_size);
 
 private:
-    VulkanRenderer &m_renderer;
+    Renderer &m_renderer;
     VkDevice p_device;
     VkPipeline p_pipeline;
     VkPipelineLayout p_pipeline_layout;

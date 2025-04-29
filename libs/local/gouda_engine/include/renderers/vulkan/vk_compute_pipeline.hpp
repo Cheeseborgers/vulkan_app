@@ -20,12 +20,12 @@
 
 namespace gouda::vk {
 
-class VulkanRenderer;
+class Renderer;
 class Shader;
 
 class ComputePipeline {
 public:
-    ComputePipeline(VulkanRenderer &renderer, Shader *compute_shader, const std::vector<Buffer> &storage_buffers,
+    ComputePipeline(Renderer &renderer, Shader *compute_shader, const std::vector<Buffer> &storage_buffers,
                     const std::vector<Buffer> &uniform_buffers, VkDeviceSize storage_buffer_size,
                     VkDeviceSize uniform_buffer_size);
     ~ComputePipeline();
@@ -40,7 +40,7 @@ public:
     VkPipelineLayout GetPipelineLayout() const { return p_pipeline_layout; }
 
 private:
-    VulkanRenderer &m_renderer;
+    Renderer &m_renderer;
     VkDevice p_device;
     VkPipeline p_pipeline{VK_NULL_HANDLE};
     VkPipelineLayout p_pipeline_layout{VK_NULL_HANDLE};

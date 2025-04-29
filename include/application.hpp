@@ -55,7 +55,7 @@ private:
     std::unique_ptr<gouda::glfw::Window> p_window;
     std::unique_ptr<gouda::InputHandler> p_input_handler;
     SettingsManager m_settings_manager;
-    gouda::vk::VulkanRenderer m_renderer;
+    gouda::vk::Renderer m_renderer;
 
     bool m_is_iconified;
     FrameBufferSize m_framebuffer_size;

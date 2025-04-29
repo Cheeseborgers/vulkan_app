@@ -42,6 +42,10 @@ constexpr u32 bit_shift(int x) noexcept { return std::bit_cast<u32>(1U << x); }
 constexpr u64 bytes_to_kb(u64 bytes) { return bytes / 1024ULL; }
 constexpr u64 bytes_to_mb(u64 bytes) { return bytes / (1024ULL * 1024); }
 constexpr u64 bytes_to_gb(u64 bytes) { return bytes / (1024ULL * 1024 * 1024); }
+constexpr size_t mb_to_bytes(size_t mb) { return mb * 1024 * 1024; }
+constexpr size_t gb_to_bytes(size_t gb) { return gb * 1024 * 1024 * 1024; }
+constexpr size_t set_size_in_mb(size_t mb) { return mb_to_bytes(mb); }
+constexpr size_t set_size_in_gb(size_t gb) { return gb_to_bytes(gb); }
 
 // Function that returns π with the correct precision
 template <FloatingPointT T>

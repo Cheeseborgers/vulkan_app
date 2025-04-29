@@ -5,20 +5,11 @@
  * @date 2025-04-24
  * @brief Engine module
  *
+ * @copyright
  * Copyright (c) 2025 GoudaCheeseburgers <https://github.com/Cheeseborgers>
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
+ * See <https://www.gnu.org/licenses/> for more information.
  */
 #include <iterator>
 #include <memory>
@@ -416,8 +407,8 @@ public:
     template <typename InputIt>
     iterator insert(const_iterator pos, InputIt first, InputIt last)
     {
-        size_t index = pos - begin();              // Calculate the index to insert at
-        size_t count = std::distance(first, last); // Number of elements to insert
+        size_t index{pos - begin()};              // Calculate the index to insert at
+        size_t count{std::distance(first, last)}; // Number of elements to insert
 
         if (m_size + count > m_capacity) {
             grow(); // Ensure enough capacity
@@ -469,5 +460,8 @@ private:
     T *m_data;
     alignas(T) char m_stack_buffer[sizeof(T) * N];
 };
+
+template <typename T>
+using Vector = SmallVector<T, 0>;
 
 } // namespace gouda

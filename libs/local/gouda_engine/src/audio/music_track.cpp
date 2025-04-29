@@ -4,8 +4,7 @@
 
 #include "debug/logger.hpp"
 
-namespace gouda {
-namespace audio {
+namespace gouda::audio {
 
 MusicTrack::MusicTrack() : p_sndfile{nullptr}, m_format{AL_NONE}, m_sample_rate{0}, m_channels{0}, m_finished{true}
 {
@@ -51,7 +50,7 @@ MusicTrack &MusicTrack::operator=(MusicTrack &&other) noexcept
 
 bool MusicTrack::Load(std::string_view filepath)
 {
-    ENGINE_LOG_INFO("Attempting to load music track: {}", filepath);
+    ENGINE_LOG_DEBUG("Attempting to load music track: {}", filepath);
 
     if (filepath.empty()) {
         ENGINE_LOG_ERROR("Empty filepath provided");
@@ -122,5 +121,4 @@ size_t MusicTrack::ReadFrames(float *buffer, size_t frames)
     return static_cast<size_t>(read);
 }
 
-} // namespace audio end
-} // namespace gouda end
+} // namespace gouda::audio

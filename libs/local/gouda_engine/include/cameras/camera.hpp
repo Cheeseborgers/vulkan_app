@@ -1,6 +1,6 @@
 #pragma once
 /**
- * @file camera/camera.hpp
+ * @file cameras/camera.hpp
  * @author GoudaCheeseburgers
  * @date 2025-03-12
  * @brief Camera system for 3D rendering with movement, shake, sway, and follow functionalities.
@@ -11,20 +11,11 @@
  *
  * The camera can also follow a target and has adjustable movement speed and sensitivity.
  *
- * @copyright (c) 2025 GoudaCheeseburgers <https://github.com/Cheeseborgers>
+ * @copyright
+ * Copyright (c) 2025 GoudaCheeseburgers <https://github.com/Cheeseborgers>
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published
- * by the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
+ * See <https://www.gnu.org/licenses/> for more information.
  */
 
 #include "core/types.hpp"

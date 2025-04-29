@@ -218,14 +218,20 @@ void Scene::Update(f32 delta_time)
     UpdateVisibleInstances();
 }
 
-void Scene::Render(f32 delta_time, gouda::vk::VulkanRenderer &renderer, gouda::vk::UniformData &uniform_data)
+void Scene::Render(f32 delta_time, gouda::vk::Renderer &renderer, gouda::vk::UniformData &uniform_data)
 {
 
-    m_text_instances.clear();
     uniform_data.WVP = p_camera->GetViewProjectionMatrix();
-    // renderer.DrawText("MDEDGFGFGFGFG5", {100.0f}, 1035.0f, m_font_id, m_text_instances);
+    DrawUI(renderer);
 
     renderer.Render(delta_time, uniform_data, m_visible_quad_instances, m_text_instances, m_particles_instances);
+}
+
+void Scene::DrawUI(gouda::vk::Renderer &renderer)
+{
+    m_text_instances.clear();
+
+    renderer.DrawText("MEEFFFDFDSFDSFDSFDSFD", {100.0f}, 200.0f, m_font_id, m_text_instances);
 }
 
 void Scene::LoadFromJSON(std::string_view filepath)

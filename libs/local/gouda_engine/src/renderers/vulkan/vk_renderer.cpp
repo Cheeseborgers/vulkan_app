@@ -29,7 +29,10 @@
 
 namespace gouda::vk {
 
-InstanceData::InstanceData() : position{0.0f, 0.0f, 0.0f}, size{1.0f}, rotation{0.0f}, texture_index{0}, colour{1.0f} {}
+InstanceData::InstanceData()
+    : position{0.0f, 0.0f, 0.0f}, size{1.0f, 1.0f}, rotation{0.0f}, texture_index{0}, colour{1.0f}
+{
+}
 InstanceData::InstanceData(Vec3 position_, Vec2 size_, f32 rotation_, u32 texture_index_, Vec4 colour_,
                            Vec4 sprite_rect_, u32 is_atlas_)
     : position{position_},
@@ -43,7 +46,13 @@ InstanceData::InstanceData(Vec3 position_, Vec2 size_, f32 rotation_, u32 textur
     position.z = math::clamp(position.z, -0.9f, 0.0f);
 }
 
-VulkanRenderer::VulkanRenderer()
+TextData::TextData()
+    : position{0.0f, 0.0f, 0.0f}, size{1.0f, 1.0f}, colour{0.0f}, glyph_index{0}, sdf_params{0.0f}, texture_index{0}
+{
+}
+
+// Renderer implentation --------------------------------------------
+Renderer::Renderer()
     : p_instance{nullptr},
       p_device{nullptr},
       p_buffer_manager{nullptr},
@@ -90,7 +99,7 @@ VulkanRenderer::VulkanRenderer()
 {
 }
 
-VulkanRenderer::~VulkanRenderer()
+Renderer::~Renderer()
 {
     ENGINE_LOG_DEBUG("Cleaning up Vulkan renderer.");
 
@@ -112,8 +121,8 @@ VulkanRenderer::~VulkanRenderer()
     }
 }
 
-void VulkanRenderer::Initialize(GLFWwindow *window_ptr, std::string_view app_name, SemVer vulkan_api_version,
-                                VSyncMode vsync_mode)
+void Renderer::Initialize(GLFWwindow *window_ptr, std::string_view app_name, SemVer vulkan_api_version,
+                          VSyncMode vsync_mode)
 {
     ASSERT(window_ptr, "Window pointer cannot be null.");
     ASSERT(!app_name.empty(), "Application name cannot be empty or null.");
@@ -131,11 +140,11 @@ void VulkanRenderer::Initialize(GLFWwindow *window_ptr, std::string_view app_nam
     InitializeImGUIIfEnabled();
 
     m_is_initialized = true;
-    ENGINE_LOG_DEBUG("VulkanRenderer initialized.");
+    ENGINE_LOG_DEBUG("Renderer initialized.");
 }
 
-void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer command_buffer, u32 image_index, u32 quad_instance_count,
-                                         u32 text_instance_count, u32 particle_instance_count, ImDrawData *draw_data)
+void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, u32 image_index, u32 quad_instance_count,
+                                   u32 text_instance_count, u32 particle_instance_count, ImDrawData *draw_data)
 {
     ENGINE_PROFILE_SCOPE("Record command buffer");
 
@@ -211,6 +220,7 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer command_buffer, u32 ima
 
         ParticleData *instance_particles = static_cast<ParticleData *>(m_mapped_particle_instance_data[image_index]);
         if (particle_count > 0) {
+            /*
             ENGINE_LOG_DEBUG(
                 "After copy[{}]: Particle[0]: pos = [{}, {}, {}], size = [{}, {}], lifetime = {}, vel = [{}, {}, {}], "
                 "colour = [{}, {}, {}, {}]",
@@ -219,8 +229,11 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer command_buffer, u32 ima
                 instance_particles[0].lifetime, instance_particles[0].velocity[0], instance_particles[0].velocity[1],
                 instance_particles[0].velocity[2], instance_particles[0].colour[0], instance_particles[0].colour[1],
                 instance_particles[0].colour[2], instance_particles[0].colour[3]);
+
+            */
         }
         if (particle_count > 2) {
+            /*
             ENGINE_LOG_DEBUG(
                 "After copy[{}]: Particle[2]: pos = [{}, {}, {}], size = [{}, {}], lifetime = {}, vel = [{}, {}, {}], "
                 "colour = [{}, {}, {}, {}]",
@@ -229,6 +242,7 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer command_buffer, u32 ima
                 instance_particles[2].lifetime, instance_particles[2].velocity[0], instance_particles[2].velocity[1],
                 instance_particles[2].velocity[2], instance_particles[2].colour[0], instance_particles[2].colour[1],
                 instance_particles[2].colour[2], instance_particles[2].colour[3]);
+            */
         }
     }
 
@@ -272,19 +286,19 @@ void VulkanRenderer::RecordCommandBuffer(VkCommandBuffer command_buffer, u32 ima
     EndCommandBuffer(command_buffer);
 }
 
-void VulkanRenderer::Render(f32 delta_time, const UniformData &uniform_data,
-                            const std::vector<InstanceData> &quad_instances,
-                            const std::vector<InstanceData> &text_instances,
-                            const std::vector<ParticleData> &particle_instances)
+void Renderer::Render(f32 delta_time, const UniformData &uniform_data, const std::vector<InstanceData> &quad_instances,
+                      const std::vector<TextData> &text_instances, const std::vector<ParticleData> &particle_instances)
 {
-    ENGINE_LOG_DEBUG("Render: particle_instances.size() = {}", particle_instances.size());
+    // ENGINE_LOG_DEBUG("Render: particle_instances.size() = {}", particle_instances.size());
     for (size_t i = 0; i < std::min(particle_instances.size(), size_t(3)); ++i) {
+        /*
         ENGINE_LOG_DEBUG("Particle[{}]: pos = [{}, {}, {}], size = [{}, {}], lifetime = {}, colour = [{}, {}, {}, {}]",
                          i, particle_instances[i].position[0], particle_instances[i].position[1],
                          particle_instances[i].position[2], particle_instances[i].size[0],
                          particle_instances[i].size[1], particle_instances[i].lifetime, particle_instances[i].colour[0],
                          particle_instances[i].colour[1], particle_instances[i].colour[2],
                          particle_instances[i].colour[3]);
+        */
     }
 
     while (!p_swapchain->IsValid()) {
@@ -314,8 +328,8 @@ void VulkanRenderer::Render(f32 delta_time, const UniformData &uniform_data,
     }
 
     // Update text instance data
-    VkDeviceSize text_instance_size{sizeof(InstanceData) * text_instances.size()};
-    ASSERT(text_instance_size <= sizeof(InstanceData) * m_max_text_instances,
+    VkDeviceSize text_instance_size{sizeof(TextData) * text_instances.size()};
+    ASSERT(text_instance_size <= sizeof(TextData) * m_max_text_instances,
            "Text instance count exceeds maximum buffer size.");
     if (text_instance_size > 0) {
         memcpy(m_mapped_text_instance_data[image_index], text_instances.data(), text_instance_size);
@@ -369,14 +383,14 @@ void VulkanRenderer::Render(f32 delta_time, const UniformData &uniform_data,
     m_current_frame = (m_current_frame + 1) % m_queue.GetMaxFramesInFlight();
 }
 
-void VulkanRenderer::UpdateComputeUniformBuffer(u32 image_index, f32 delta_time)
+void Renderer::UpdateComputeUniformBuffer(u32 image_index, f32 delta_time)
 {
     m_simulation_params.deltaTime = delta_time;
     m_compute_uniform_buffers[image_index].Update(p_device->GetDevice(), &m_simulation_params,
                                                   sizeof(SimulationParams));
 }
 
-void VulkanRenderer::UpdateParticleStorageBuffer(u32 image_index, const std::vector<ParticleData> &particle_instances)
+void Renderer::UpdateParticleStorageBuffer(u32 image_index, const std::vector<ParticleData> &particle_instances)
 {
     VkDeviceSize max_particle_instance_size = sizeof(ParticleData) * m_max_particle_instances;
     memset(m_mapped_particle_storage_data[image_index], 0, max_particle_instance_size);
@@ -411,21 +425,21 @@ void VulkanRenderer::UpdateParticleStorageBuffer(u32 image_index, const std::vec
     }
 }
 
-void VulkanRenderer::ClearParticleBuffers(u32 image_index)
+void Renderer::ClearParticleBuffers(u32 image_index)
 {
     VkDeviceSize max_particle_instance_size = sizeof(ParticleData) * m_max_particle_instances;
     memset(m_mapped_particle_storage_data[image_index], 0, max_particle_instance_size);
     memset(m_mapped_particle_instance_data[image_index], 0, max_particle_instance_size);
 }
 
-void VulkanRenderer::ToggleComputeParticles()
+void Renderer::ToggleComputeParticles()
 {
     m_use_compute_particles = !m_use_compute_particles;
     ENGINE_LOG_DEBUG("Compute particles {}", m_use_compute_particles ? "enabled" : "disabled");
 }
 
-void VulkanRenderer::DrawText(std::string_view text, Vec2 position, f32 scale, u32 font_id,
-                              std::vector<InstanceData> &text_instances)
+void Renderer::DrawText(std::string_view text, Vec2 position, f32 scale, u32 font_id,
+                        std::vector<TextData> &text_instances)
 {
     if (m_fonts.find(font_id) == m_fonts.end()) {
         ENGINE_LOG_ERROR("Font ID {} not found!", font_id);
@@ -436,38 +450,69 @@ void VulkanRenderer::DrawText(std::string_view text, Vec2 position, f32 scale, u
     f32 x = position.x;
     f32 y = position.y;
 
-    for (char c : text) {
-        if (glyphs.find(c) == glyphs.end())
+    ENGINE_LOG_DEBUG("Drawing text '{}' at position=({}, {}), scale={}, font_id={}", text, x, y, scale, font_id);
+    ENGINE_LOG_DEBUG("Available glyphs: {}", glyphs.size());
+    for (const auto &[c, _] : glyphs) {
+        ENGINE_LOG_DEBUG("Glyph '{}'(unicode={})", c, static_cast<int>(c));
+    }
+
+    size_t instance_count = text_instances.size();
+    for (size_t i = 0; i < text.size(); ++i) {
+        char c = text[i];
+        auto it = glyphs.find(c);
+        if (it == glyphs.end()) {
+            ENGINE_LOG_WARNING("Glyph '{}' (unicode={}) not found in font {}", c, static_cast<int>(c), font_id);
             continue;
-        const Glyph &glyph = glyphs.at(c);
+        }
 
-        f32 xpos = x + glyph.plane_bounds.left * scale;
-        f32 ypos = y + glyph.plane_bounds.bottom * scale;
-        f32 width = (glyph.plane_bounds.right - glyph.plane_bounds.left) * scale;
-        f32 height = (glyph.plane_bounds.top - glyph.plane_bounds.bottom) * scale;
+        const Glyph &glyph = it->second;
 
-        InstanceData instance;
+        // Log glyph data
+        ENGINE_LOG_DEBUG("Glyph {} '{}': advance={}, plane_bounds=({}, {}, {}, {}), atlas_bounds=({}, {}, {}, {})", i,
+                         c, glyph.advance, glyph.plane_bounds.left, glyph.plane_bounds.bottom, glyph.plane_bounds.right,
+                         glyph.plane_bounds.top, glyph.atlas_bounds.left, glyph.atlas_bounds.bottom,
+                         glyph.atlas_bounds.right, glyph.atlas_bounds.top);
+
+        // Compute bounds
+        f32 left = std::min(glyph.plane_bounds.left, glyph.plane_bounds.right);
+        f32 right = std::max(glyph.plane_bounds.left, glyph.plane_bounds.right);
+        f32 bottom = std::min(glyph.plane_bounds.bottom, glyph.plane_bounds.top);
+        f32 top = std::max(glyph.plane_bounds.bottom, glyph.plane_bounds.top);
+
+        f32 xpos = x + left * scale;
+        f32 ypos = y + bottom * scale;
+        f32 width = (right - left) * scale;
+        f32 height = (top - bottom) * scale;
+
+        TextData instance;
         instance.position = Vec3{xpos, ypos, -0.1f};
         instance.size = Vec2{width, height};
-        instance.rotation = 0.0f;
-        instance.texture_index = font_id;
-        instance.colour = Vec4{1.0f, 1.0f, 1.0f, 1.0f};
-        instance.sprite_rect =
+        instance.colour = Vec4{1.0f, 0.0f, 0.0f, 1.0f}; // Red for visibility
+        instance.glyph_index = static_cast<u32>(c);
+        instance.sdf_params =
             Vec4{glyph.atlas_bounds.left, glyph.atlas_bounds.bottom, glyph.atlas_bounds.right, glyph.atlas_bounds.top};
-        instance.is_atlas = 1;
+        instance.texture_index = font_id;
+
+        // Log instance data
+        ENGINE_LOG_DEBUG("Instance {} '{}': position=({}, {}, {}), size=({}, {}), glyph_index={}, sdf_params=({}, {}, "
+                         "{}, {}), texture_index={}",
+                         i, c, instance.position.x, instance.position.y, instance.position.z, instance.size.x,
+                         instance.size.y, instance.glyph_index, instance.sdf_params.x, instance.sdf_params.y,
+                         instance.sdf_params.z, instance.sdf_params.w, instance.texture_index);
 
         text_instances.push_back(instance);
         x += glyph.advance * scale;
     }
+
+    ENGINE_LOG_DEBUG("Added {} instances, total instances: {}", text_instances.size() - instance_count,
+                     text_instances.size());
 }
 
-void VulkanRenderer::SetupPipelines(std::string_view quad_vertex_shader_path,
-                                    std::string_view quad_fragment_shader_path,
-                                    std::string_view text_vertex_shader_path,
-                                    std::string_view text_fragment_shader_path,
-                                    std::string_view particle_vertex_shader_path,
-                                    std::string_view particle_fragment_shader_path,
-                                    std::string_view particle_compute_shader_path)
+void Renderer::SetupPipelines(std::string_view quad_vertex_shader_path, std::string_view quad_fragment_shader_path,
+                              std::string_view text_vertex_shader_path, std::string_view text_fragment_shader_path,
+                              std::string_view particle_vertex_shader_path,
+                              std::string_view particle_fragment_shader_path,
+                              std::string_view particle_compute_shader_path)
 {
     p_quad_vertex_shader = std::make_unique<Shader>(*p_device, quad_vertex_shader_path);
     p_quad_fragment_shader = std::make_unique<Shader>(*p_device, quad_fragment_shader_path);
@@ -493,7 +538,7 @@ void VulkanRenderer::SetupPipelines(std::string_view quad_vertex_shader_path,
         sizeof(ParticleData) * m_max_particle_instances, sizeof(SimulationParams));
 }
 
-void VulkanRenderer::CreateFramebuffers()
+void Renderer::CreateFramebuffers()
 {
     m_framebuffers.clear();
     m_framebuffers.resize(p_swapchain->GetImages().size());
@@ -525,7 +570,7 @@ void VulkanRenderer::CreateFramebuffers()
     ENGINE_LOG_DEBUG("Framebuffers created.");
 }
 
-void VulkanRenderer::DestroyFramebuffers()
+void Renderer::DestroyFramebuffers()
 {
     for (auto buffer : m_framebuffers) {
         vkDestroyFramebuffer(p_device->GetDevice(), buffer, nullptr);
@@ -536,7 +581,7 @@ void VulkanRenderer::DestroyFramebuffers()
     ENGINE_LOG_DEBUG("Framebuffers destroyed.");
 }
 
-void VulkanRenderer::CreateCommandBuffers()
+void Renderer::CreateCommandBuffers()
 {
     m_command_buffers.clear();
     m_command_buffers.resize(p_swapchain->GetImageCount());
@@ -544,7 +589,7 @@ void VulkanRenderer::CreateCommandBuffers()
     p_command_buffer_manager->AllocateBuffers(static_cast<u32>(m_command_buffers.size()), m_command_buffers.data());
 }
 
-void VulkanRenderer::CreateUniformBuffers(size_t data_size)
+void Renderer::CreateUniformBuffers(size_t data_size)
 {
     m_uniform_buffers.clear();
     m_uniform_buffers.reserve(p_swapchain->GetImages().size());
@@ -554,7 +599,7 @@ void VulkanRenderer::CreateUniformBuffers(size_t data_size)
     }
 }
 
-u32 VulkanRenderer::LoadTexture(std::string_view filepath)
+u32 Renderer::LoadTexture(std::string_view filepath)
 {
     if (m_textures.size() == MAX_TEXTURES) {
         ENGINE_LOG_ERROR("Cannot create and add texture '{}' as array is already full. (Max slots: {})", filepath,
@@ -567,19 +612,19 @@ u32 VulkanRenderer::LoadTexture(std::string_view filepath)
     return static_cast<u32>(m_textures.size() - 1);
 }
 
-u32 VulkanRenderer::LoadMSDFFont(std::string_view image_filepath, std::string_view json_filepath)
+u32 Renderer::LoadMSDFFont(std::string_view image_filepath, std::string_view json_filepath)
 {
     u32 font_id{LoadTexture(image_filepath)};
     m_fonts[font_id] = load_msdf_glyphs(json_filepath);
     return font_id;
 }
 
-void VulkanRenderer::SetClearColour(const Colour<f32> &colour)
+void Renderer::SetClearColour(const Colour<f32> &colour)
 {
     m_clear_colour = {{colour.value[0], colour.value[1], colour.value[2], colour.value[3]}};
 }
 
-void VulkanRenderer::InitializeCore(GLFWwindow *window_ptr, std::string_view app_name, SemVer vulkan_api_version)
+void Renderer::InitializeCore(GLFWwindow *window_ptr, std::string_view app_name, SemVer vulkan_api_version)
 {
     p_window = window_ptr;
     CacheFrameBufferSize();
@@ -594,7 +639,7 @@ void VulkanRenderer::InitializeCore(GLFWwindow *window_ptr, std::string_view app
     ENGINE_LOG_DEBUG("Buffer manager initialized.");
 }
 
-void VulkanRenderer::InitializeSwapchainAndQueue(VSyncMode vsync_mode)
+void Renderer::InitializeSwapchainAndQueue(VSyncMode vsync_mode)
 {
     p_swapchain =
         std::make_unique<Swapchain>(p_window, p_device.get(), p_instance.get(), p_buffer_manager.get(), vsync_mode);
@@ -604,7 +649,7 @@ void VulkanRenderer::InitializeSwapchainAndQueue(VSyncMode vsync_mode)
     ENGINE_LOG_DEBUG("Queue initialized.");
 }
 
-void VulkanRenderer::InitializeDefaultResources()
+void Renderer::InitializeDefaultResources()
 {
     auto default_texture = p_buffer_manager->CreateDefaultTexture();
     m_textures.push_back(std::move(default_texture));
@@ -627,7 +672,7 @@ void VulkanRenderer::InitializeDefaultResources()
     m_index_count = static_cast<u32>(quad_indices.size());
 }
 
-void VulkanRenderer::InitializeRenderResources()
+void Renderer::InitializeRenderResources()
 {
     CreateFences();
     CreateInstanceBuffers();
@@ -647,7 +692,7 @@ void VulkanRenderer::InitializeRenderResources()
     SetClearColour({0.0f, 0.0f, 0.0f, 0.0f});
 }
 
-VkRenderPass VulkanRenderer::CreateRenderPass()
+VkRenderPass Renderer::CreateRenderPass()
 {
     ENGINE_PROFILE_SCOPE("Create render passes");
 
@@ -725,7 +770,7 @@ VkRenderPass VulkanRenderer::CreateRenderPass()
     return render_pass;
 }
 
-void VulkanRenderer::CreateFences()
+void Renderer::CreateFences()
 {
     const auto max_frames = m_queue.GetMaxFramesInFlight();
     VkFenceCreateFlags fence_flags{VK_FENCE_CREATE_SIGNALED_BIT};
@@ -740,12 +785,12 @@ void VulkanRenderer::CreateFences()
     ENGINE_LOG_DEBUG("Frame fences created.");
 }
 
-void VulkanRenderer::CacheFrameBufferSize()
+void Renderer::CacheFrameBufferSize()
 {
     glfwGetWindowSize(p_window, &m_framebuffer_size.width, &m_framebuffer_size.height);
 }
 
-void VulkanRenderer::ReCreateSwapchain()
+void Renderer::ReCreateSwapchain()
 {
     DestroyFramebuffers();
 
@@ -757,10 +802,10 @@ void VulkanRenderer::ReCreateSwapchain()
     CreateFramebuffers();
 }
 
-void VulkanRenderer::CreateInstanceBuffers()
+void Renderer::CreateInstanceBuffers()
 {
     VkDeviceSize max_quad_instance_size{sizeof(InstanceData) * m_max_quad_instances};
-    VkDeviceSize max_text_instance_size{sizeof(InstanceData) * m_max_text_instances};
+    VkDeviceSize max_text_instance_size{sizeof(TextData) * m_max_text_instances};
     VkDeviceSize max_particle_instance_size{sizeof(ParticleData) * m_max_particle_instances};
 
     m_quad_instance_buffers.resize(p_swapchain->GetImageCount());
@@ -791,7 +836,7 @@ void VulkanRenderer::CreateInstanceBuffers()
     }
 }
 
-void VulkanRenderer::InitializeImGUIIfEnabled()
+void Renderer::InitializeImGUIIfEnabled()
 {
 #ifdef USE_IMGUI
     IMGUI_CHECKVERSION();
@@ -856,7 +901,7 @@ void VulkanRenderer::InitializeImGUIIfEnabled()
 #endif
 }
 
-ImDrawData *VulkanRenderer::RenderImGUI(const RenderStatistics &stats)
+ImDrawData *Renderer::RenderImGUI(const RenderStatistics &stats)
 {
 #ifdef USE_IMGUI
     ImGui_ImplVulkan_NewFrame();
@@ -933,7 +978,7 @@ ImDrawData *VulkanRenderer::RenderImGUI(const RenderStatistics &stats)
 #endif
 }
 
-void VulkanRenderer::DestroyImGUI()
+void Renderer::DestroyImGUI()
 {
 #ifdef USE_IMGUI
     ImGui_ImplVulkan_Shutdown();
@@ -945,7 +990,7 @@ void VulkanRenderer::DestroyImGUI()
 #endif
 }
 
-void VulkanRenderer::DestroyBuffers()
+void Renderer::DestroyBuffers()
 {
     for (auto &buffer : m_uniform_buffers) {
         buffer.Destroy(p_device->GetDevice());

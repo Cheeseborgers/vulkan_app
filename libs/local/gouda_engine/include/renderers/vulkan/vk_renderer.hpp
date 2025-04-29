@@ -44,6 +44,8 @@ struct Vertex {
 };
 
 struct UniformData {
+    UniformData() : WVP{Mat4::identity()} {}
+
     Mat4 WVP;
 };
 
@@ -52,21 +54,24 @@ struct InstanceData {
     InstanceData(Vec3 position_, Vec2 size_, f32 rotation_, u32 texture_index_, Vec4 colour_ = Vec4(1.0f),
                  Vec4 sprite_rect_ = Vec4(0.0f), u32 is_atlas_ = 0);
 
-    Vec3 position;
-    Vec2 size;
+    Vec3 position; // VK_FORMAT_R32G32B32_SFLOAT
+    Vec2 size;     // VK_FORMAT_R32G32_SFLOAT
     f32 rotation;
-    u32 texture_index;
-    Vec4 colour;
+    u32 texture_index; // VK_FORMAT_R32_UINT
+    Vec4 colour;       // VK_FORMAT_R32G32B32A32_SFLOAT
     Vec4 sprite_rect;
-    u32 is_atlas;
+    u32 is_atlas; // VK_FORMAT_R32_UINT
 };
 
 struct TextData {
-    Vec3 position;   // VK_FORMAT_R32G32B32_SFLOAT
-    Vec2 size;       // VK_FORMAT_R32G32_SFLOAT
-    Vec4 colour;     // VK_FORMAT_R32G32B32A32_SFLOAT
-    u32 glyph_index; // VK_FORMAT_R32_UINT
-    Vec4 sdf_params; // VK_FORMAT_R32G32B32A32_SFLOAT
+    TextData();
+
+    Vec3 position;     // VK_FORMAT_R32G32B32_SFLOAT
+    Vec2 size;         // VK_FORMAT_R32G32_SFLOAT
+    Vec4 colour;       // VK_FORMAT_R32G32B32A32_SFLOAT
+    u32 glyph_index;   // VK_FORMAT_R32_UINT
+    Vec4 sdf_params;   // VK_FORMAT_R32G32B32A32_SFLOAT
+    u32 texture_index; // VK_FORMAT_R32_UINT
 };
 
 struct SimulationParams {
@@ -86,10 +91,10 @@ struct ParticleData {
     // Total: 64 bytes
 };
 
-class VulkanRenderer {
+class Renderer {
 public:
-    VulkanRenderer();
-    ~VulkanRenderer();
+    Renderer();
+    ~Renderer();
 
     void Initialize(GLFWwindow *window_ptr, std::string_view app_name, SemVer vulkan_api_version = {1, 3, 0, 0},
                     VSyncMode vsync_mode = VSyncMode::Enabled);
@@ -98,7 +103,7 @@ public:
                              u32 text_instance_count, u32 particle_instance_count, ImDrawData *draw_data);
 
     void Render(f32 delta_time, const UniformData &uniform_data, const std::vector<InstanceData> &quad_instances,
-                const std::vector<InstanceData> &text_instances, const std::vector<ParticleData> &particle_instances);
+                const std::vector<TextData> &text_instances, const std::vector<ParticleData> &particle_instances);
 
     void UpdateComputeUniformBuffer(u32 image_index, f32 delta_time);
     void UpdateParticleStorageBuffer(u32 image_index, const std::vector<ParticleData> &particle_instances);
@@ -107,8 +112,7 @@ public:
     void ToggleComputeParticles();
     bool UseComputeParticles() const { return m_use_compute_particles; }
 
-    void DrawText(std::string_view text, Vec2 position, f32 scale, u32 font_id,
-                  std::vector<InstanceData> &text_instances);
+    void DrawText(std::string_view text, Vec2 position, f32 scale, u32 font_id, std::vector<TextData> &text_instances);
 
     void SetupPipelines(std::string_view quad_vertex_shader_path, std::string_view quad_fragment_shader_path,
                         std::string_view text_vertex_shader_path, std::string_view text_fragment_shader_path,

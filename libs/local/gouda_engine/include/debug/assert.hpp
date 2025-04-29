@@ -1,5 +1,16 @@
 #pragma once
-
+/**
+ * @file debug/assert.hpp
+ * @author GoudaCheeseburgers
+ * @date 2025-03-03
+ * @brief Engine assert module
+ *
+ * @copyright
+ * Copyright (c) 2025 GoudaCheeseburgers <https://github.com/Cheeseborgers>
+ *
+ * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
+ * See <https://www.gnu.org/licenses/> for more information.
+ */
 #include <format>
 #include <iostream>
 #include <source_location>
@@ -9,7 +20,7 @@
 
 #ifndef NDEBUG
 
-namespace assert_internal {
+namespace gouda::internal {
 
 #if defined(_WIN32) || defined(_WIN64)
 #define ASSERT_INTERNAL_DEBUGBREAK() __debugbreak()
@@ -48,10 +59,9 @@ inline void assert_impl(const std::source_location &location, bool check, std::s
     }
 }
 
-} // namespace assert_internal
+} // namespace gouda::internal
 
-// Define ASSERT macro
-#define ASSERT(...) assert_internal::assert_impl(std::source_location::current(), __VA_ARGS__ __VA_OPT__(, ) true)
+#define ASSERT(...) gouda::internal::assert_impl(std::source_location::current(), __VA_ARGS__ __VA_OPT__(, ) true)
 
 #else
 #define ASSERT(...)

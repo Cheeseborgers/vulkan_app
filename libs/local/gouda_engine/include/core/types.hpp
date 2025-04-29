@@ -1,5 +1,16 @@
 #pragma once
-
+/**
+ * @file types.hpp
+ * @author GoudaCheeseburgers
+ * @date 2025-02-24
+ * @brief Engine module
+ *
+ * @copyright
+ * Copyright (c) 2025 GoudaCheeseburgers <https://github.com/Cheeseborgers>
+ *
+ * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
+ * See <https://www.gnu.org/licenses/> for more information.
+ */
 #ifndef _WIN64
 #include <unistd.h>
 #endif
@@ -42,6 +53,8 @@ struct Constants {
 
     static constexpr float f32_max = std::numeric_limits<float>::max();
     static constexpr double f64_max = std::numeric_limits<double>::max();
+
+    static constexpr size_t size_t_max = std::numeric_limits<size_t>::max();
 };
 
 // Chrono types

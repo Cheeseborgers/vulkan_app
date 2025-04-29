@@ -1,9 +1,9 @@
 #pragma once
 /**
- * @file text.hpp
+ * @file default_allocator.hpp
  * @author GoudaCheeseburgers
- * @date 2025-04-08
- * @brief Engine msdf text module implementation
+ * @date 2025-04-25
+ * @brief Engine module
  *
  * Copyright (c) 2025 GoudaCheeseburgers <https://github.com/Cheeseborgers>
  *
@@ -20,22 +20,41 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-#include <string_view>
-#include <unordered_map>
-
 #include "core/types.hpp"
-#include "math/math.hpp"
 
 namespace gouda {
 
-struct Glyph {
-    Glyph();
+template <typename T>
+class DefaultAllocator {
+public:
+    using value_type = T;
 
-    f32 advance;
-    Rect<f32> plane_bounds;
-    Rect<f32> atlas_bounds;
+    DefaultAllocator() noexcept = default;
+    template <typename U>
+    DefaultAllocator(const DefaultAllocator<U> &) noexcept
+    {
+    }
+
+    T *allocate(size_t n)
+    {
+        if (n > Constants::size_t_max / sizeof(T)) {
+            throw std::bad_alloc();
+        }
+        return static_cast<T *>(::operator new[](n * sizeof(T)));
+    }
+
+    void deallocate(T *p, size_t) noexcept { ::operator delete[](p); }
 };
 
-std::unordered_map<char, Glyph> load_msdf_glyphs(std::string_view json_path);
+template <typename T, typename U>
+bool operator==(const DefaultAllocator<T> &, const DefaultAllocator<U> &) noexcept
+{
+    return true;
+}
 
+template <typename T, typename U>
+bool operator!=(const DefaultAllocator<T> &, const DefaultAllocator<U> &) noexcept
+{
+    return false;
+}
 } // namespace gouda

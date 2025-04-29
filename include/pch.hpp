@@ -1,5 +1,4 @@
-#ifndef ENGINE_PCH_HPP
-#define ENGINE_PCH_HPP
+#pragma once
 
 #include <algorithm>
 #include <atomic>
@@ -20,10 +19,9 @@
 #include <mutex>
 #include <span>
 #include <sstream>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
-
-#endif // ENGINE_PCH_HPP

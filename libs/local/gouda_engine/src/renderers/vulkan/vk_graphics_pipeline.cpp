@@ -75,7 +75,10 @@ u32 get_struct_offset(const std::string &name, VkFormat format, bool &success)
             return offsetof(TextData, glyph_index);
         if (name == "instance_sdf_params" && format == VK_FORMAT_R32G32B32A32_SFLOAT)
             return offsetof(TextData, sdf_params);
+        if (name == "instance_texture_index" && format == VK_FORMAT_R32_UINT)
+            return offsetof(TextData, texture_index);
     }
+
     success = false;
     return 0;
 }
@@ -97,7 +100,7 @@ static constexpr std::string_view to_string(PipelineType type)
 }
 
 // GraphicsPipeline implementation -----------------------------------------------------------------
-GraphicsPipeline::GraphicsPipeline(VulkanRenderer &renderer, GLFWwindow *p_window, VkRenderPass p_render_pass,
+GraphicsPipeline::GraphicsPipeline(Renderer &renderer, GLFWwindow *p_window, VkRenderPass p_render_pass,
                                    Shader *vertex_shader, Shader *fragment_shader, int number_of_images,
                                    std::vector<Buffer> &uniform_buffers, int uniform_data_size, PipelineType type)
     : m_renderer{renderer},
@@ -186,7 +189,7 @@ GraphicsPipeline::GraphicsPipeline(VulkanRenderer &renderer, GLFWwindow *p_windo
     }
 
     // Binding 1: Per-instance data (InstanceData or ParticleData)
-    if (type == PipelineType::Quad || type == PipelineType::Text) {
+    if (type == PipelineType::Quad) {
         binding_descriptions.push_back(
             {.binding = 1, .stride = sizeof(InstanceData), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE});
         for (const auto &input : vertex_shader->Reflection().vertex_inputs) {
@@ -196,6 +199,24 @@ GraphicsPipeline::GraphicsPipeline(VulkanRenderer &renderer, GLFWwindow *p_windo
             u32 offset{internal::get_struct_offset<InstanceData>(input.name, input.format, success)};
             if (!success) {
                 ENGINE_LOG_WARNING("Unsupported instance input: name={}, format={}", input.name,
+                                   vk_format_to_string_view(input.format));
+                continue;
+            }
+            attribute_descriptions.push_back(
+                {.location = input.location, .binding = 1, .format = input.format, .offset = offset});
+            attribute_index++;
+        }
+    }
+    else if (type == PipelineType::Text) {
+        binding_descriptions.push_back(
+            {.binding = 1, .stride = sizeof(TextData), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE});
+        for (const auto &input : vertex_shader->Reflection().vertex_inputs) {
+            if (input.input_rate != VK_VERTEX_INPUT_RATE_INSTANCE)
+                continue;
+            bool success{false};
+            u32 offset{internal::get_struct_offset<TextData>(input.name, input.format, success)};
+            if (!success) {
+                ENGINE_LOG_WARNING("Unsupported instance input: name={}, format={} in Text Pipeline", input.name,
                                    vk_format_to_string_view(input.format));
                 continue;
             }

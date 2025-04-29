@@ -13,9 +13,9 @@
 
 namespace gouda::vk {
 
-ComputePipeline::ComputePipeline(VulkanRenderer &renderer, Shader *compute_shader,
-                                 const std::vector<Buffer> &storage_buffers, const std::vector<Buffer> &uniform_buffers,
-                                 VkDeviceSize storage_buffer_size, VkDeviceSize uniform_buffer_size)
+ComputePipeline::ComputePipeline(Renderer &renderer, Shader *compute_shader, const std::vector<Buffer> &storage_buffers,
+                                 const std::vector<Buffer> &uniform_buffers, VkDeviceSize storage_buffer_size,
+                                 VkDeviceSize uniform_buffer_size)
     : m_renderer{renderer}, p_device{renderer.GetDevice()}
 {
     // Create descriptor pool

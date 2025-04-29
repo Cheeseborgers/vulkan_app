@@ -89,6 +89,8 @@ target_include_directories(${PROJECT_NAME}
     $<INSTALL_INTERFACE:include>
 )
 
+target_include_directories(gouda_engine PRIVATE ${CMAKE_SOURCE_DIR}/include)
+
 target_link_libraries(${PROJECT_NAME}
     PUBLIC
     gouda_engine
@@ -96,52 +98,41 @@ target_link_libraries(${PROJECT_NAME}
     Threads::Threads
 )
 
-target_precompile_headers(
-    ${PROJECT_NAME}
-    PUBLIC
-    include/pch.hpp
-)
+# Only enable PCH in Debug builds
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "Enabling precompiled headers (Debug only)")
+    add_library(pch INTERFACE)
+    target_precompile_headers(pch INTERFACE "include/pch.hpp")
+
+    target_link_libraries(gouda_engine PRIVATE pch)
+    target_link_libraries(${PROJECT_NAME} PRIVATE pch)
+endif()
 
 # Detect Platform and Required Libraries, adds macros ------------------------------------------------------------------
-message(STATUS "${PROJECT_NAME}: Detecting platform and dependencies... ")
+message(STATUS "${PROJECT_NAME}: Configuring platform-specific stacktrace dependencies...")
 
 if(WIN32)
-    message(STATUS "${PROJECT_NAME}: Configuring for Windows ")
-    target_compile_definitions(${PROJECT_NAME} PRIVATE STACKTRACE_WINDOWS)
     target_link_libraries(${PROJECT_NAME} PRIVATE dbghelp)
-elseif(APPLE)
-    message(STATUS "${PROJECT_NAME}: Configuring for macOS ")
-    target_compile_definitions(${PROJECT_NAME} PRIVATE STACKTRACE_MACOS)
-    find_library(EXECINFO_LIBRARY execinfo)
 
-    if(EXECINFO_LIBRARY)
-        target_link_libraries(${PROJECT_NAME} PRIVATE ${EXECINFO_LIBRARY})
-    endif()
-
+elseif(APPLE OR UNIX)
     find_library(UNWIND_LIBRARY unwind)
 
     if(UNWIND_LIBRARY)
-        target_link_libraries(${PROJECT_NAME} PRIVATE ${UNWIND_LIBRARY})
-        target_compile_definitions(${PROJECT_NAME} PRIVATE USE_LIBUNWIND)
-    endif()
-elseif(UNIX)
-    message(STATUS "${PROJECT_NAME}: Configuring for Linux ")
-    target_compile_definitions(${PROJECT_NAME} PRIVATE STACKTRACE_LINUX)
-    find_library(UNWIND_LIBRARY unwind)
-
-    if(UNWIND_LIBRARY)
+        message(STATUS "Using libunwind: ${UNWIND_LIBRARY}")
         target_link_libraries(${PROJECT_NAME} PRIVATE ${UNWIND_LIBRARY})
         target_compile_definitions(${PROJECT_NAME} PRIVATE USE_LIBUNWIND)
     else()
         find_library(EXECINFO_LIBRARY execinfo)
 
         if(EXECINFO_LIBRARY)
+            message(STATUS "Using execinfo: ${EXECINFO_LIBRARY}")
             target_link_libraries(${PROJECT_NAME} PRIVATE ${EXECINFO_LIBRARY})
+        else()
+            message(WARNING "Neither libunwind nor execinfo found. Stacktraces may not work.")
         endif()
     endif()
 else()
-    message(WARNING "${PROJECT_NAME}: Unknown platform: Stack tracing may not be supported ")
-    target_compile_definitions(${PROJECT_NAME} PRIVATE STACKTRACE_UNSUPPORTED)
+    message(WARNING "${PROJECT_NAME}: Unknown platform. Stacktraces will be disabled.")
 endif()
 
 # Compiler flags -------------------------------------------------------------------------------------------------------
