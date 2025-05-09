@@ -4,6 +4,7 @@
  * @author GoudaCheeseburgers
  * @date 2025-04-15
  * @brief Engine module
+ *
  * @copyright
  * Copyright (c) 2025 GoudaCheeseburgers <https://github.com/Cheeseborgers>
  *
@@ -23,6 +24,7 @@ namespace gouda::vk {
 class Buffer;
 class Renderer;
 class Shader;
+class Texture;
 
 enum class PipelineType : u8 { Quad, Text, Particle };
 
@@ -41,6 +43,8 @@ public:
 
     void Bind(VkCommandBuffer command_buffer_ptr, size_t image_index) const;
     void Destroy();
+
+    void UpdateTextureDescriptors(int number_of_images, const std::vector<std::unique_ptr<Texture>> &textures);
 
     [[nodiscard]] constexpr VkPipeline GetPipeline() const noexcept { return p_pipeline; }
     [[nodiscard]] constexpr VkPipelineLayout GetLayout() const noexcept { return p_pipeline_layout; }

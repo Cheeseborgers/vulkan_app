@@ -73,7 +73,7 @@ Renderer::Renderer()
       m_index_count{0},
       m_is_initialized{false},
       m_use_compute_particles{false},
-      m_particles_instances{}
+      m_textures_dirty{true}
 {
 }
 
@@ -269,22 +269,27 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, u32 image_ind
 void Renderer::Render(f32 delta_time, const UniformData &uniform_data, const std::vector<InstanceData> &quad_instances,
                       const std::vector<TextData> &text_instances, const std::vector<ParticleData> &particle_instances)
 {
+
+    /*
     // ENGINE_LOG_DEBUG("Render: particle_instances.size() = {}", particle_instances.size());
-    for (size_t i = 0; i < std::min(particle_instances.size(), size_t(3)); ++i) {
-        /*
+    for (size_t i = 0; i < math:min(particle_instances.size(), size_t(3)); ++i) {
+
         ENGINE_LOG_DEBUG("Particle[{}]: pos = [{}, {}, {}], size = [{}, {}], lifetime = {}, colour = [{}, {}, {}, {}]",
                          i, particle_instances[i].position[0], particle_instances[i].position[1],
                          particle_instances[i].position[2], particle_instances[i].size[0],
                          particle_instances[i].size[1], particle_instances[i].lifetime, particle_instances[i].colour[0],
                          particle_instances[i].colour[1], particle_instances[i].colour[2],
                          particle_instances[i].colour[3]);
-        */
+
     }
+                         */
 
     while (!p_swapchain->IsValid()) {
         std::this_thread::yield();
         ENGINE_LOG_INFO("Rendering paused, waiting for valid swapchain");
     }
+
+    UpdateTextureDescriptors(); // Returns early if m_textures_dirty = false.
 
     m_frame_fences[m_current_frame].WaitFor(Constants::u64_max);
     m_frame_fences[m_current_frame].Reset();
@@ -592,6 +597,8 @@ u32 Renderer::LoadTexture(std::string_view filepath)
 
     auto texture = p_buffer_manager->CreateTexture(filepath);
     m_textures.push_back(std::move(texture));
+    m_textures_dirty = true;
+
     return static_cast<u32>(m_textures.size() - 1);
 }
 
@@ -891,20 +898,21 @@ ImDrawData *Renderer::RenderImGUI(const RenderStatistics &stats)
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    static int location = 0;
+    static int location{0};
     static bool open{true};
-    ImGuiIO &io = ImGui::GetIO();
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
-                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
-                                    ImGuiWindowFlags_NoNav;
+    ImGuiIO &io{ImGui::GetIO()};
+    ImGuiWindowFlags window_flags{ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                                  ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                  ImGuiWindowFlags_NoNav};
     if (location >= 0) {
-        const float PAD = 10.0f;
-        const ImGuiViewport *viewport = ImGui::GetMainViewport();
-        ImVec2 work_pos = viewport->WorkPos;
-        ImVec2 work_size = viewport->WorkSize;
-        ImVec2 window_pos, window_pos_pivot;
-        window_pos.x = (location & 1) ? (work_pos.x + work_size.x - PAD) : (work_pos.x + PAD);
-        window_pos.y = (location & 2) ? (work_pos.y + work_size.y - PAD) : (work_pos.y + PAD);
+        const f32 padding{10.0f};
+        const ImGuiViewport *viewport{ImGui::GetMainViewport()};
+        ImVec2 work_pos{viewport->WorkPos};
+        ImVec2 work_size{viewport->WorkSize};
+        ImVec2 window_pos;
+        ImVec2 window_pos_pivot;
+        window_pos.x = (location & 1) ? (work_pos.x + work_size.x - padding) : (work_pos.x + padding);
+        window_pos.y = (location & 2) ? (work_pos.y + work_size.y - padding) : (work_pos.y + padding);
         window_pos_pivot.x = (location & 1) ? 1.0f : 0.0f;
         window_pos_pivot.y = (location & 2) ? 1.0f : 0.0f;
         ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
@@ -916,6 +924,7 @@ ImDrawData *Renderer::RenderImGUI(const RenderStatistics &stats)
     }
     ImGui::SetNextWindowBgAlpha(0.35f);
     if (ImGui::Begin("Stats for nerds", &open, window_flags)) {
+
         ImGui::Text("Stats for nerds.");
         ImGui::Separator();
         ImGui::Text("Deltatime: %f", stats.delta_time);
@@ -929,22 +938,26 @@ ImDrawData *Renderer::RenderImGUI(const RenderStatistics &stats)
         ImGui::Text("Textures: %u", stats.texture_count);
         ImGui::Separator();
         ImGui::Text("Compute: %u", m_use_compute_particles);
-        if (ImGui::IsMousePosValid())
+
+        if (ImGui::IsMousePosValid()) {
             ImGui::Text("Mouse Position: (%.1f,%.1f)", io.MousePos.x, io.MousePos.y);
-        else
+        }
+        else {
             ImGui::Text("Mouse Position: <invalid>");
+        }
+
         if (ImGui::BeginPopupContextWindow()) {
-            if (ImGui::MenuItem("Custom", NULL, location == -1))
+            if (ImGui::MenuItem("Custom", nullptr, location == -1))
                 location = -1;
-            if (ImGui::MenuItem("Center", NULL, location == -2))
+            if (ImGui::MenuItem("Center", nullptr, location == -2))
                 location = -2;
-            if (ImGui::MenuItem("Top-left", NULL, location == 0))
+            if (ImGui::MenuItem("Top-left", nullptr, location == 0))
                 location = 0;
-            if (ImGui::MenuItem("Top-right", NULL, location == 1))
+            if (ImGui::MenuItem("Top-right", nullptr, location == 1))
                 location = 1;
-            if (ImGui::MenuItem("Bottom-left", NULL, location == 2))
+            if (ImGui::MenuItem("Bottom-left", nullptr, location == 2))
                 location = 2;
-            if (ImGui::MenuItem("Bottom-right", NULL, location == 3))
+            if (ImGui::MenuItem("Bottom-right", nullptr, location == 3))
                 location = 3;
             if (open && ImGui::MenuItem("Close"))
                 open = false;
@@ -954,7 +967,7 @@ ImDrawData *Renderer::RenderImGUI(const RenderStatistics &stats)
     ImGui::End();
 
     ImGui::Render();
-    ImDrawData *draw_data = ImGui::GetDrawData();
+    ImDrawData *draw_data{ImGui::GetDrawData()};
     return draw_data;
 #else
     return nullptr;
@@ -971,6 +984,19 @@ void Renderer::DestroyImGUI()
 
     ENGINE_LOG_DEBUG("ImGUI destroyed.");
 #endif
+}
+
+void Renderer::UpdateTextureDescriptors()
+{
+    if (!m_textures_dirty) {
+        return;
+    }
+
+    p_quad_pipeline->UpdateTextureDescriptors(p_swapchain->GetImageCount(), m_textures);
+    p_text_pipeline->UpdateTextureDescriptors(p_swapchain->GetImageCount(), m_textures);
+    p_particle_pipeline->UpdateTextureDescriptors(p_swapchain->GetImageCount(), m_textures);
+
+    m_textures_dirty = false;
 }
 
 void Renderer::DestroyBuffers()

@@ -74,6 +74,46 @@ public:
     }
 
     /**
+     * @brief Constructs a SmallVector with count default-initialized elements.
+     * @param count The number of elements to create.
+     * @param alloc The allocator to use (default: Allocator()).
+     * @throws Any exception thrown by T's default constructor or allocator.
+     */
+    explicit SmallVector(size_t count) : m_data(stack_data()), m_size(0), m_capacity(N)
+    {
+        if (count > N) {
+            reserve(count);
+        }
+
+        if constexpr (std::is_trivially_default_constructible_v<T>) {
+            std::uninitialized_default_construct_n(m_data, count);
+        }
+        else {
+            for (size_t i = 0; i < count; ++i) {
+                std::construct_at(m_data + i);
+            }
+        }
+        m_size = count;
+    }
+
+    /**
+     * @brief Constructs a SmallVector with count copies of a given value.
+     * @param count The number of elements.
+     * @param value The value to copy into each element.
+     */
+    SmallVector(size_t count, const T &value) : m_data(stack_data()), m_size(0), m_capacity(N)
+    {
+        if (count > N) {
+            reserve(count);
+        }
+
+        for (size_t i = 0; i < count; ++i) {
+            std::construct_at(m_data + i, value);
+        }
+        m_size = count;
+    }
+
+    /**
      * @brief Destructor clears the vector and frees any heap memory if used.
      */
     ~SmallVector()

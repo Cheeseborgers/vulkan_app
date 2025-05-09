@@ -46,6 +46,9 @@ void Application::Initialize()
     SetupCamera();
     SetupAudio(settings);
 
+    LoadTextures();
+    LoadFonts();
+
     p_current_scene = std::make_unique<Scene>(p_ortho_camera.get());
 
     APP_LOG_DEBUG("Application initialization success");
@@ -138,10 +141,8 @@ void Application::SetupRenderer()
 {
     // Initialize Vulkan
     m_renderer.Initialize(p_window->GetWindow(), "Gouda renderer", {1, 3, 0, 0}, m_time_settings.vsync_mode);
-    m_renderer.CreateUniformBuffers(sizeof(gouda::UniformData));
 
-    LoadTextures();
-    LoadFonts();
+    m_renderer.CreateUniformBuffers(sizeof(gouda::UniformData));
 
     m_renderer.SetupPipelines(quad_vertex_shader_path, quad_frag_shader_path, text_vertex_shader_path,
                               text_frag_shader_path, particle_vertex_shader_path, particle_frag_shader_path,

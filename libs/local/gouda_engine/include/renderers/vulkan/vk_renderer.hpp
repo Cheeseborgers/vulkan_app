@@ -105,6 +105,7 @@ private:
     void CreateInstanceBuffers();
     void InitializeImGUIIfEnabled();
     ImDrawData *RenderImGUI(const RenderStatistics &stats);
+    void UpdateTextureDescriptors();
     void DestroyImGUI();
     void DestroyBuffers();
 
@@ -173,6 +174,7 @@ private:
     u32 m_index_count;
     bool m_is_initialized;
     bool m_use_compute_particles;
+    bool m_textures_dirty;
 };
 
 } // namespace gouda::vk

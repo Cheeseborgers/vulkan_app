@@ -381,7 +381,7 @@ void GraphicsPipeline::Bind(VkCommandBuffer command_buffer_ptr, size_t image_ind
     vkCmdBindPipeline(command_buffer_ptr, VK_PIPELINE_BIND_POINT_GRAPHICS, p_pipeline);
 
     if (!m_descriptor_sets.empty()) {
-        std::vector<VkDescriptorSet> sets;
+        Vector<VkDescriptorSet> sets;
         for (const auto &set : m_descriptor_sets) {
             if (image_index < set.size()) {
                 sets.push_back(set[image_index]);
@@ -422,6 +422,65 @@ void GraphicsPipeline::Destroy()
     ENGINE_LOG_DEBUG("Graphics pipeline destroyed");
 }
 
+void GraphicsPipeline::UpdateTextureDescriptors(int number_of_images,
+                                                const std::vector<std::unique_ptr<Texture>> &textures)
+{
+    ASSERT(!textures.empty(), "Texture vector must contain at least the default texture");
+    Texture *default_texture{textures.front().get()}; // Default 1x1 texture at index 0
+
+    Vector<VkDescriptorImageInfo> image_infos{MAX_TEXTURES};
+    for (size_t i = 0; i < MAX_TEXTURES; ++i) {
+        Texture *texture{(i < textures.size()) ? textures[i].get() : default_texture};
+        image_infos[i] = {.sampler = texture->p_sampler,
+                          .imageView = texture->p_view,
+                          .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+    }
+
+    Vector<VkWriteDescriptorSet> write_descriptor_sets;
+    write_descriptor_sets.reserve(m_descriptor_sets.size() * number_of_images * 4);
+
+    for (u32 set = 0; set < m_descriptor_sets.size(); ++set) {
+
+        if (m_descriptor_sets[set].empty()) {
+            continue;
+        }
+
+        for (int i = 0; i < number_of_images; ++i) {
+            for (const auto &shader : {p_vertex_shader, p_fragment_shader}) {
+                for (const auto &binding : shader->Reflection().descriptor_bindings) {
+
+                    if (binding.set != set || binding.type != VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
+                        continue;
+                    }
+
+                    VkWriteDescriptorSet write_descriptor_set{};
+                    write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                    write_descriptor_set.dstSet = m_descriptor_sets[set][i];
+                    write_descriptor_set.dstBinding = binding.binding;
+                    write_descriptor_set.dstArrayElement = 0;
+                    write_descriptor_set.descriptorCount = binding.count;
+                    write_descriptor_set.descriptorType = binding.type;
+                    write_descriptor_set.pImageInfo = image_infos.data();
+
+                    if (binding.count > MAX_TEXTURES) {
+                        ENGINE_LOG_WARNING("Descriptor set {}, binding {} requests {} samplers, but MAX_TEXTURES is {}",
+                                           binding.set, binding.binding, binding.count, MAX_TEXTURES);
+                        write_descriptor_set.descriptorCount = MAX_TEXTURES;
+                    }
+
+                    write_descriptor_sets.push_back(write_descriptor_set);
+                }
+            }
+        }
+    }
+
+    if (!write_descriptor_sets.empty()) {
+        vkUpdateDescriptorSets(p_device, static_cast<u32>(write_descriptor_sets.size()), write_descriptor_sets.data(),
+                               0, nullptr);
+    }
+}
+
+// Private functions ---------------------------------------------------------------
 void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
 {
     // Count descriptors by type across all sets and shaders
@@ -432,7 +491,7 @@ void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
         }
     }
 
-    std::vector<VkDescriptorPoolSize> pool_sizes;
+    Vector<VkDescriptorPoolSize> pool_sizes;
     for (const auto &[type, count] : pool_size_counts) {
         pool_sizes.push_back({.type = type, .descriptorCount = count});
     }
@@ -449,6 +508,7 @@ void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
             max_set = std::max(max_set, binding.set);
         }
     }
+
     u32 total_sets{(max_set + 1) * number_of_images};
 
     VkDescriptorPoolCreateInfo descriptor_pool_create_info{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -463,20 +523,30 @@ void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
     }
 }
 
+void GraphicsPipeline::CreateDescriptorSets(int number_of_images, std::vector<Buffer> &uniform_buffers,
+                                            int uniform_data_size)
+{
+    CreateDescriptorPool(number_of_images);
+    CreateDescriptorSetLayout();
+    AllocateDescriptorSets(number_of_images);
+    UpdateDescriptorSets(number_of_images, uniform_buffers, uniform_data_size);
+    UpdateTextureDescriptors(number_of_images, m_renderer.GetTextures());
+}
+
 void GraphicsPipeline::CreateDescriptorSetLayout()
 {
     // Find maximum set number
-    u32 max_set = 0;
+    u32 max_set{0};
     for (const auto &shader : {p_vertex_shader, p_fragment_shader}) {
         for (const auto &binding : shader->Reflection().descriptor_bindings) {
-            max_set = std::max(max_set, binding.set);
+            max_set = math::max(max_set, binding.set);
         }
     }
 
     // Create a layout for each set (0 to max_set)
     m_descriptor_set_layouts.resize(max_set + 1, VK_NULL_HANDLE);
     for (u32 set = 0; set <= max_set; ++set) {
-        std::vector<VkDescriptorSetLayoutBinding> layout_bindings;
+        Vector<VkDescriptorSetLayoutBinding> layout_bindings;
         std::unordered_set<u32> seen_bindings;
         for (const auto &shader : {p_vertex_shader, p_fragment_shader}) {
             for (const auto &binding : shader->Reflection().descriptor_bindings) {
@@ -531,7 +601,7 @@ void GraphicsPipeline::AllocateDescriptorSets(int number_of_images)
         if (m_descriptor_set_layouts[set] == VK_NULL_HANDLE) {
             continue; // Skip unused sets
         }
-        std::vector<VkDescriptorSetLayout> layouts(number_of_images, m_descriptor_set_layouts[set]);
+        Vector<VkDescriptorSetLayout> layouts(number_of_images, m_descriptor_set_layouts[set]);
         VkDescriptorSetAllocateInfo alloc_info{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
                                                .descriptorPool = p_descriptor_pool,
                                                .descriptorSetCount = static_cast<u32>(number_of_images),
@@ -550,18 +620,8 @@ void GraphicsPipeline::UpdateDescriptorSets(int number_of_images, std::vector<Bu
 {
     ASSERT(uniform_buffers.size() >= static_cast<size_t>(number_of_images), "Not enough uniform buffers");
 
-    const auto &textures = m_renderer.GetTextures();
-    std::vector<VkDescriptorImageInfo> image_infos(MAX_TEXTURES);
-    Texture *fallback_texture{textures[0].get()};
-    for (size_t i = 0; i < MAX_TEXTURES; ++i) {
-        Texture *texture = (i < textures.size()) ? textures[i].get() : fallback_texture;
-        image_infos[i] = {.sampler = texture->p_sampler,
-                          .imageView = texture->p_view,
-                          .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-    }
-
-    std::vector<VkWriteDescriptorSet> write_descriptor_sets;
-    std::vector<std::unique_ptr<VkDescriptorBufferInfo>> buffer_infos;
+    SmallVector<VkWriteDescriptorSet, 10, GrowthPolicyDouble> write_descriptor_sets;
+    SmallVector<std::unique_ptr<VkDescriptorBufferInfo>, 10> buffer_infos;
 
     for (u32 set = 0; set < m_descriptor_sets.size(); ++set) {
         if (m_descriptor_sets[set].empty()) {
@@ -581,7 +641,6 @@ void GraphicsPipeline::UpdateDescriptorSets(int number_of_images, std::vector<Bu
                                                .descriptorType = binding.type};
 
                     if (binding.type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
-                        // Assume uniform buffer is for set=0, binding=0
                         if (binding.set == 0 && binding.binding == 0) {
                             auto buffer_info = std::make_unique<VkDescriptorBufferInfo>(
                                 VkDescriptorBufferInfo{.buffer = uniform_buffers[i].p_buffer,
@@ -597,14 +656,8 @@ void GraphicsPipeline::UpdateDescriptorSets(int number_of_images, std::vector<Bu
                         }
                     }
                     else if (binding.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-                        // Use texture array for sampler bindings
-                        if (binding.count > MAX_TEXTURES) {
-                            ENGINE_LOG_WARNING(
-                                "Descriptor set {}, binding {} requests {} samplers, but MAX_TEXTURES is {}",
-                                binding.set, binding.binding, binding.count, MAX_TEXTURES);
-                            write.descriptorCount = MAX_TEXTURES;
-                        }
-                        write.pImageInfo = image_infos.data();
+                        // Skip texture bindings during initialization
+                        continue;
                     }
                     else {
                         ENGINE_LOG_WARNING("Unsupported descriptor type {} at set {}, binding {}",
@@ -625,15 +678,6 @@ void GraphicsPipeline::UpdateDescriptorSets(int number_of_images, std::vector<Bu
 
     vkUpdateDescriptorSets(p_device, static_cast<u32>(write_descriptor_sets.size()), write_descriptor_sets.data(), 0,
                            nullptr);
-}
-
-void GraphicsPipeline::CreateDescriptorSets(int number_of_images, std::vector<Buffer> &uniform_buffers,
-                                            int uniform_data_size)
-{
-    CreateDescriptorPool(number_of_images);
-    CreateDescriptorSetLayout();
-    AllocateDescriptorSets(number_of_images);
-    UpdateDescriptorSets(number_of_images, uniform_buffers, uniform_data_size);
 }
 
 } // namespace gouda::vk
