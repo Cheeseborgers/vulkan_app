@@ -6,6 +6,7 @@
 #include "backends/input_handler.hpp"
 #include "cameras/orthographic_camera.hpp"
 #include "core/settings_manager.hpp"
+#include "renderers/render_data.hpp"
 #include "renderers/vulkan/vk_renderer.hpp"
 #include "scenes/scene.hpp"
 #include "utils/timer.hpp"
@@ -45,6 +46,7 @@ private:
     void SetupAudio(const ApplicationSettings &settings);
     void SetupCamera();
     void LoadTextures();
+    void LoadFonts();
     void SetupInputSystem();
 
     void OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_size);
@@ -64,7 +66,7 @@ private:
 
     std::unique_ptr<gouda::OrthographicCamera> p_ortho_camera;
 
-    gouda::vk::UniformData m_uniform_data;
+    gouda::UniformData m_uniform_data;
 
     // Audio
     gouda::audio::AudioManager m_audio_manager;
@@ -74,6 +76,8 @@ private:
     gouda::audio::MusicTrack m_music;
     gouda::audio::MusicTrack m_music2;
     gouda::audio::MusicTrack m_music3;
+
+    u8 m_main_font_id;
 
     std::unique_ptr<Scene> p_current_scene;
 };

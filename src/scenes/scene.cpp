@@ -37,9 +37,9 @@ bool IsInFrustum(const gouda::Vec3 &position, const gouda::Vec2 &size,
 }
 // Scene ---------------------------------------------------------------------------------------
 Scene::Scene(gouda::OrthographicCamera *camera_ptr)
-    : p_camera{camera_ptr}, m_player{gouda::vk::InstanceData{}, {0.0f}, 0.0f}, m_instances_dirty{true}, m_font_id{5}
+    : p_camera{camera_ptr}, m_player{gouda::InstanceData{}, {0.0f}, 0.0f}, m_instances_dirty{true}, m_font_id{5}
 {
-    std::vector<gouda::vk::InstanceData> instances = {
+    std::vector<gouda::InstanceData> instances = {
         {{2945.3f, 3048.8f, -0.3f}, {81.9f, 453.95f}, 0.0f, 4},
         {{200.3f, 200.8f, -0.3f}, {281.9f, 453.95f}, 0.0f, 4},
         {{1182.08f, 69.08f, -0.8f}, {188.0f, 101.51f}, 0.0f, 2},
@@ -94,17 +94,12 @@ Scene::Scene(gouda::OrthographicCamera *camera_ptr)
         {{710.36f, -330.24f, -0.6f}, {88.82f, 401.39f}, 0.0f, 2},
     };
 
-    m_entities.reserve(instances.size() + 1);
+    m_entities.reserve(instances.size());
     for (const auto &instance : instances) {
         m_entities.emplace_back(instance, EntityType::Quad);
     }
 
-    // Setup the player
-    m_player.render_data.position = {500.0f, 500.0f, 0.0f};
-    m_player.render_data.size = {25.0f, 25.0f}; // Was {50, 50}
-    m_player.render_data.texture_index = 1;
-    m_player.velocity = {0.0f};
-    m_player.speed = 200.0f;
+    SetupPlayer();
 
     m_visible_quad_instances.reserve(instances.size() + 1);
     BuildSpatialGrid();
@@ -218,7 +213,7 @@ void Scene::Update(f32 delta_time)
     UpdateVisibleInstances();
 }
 
-void Scene::Render(f32 delta_time, gouda::vk::Renderer &renderer, gouda::vk::UniformData &uniform_data)
+void Scene::Render(f32 delta_time, gouda::vk::Renderer &renderer, gouda::UniformData &uniform_data)
 {
 
     uniform_data.WVP = p_camera->GetViewProjectionMatrix();
@@ -254,6 +249,32 @@ void Scene::SpawnParticle(const gouda::Vec3 &position, const gouda::Vec2 &size, 
 }
 
 // Private ---------------------------------------------------------------------------------
+void Scene::SetupEntities() {}
+
+void Scene::SetupPlayer()
+{
+    m_player.render_data.position = {500.0f, 500.0f, 0.0f};
+    m_player.render_data.size = {25.0f, 25.0f};
+    m_player.render_data.texture_index = 1;
+    m_player.velocity = {0.0f};
+    m_player.speed = 200.0f;
+
+    // todo: load player animations from json
+
+    // Add animation component to player
+    m_player.animation_component = AnimationComponent{};
+    m_player.animation_component->current_animation = "idle";
+
+    // Animations
+    m_player.animation_component->animations["walk"] =
+        Animation{"walk",
+                  {{0.0f, 0.0f, 0.25f, 1.0f}, {0.25f, 0.0f, 0.5f, 1.0f}, {0.5f, 0.0f, 0.75f, 1.0f}},
+                  {0.2f, 0.2f, 0.2f},
+                  true};
+
+    m_player.animation_component->animations["idle"] = Animation{"idle", {{0.75f, 0.0f, 1.0f, 1.0f}}, {1.0f}, true};
+}
+
 void Scene::BuildSpatialGrid()
 {
     m_spatial_grid.clear();

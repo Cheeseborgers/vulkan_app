@@ -1,6 +1,6 @@
 #pragma once
 /**
- * @file player.hpp
+ * @file entities/entity.hpp
  * @author GoudaCheeseburgers
  * @date 2025-04-06
  * @brief Application module
@@ -20,13 +20,28 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-#include "core/entity.hpp"
+#include <optional>
 
-struct Player : public Entity {
-public:
-    Player(gouda::vk::InstanceData instance_data, gouda::math::Vec2 velocity_, f32 speed_);
-    ~Player();
+#include "math/math.hpp"
+#include "renderers/vulkan/vk_renderer.hpp"
 
-    gouda::math::Vec2 velocity; ///< Movement velocity
-    f32 speed;                  ///< Movement speed
+#include "components/animation_component.hpp"
+
+enum class EntityType : u8 {
+    Quad = 0,  // Static quad
+    Player,    // Player-controlled entity
+    Enemy,     // AI-controlled entity
+    Trigger,   // Interactive trigger
+    Background // Static background
+};
+
+struct Entity {
+    Entity(const gouda::InstanceData &instance_data, EntityType type_ = EntityType::Quad)
+        : type{type_}, render_data{instance_data}
+    {
+    }
+
+    EntityType type;                                       ///< Type of entity
+    gouda::InstanceData render_data;                       ///< Rendering-specific data
+    std::optional<AnimationComponent> animation_component; ///< Optional animation component
 };

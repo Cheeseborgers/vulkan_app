@@ -1,8 +1,7 @@
 /**
- * @file entity.cpp
+ * @file entities/entity.cpp
  * @author GoudaCheeseburgers
  * @date 2025-04-06
  * @brief Application module implementation
  */
-
-#include "core/entity.hpp"
+#include "entities/entity.hpp"

@@ -63,6 +63,8 @@ set(PROJECT_SOURCES
     src/debug/stacktrace.cpp
 
     src/renderers/text.cpp
+    src/renderers/render_data.cpp
+
     src/renderers/vulkan/gouda_vk_wrapper.cpp
     src/renderers/vulkan/vk_buffer.cpp
     src/renderers/vulkan/vk_buffer_manager.cpp

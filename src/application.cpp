@@ -19,6 +19,7 @@ Application::Application()
       m_time_settings{},
       p_ortho_camera{nullptr},
       m_uniform_data{},
+      m_main_font_id{0},
       p_current_scene{nullptr}
 {
 }
@@ -137,9 +138,10 @@ void Application::SetupRenderer()
 {
     // Initialize Vulkan
     m_renderer.Initialize(p_window->GetWindow(), "Gouda renderer", {1, 3, 0, 0}, m_time_settings.vsync_mode);
+    m_renderer.CreateUniformBuffers(sizeof(gouda::UniformData));
 
     LoadTextures();
-    m_renderer.CreateUniformBuffers(sizeof(gouda::vk::UniformData));
+    LoadFonts();
 
     m_renderer.SetupPipelines(quad_vertex_shader_path, quad_frag_shader_path, text_vertex_shader_path,
                               text_frag_shader_path, particle_vertex_shader_path, particle_frag_shader_path,
@@ -178,10 +180,13 @@ void Application::LoadTextures()
     m_renderer.LoadTexture("assets/textures/checkerboard2.png");
     m_renderer.LoadTexture("assets/textures/checkerboard3.png");
     m_renderer.LoadTexture("assets/textures/checkerboard4.png");
+}
 
-    u32 font_id = m_renderer.LoadMSDFFont("assets/fonts/atlas.png", "assets/fonts/atlas.json");
+void Application::LoadFonts()
+{
+    m_main_font_id = m_renderer.LoadMSDFFont("assets/fonts/atlas.png", "assets/fonts/atlas.json");
 
-    APP_LOG_DEBUG("font texture id: {}", font_id);
+    APP_LOG_DEBUG("font texture id: {}", m_main_font_id);
 }
 
 void Application::SetupInputSystem()

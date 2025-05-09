@@ -29,28 +29,6 @@
 
 namespace gouda::vk {
 
-InstanceData::InstanceData()
-    : position{0.0f, 0.0f, 0.0f}, size{1.0f, 1.0f}, rotation{0.0f}, texture_index{0}, colour{1.0f}
-{
-}
-InstanceData::InstanceData(Vec3 position_, Vec2 size_, f32 rotation_, u32 texture_index_, Vec4 colour_,
-                           Vec4 sprite_rect_, u32 is_atlas_)
-    : position{position_},
-      size{size_},
-      rotation{rotation_},
-      texture_index{texture_index_},
-      colour{colour_},
-      sprite_rect{sprite_rect_},
-      is_atlas{is_atlas_}
-{
-    position.z = math::clamp(position.z, -0.9f, 0.0f);
-}
-
-TextData::TextData()
-    : position{0.0f, 0.0f, 0.0f}, size{1.0f, 1.0f}, colour{0.0f}, glyph_index{0}, sdf_params{0.0f}, texture_index{0}
-{
-}
-
 // Renderer implentation --------------------------------------------
 Renderer::Renderer()
     : p_instance{nullptr},
@@ -219,21 +197,22 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, u32 image_ind
                              nullptr, 1, &copy_to_vertex_barrier, 0, nullptr);
 
         ParticleData *instance_particles = static_cast<ParticleData *>(m_mapped_particle_instance_data[image_index]);
-        if (particle_count > 0) {
-            /*
-            ENGINE_LOG_DEBUG(
-                "After copy[{}]: Particle[0]: pos = [{}, {}, {}], size = [{}, {}], lifetime = {}, vel = [{}, {}, {}], "
-                "colour = [{}, {}, {}, {}]",
-                image_index, instance_particles[0].position[0], instance_particles[0].position[1],
-                instance_particles[0].position[2], instance_particles[0].size[0], instance_particles[0].size[1],
-                instance_particles[0].lifetime, instance_particles[0].velocity[0], instance_particles[0].velocity[1],
-                instance_particles[0].velocity[2], instance_particles[0].colour[0], instance_particles[0].colour[1],
-                instance_particles[0].colour[2], instance_particles[0].colour[3]);
+        /*
+    if (particle_count > 0) {
 
-            */
+        ENGINE_LOG_DEBUG(
+            "After copy[{}]: Particle[0]: pos = [{}, {}, {}], size = [{}, {}], lifetime = {}, vel = [{}, {}, {}], "
+            "colour = [{}, {}, {}, {}]",
+            image_index, instance_particles[0].position[0], instance_particles[0].position[1],
+            instance_particles[0].position[2], instance_particles[0].size[0], instance_particles[0].size[1],
+            instance_particles[0].lifetime, instance_particles[0].velocity[0], instance_particles[0].velocity[1],
+            instance_particles[0].velocity[2], instance_particles[0].colour[0], instance_particles[0].colour[1],
+            instance_particles[0].colour[2], instance_particles[0].colour[3]);
+
+
         }
         if (particle_count > 2) {
-            /*
+
             ENGINE_LOG_DEBUG(
                 "After copy[{}]: Particle[2]: pos = [{}, {}, {}], size = [{}, {}], lifetime = {}, vel = [{}, {}, {}], "
                 "colour = [{}, {}, {}, {}]",
@@ -242,8 +221,9 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, u32 image_ind
                 instance_particles[2].lifetime, instance_particles[2].velocity[0], instance_particles[2].velocity[1],
                 instance_particles[2].velocity[2], instance_particles[2].colour[0], instance_particles[2].colour[1],
                 instance_particles[2].colour[2], instance_particles[2].colour[3]);
-            */
+
         }
+                */
     }
 
     // Quad/Sprite rendering
@@ -392,7 +372,8 @@ void Renderer::UpdateComputeUniformBuffer(u32 image_index, f32 delta_time)
 
 void Renderer::UpdateParticleStorageBuffer(u32 image_index, const std::vector<ParticleData> &particle_instances)
 {
-    VkDeviceSize max_particle_instance_size = sizeof(ParticleData) * m_max_particle_instances;
+    VkDeviceSize max_particle_instance_size{sizeof(ParticleData) * m_max_particle_instances};
+
     memset(m_mapped_particle_storage_data[image_index], 0, max_particle_instance_size);
 
     if (particle_instances.empty()) {
@@ -400,11 +381,12 @@ void Renderer::UpdateParticleStorageBuffer(u32 image_index, const std::vector<Pa
         return;
     }
 
-    VkDeviceSize particle_instance_size =
-        sizeof(ParticleData) * std::min(particle_instances.size(), static_cast<size_t>(m_max_particle_instances));
+    VkDeviceSize particle_instance_size{
+        sizeof(ParticleData) * std::min(particle_instances.size(), static_cast<size_t>(m_max_particle_instances))};
     memcpy(m_mapped_particle_storage_data[image_index], particle_instances.data(), particle_instance_size);
 
-    ParticleData *gpu_particles = static_cast<ParticleData *>(m_mapped_particle_storage_data[image_index]);
+    ParticleData *gpu_particles{static_cast<ParticleData *>(m_mapped_particle_storage_data[image_index])};
+    /*
     if (particle_instances.size() > 0) {
         ENGINE_LOG_DEBUG("Storage buffer[{}] Particle[0]: pos = [{}, {}, {}], size = [{}, {}], lifetime = {}, vel = "
                          "[{}, {}, {}], colour = [{}, {}, {}, {}]",
@@ -423,6 +405,7 @@ void Renderer::UpdateParticleStorageBuffer(u32 image_index, const std::vector<Pa
                          gpu_particles[2].velocity[2], gpu_particles[2].colour[0], gpu_particles[2].colour[1],
                          gpu_particles[2].colour[2], gpu_particles[2].colour[3]);
     }
+                         */
 }
 
 void Renderer::ClearParticleBuffers(u32 image_index)

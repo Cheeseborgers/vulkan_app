@@ -1,13 +1,26 @@
 #pragma once
-
+/**
+ * @file scenes/scene.hpp
+ * @author GoudaCheeseburgers
+ * @date 2025-04-06
+ * @brief Application scene module
+ *
+ * @copyright
+ * Copyright (c) 2025 GoudaCheeseburgers <https://github.com/Cheeseborgers>
+ *
+ * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
+ * See <https://www.gnu.org/licenses/> for more information.
+ */
 #include "cameras/orthographic_camera.hpp"
 #include "renderers/vulkan/vk_renderer.hpp"
 
-#include "core/player.hpp"
+#include "entities/player.hpp"
 
 // Simple 2D grid position
 struct GridPos {
-    int x, y;
+    int x;
+    int y;
+
     bool operator==(const GridPos &other) const { return x == other.x && y == other.y; }
     struct Hash {
         size_t operator()(const GridPos &pos) const { return std::hash<int>()(pos.x) ^ (std::hash<int>()(pos.y) << 1); }
@@ -20,7 +33,7 @@ public:
     ~Scene() = default;
 
     void Update(f32 delta_time);
-    void Render(f32 delta_time, gouda::vk::Renderer &renderer, gouda::vk::UniformData &uniform_data);
+    void Render(f32 delta_time, gouda::vk::Renderer &renderer, gouda::UniformData &uniform_data);
 
     void DrawUI(gouda::vk::Renderer &renderer);
 
@@ -36,6 +49,8 @@ public:
     void SetFontID(u32 id) { m_font_id = id; }
 
 private:
+    void SetupEntities();
+    void SetupPlayer();
     void BuildSpatialGrid();
     void UpdateVisibleInstances();
     void UpdateParticles(f32 delta_time);
@@ -46,9 +61,9 @@ private:
     Player m_player;
     std::vector<Entity> m_entities;
 
-    std::vector<gouda::vk::InstanceData> m_visible_quad_instances;
-    std::vector<gouda::vk::TextData> m_text_instances;
-    std::vector<gouda::vk::ParticleData> m_particles_instances;
+    std::vector<gouda::InstanceData> m_visible_quad_instances;
+    std::vector<gouda::TextData> m_text_instances;
+    std::vector<gouda::ParticleData> m_particles_instances;
     bool m_instances_dirty;
 
     u32 m_font_id;

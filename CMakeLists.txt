@@ -65,11 +65,10 @@ target_sources(${PROJECT_NAME}
     PRIVATE
     src/application.cpp
     src/main.cpp
-
-    src/core/entity.cpp
-    src/core/player.cpp
+    src/components/animation_component.cpp
     src/core/settings_manager.cpp
-
+    src/entities/entity.cpp
+    src/entities/player.cpp
     src/scenes/scene.cpp
 )
 

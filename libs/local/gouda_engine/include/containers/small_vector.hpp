@@ -11,8 +11,10 @@
  * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
  * See <https://www.gnu.org/licenses/> for more information.
  */
+#include <algorithm> // For std::uninitialized_copy_n
 #include <iterator>
 #include <memory>
+#include <new> // For std::launder
 
 namespace gouda {
 
@@ -54,13 +56,31 @@ public:
     SmallVector() : m_data(stack_data()), m_size(0), m_capacity(N) {}
 
     /**
+     * @brief Initializes the SmallVector with elements from an initializer list.
+     *
+     * Constructs the vector using stack storage if the number of elements is small enough.
+     * Reserves capacity upfront to avoid multiple reallocations.
+     *
+     * @param init The initializer list of elements to populate the vector with.
+     */
+    SmallVector(std::initializer_list<T> init) : m_data(stack_data()), m_size(0), m_capacity(N)
+    {
+        if (init.size() > N) {
+            reserve(init.size()); // Use heap if needed
+        }
+        for (const auto &v : init) {
+            new (m_data + m_size++) T(v);
+        }
+    }
+
+    /**
      * @brief Destructor clears the vector and frees any heap memory if used.
      */
     ~SmallVector()
     {
         clear();
         if (m_data != stack_data()) {
-            ::operator delete[](m_data);
+            ::operator delete(m_data);
         }
     }
 
@@ -70,11 +90,21 @@ public:
      */
     SmallVector(SmallVector &&other) noexcept : m_data(other.m_data), m_size(other.m_size), m_capacity(other.m_capacity)
     {
-        if (m_data != other.stack_data()) {
-            other.m_data = nullptr;
+        if (m_data == other.stack_data()) {
+            // Copy stack data to our stack
+            m_data = stack_data();
+            std::uninitialized_copy_n(other.m_data, m_size, m_data);
+            // Clear other's elements to prevent double destruction
+            for (size_t i = 0; i < other.m_size; ++i) {
+                other.m_data[i].~T();
+            }
+            other.m_size = 0;
         }
-        other.m_size = 0;
-        other.m_capacity = 0;
+        else {
+            // Take heap data
+            other.m_data = other.stack_data();
+        }
+        other.m_capacity = N;
     }
 
     /**
@@ -87,16 +117,26 @@ public:
         if (this != &other) {
             clear();
             if (m_data != stack_data()) {
-                ::operator delete[](m_data);
+                ::operator delete(m_data);
             }
             m_data = other.m_data;
             m_size = other.m_size;
             m_capacity = other.m_capacity;
-            if (m_data != other.stack_data()) {
-                other.m_data = nullptr;
+            if (m_data == other.stack_data()) {
+                // Copy stack data to our stack
+                m_data = stack_data();
+                std::uninitialized_copy_n(other.m_data, m_size, m_data);
+                // Clear other's elements to prevent double destruction
+                for (size_t i = 0; i < other.m_size; ++i) {
+                    other.m_data[i].~T();
+                }
+                other.m_size = 0;
             }
-            other.m_size = 0;
-            other.m_capacity = 0;
+            else {
+                // Take heap data
+                other.m_data = other.stack_data();
+            }
+            other.m_capacity = N;
         }
         return *this;
     }
@@ -105,12 +145,22 @@ public:
      * @brief Copy constructor duplicates the contents of another SmallVector.
      * @param other The SmallVector to copy from.
      */
-    SmallVector(const SmallVector &other) : m_data(stack_data()), m_size(other.m_size), m_capacity(other.m_capacity)
+    SmallVector(const SmallVector &other) : m_data(stack_data()), m_size(0), m_capacity(N)
     {
-        if (other.m_data != other.stack_data()) {
-            m_data = static_cast<T *>(::operator new[](sizeof(T) * m_capacity));
+        reserve(other.m_size);
+        try {
+            std::uninitialized_copy_n(other.m_data, other.m_size, m_data);
+            m_size = other.m_size;
         }
-        std::uninitialized_copy(other.begin(), other.end(), m_data);
+        catch (...) {
+            // Clean up partially constructed elements
+            clear();
+            if (m_data != stack_data()) {
+                ::operator delete(m_data);
+                m_data = stack_data();
+            }
+            throw;
+        }
     }
 
     /**
@@ -144,8 +194,9 @@ public:
      */
     void push_back(const T &value)
     {
-        if (m_size == m_capacity)
+        if (m_size == m_capacity) {
             grow();
+        }
         new (m_data + m_size++) T(value);
     }
 
@@ -155,8 +206,9 @@ public:
      */
     void push_back(T &&value)
     {
-        if (m_size == m_capacity)
+        if (m_size == m_capacity) {
             grow();
+        }
         new (m_data + m_size++) T(std::move(value));
     }
 
@@ -169,8 +221,9 @@ public:
     template <typename... Args>
     T &emplace_back(Args &&...args)
     {
-        if (m_size == m_capacity)
+        if (m_size == m_capacity) {
             grow();
+        }
         T *ptr = new (m_data + m_size++) T(std::forward<Args>(args)...);
         return *ptr;
     }
@@ -181,19 +234,26 @@ public:
      */
     void reserve(size_t new_cap)
     {
-        if (new_cap <= m_capacity)
+        if (new_cap <= m_capacity) {
             return;
-
-        T *new_data = static_cast<T *>(::operator new[](sizeof(T) * new_cap));
-        for (size_t i = 0; i < m_size; ++i) {
-            new (new_data + i) T(std::move_if_noexcept(m_data[i]));
-            m_data[i].~T();
         }
-
+        T *new_data = static_cast<T *>(::operator new(new_cap * sizeof(T)));
+        try {
+            for (size_t i = 0; i < m_size; ++i) {
+                new (new_data + i) T(std::move_if_noexcept(m_data[i]));
+                m_data[i].~T();
+            }
+        }
+        catch (...) {
+            for (size_t i = 0; i < m_size; ++i) {
+                new_data[i].~T();
+            }
+            ::operator delete(new_data);
+            throw;
+        }
         if (m_data != stack_data()) {
-            ::operator delete[](m_data);
+            ::operator delete(m_data);
         }
-
         m_data = new_data;
         m_capacity = new_cap;
     }
@@ -206,13 +266,15 @@ public:
     void resize(size_t new_size)
     {
         if (new_size < m_size) {
-            for (size_t i = new_size; i < m_size; ++i)
+            for (size_t i = new_size; i < m_size; ++i) {
                 m_data[i].~T();
+            }
         }
         else if (new_size > m_size) {
             reserve(new_size);
-            for (size_t i = m_size; i < new_size; ++i)
+            for (size_t i = m_size; i < new_size; ++i) {
                 new (m_data + i) T();
+            }
         }
         m_size = new_size;
     }
@@ -222,17 +284,29 @@ public:
      */
     void shrink_to_fit()
     {
-        if (m_capacity > m_size) {
-            T *new_data = static_cast<T *>(::operator new[](sizeof(T) * m_size));
-            for (size_t i = 0; i < m_size; ++i) {
-                new (new_data + i) T(std::move(m_data[i]));
-                m_data[i].~T();
+        if (m_capacity > m_size && m_data != stack_data()) {
+            if (m_size <= N) {
+                // Move back to stack
+                T *new_data = stack_data();
+                for (size_t i = 0; i < m_size; ++i) {
+                    new (new_data + i) T(std::move(m_data[i]));
+                    m_data[i].~T();
+                }
+                ::operator delete(m_data);
+                m_data = new_data;
+                m_capacity = N;
             }
-            if (m_data != stack_data()) {
-                ::operator delete[](m_data);
+            else {
+                // Reallocate heap
+                T *new_data = static_cast<T *>(::operator new(m_size * sizeof(T)));
+                for (size_t i = 0; i < m_size; ++i) {
+                    new (new_data + i) T(std::move(m_data[i]));
+                    m_data[i].~T();
+                }
+                ::operator delete(m_data);
+                m_data = new_data;
+                m_capacity = m_size;
             }
-            m_data = new_data;
-            m_capacity = m_size;
         }
     }
 
@@ -241,14 +315,14 @@ public:
      * @param i Index of the element.
      * @return Reference to the element.
      */
-    T &operator[](size_t i) { return m_data[i]; }
+    T &operator[](size_t i) { return *std::launder(m_data + i); }
 
     /**
      * @brief Provides read-only access to an element by index.
      * @param i Index of the element.
      * @return Const reference to the element.
      */
-    const T &operator[](size_t i) const { return m_data[i]; }
+    const T &operator[](size_t i) const { return *std::launder(m_data + i); }
 
     /**
      * @brief Equality comparison operator.
@@ -347,25 +421,17 @@ public:
      */
     iterator insert(const_iterator pos, const T &value)
     {
-        // Calculate the index to insert at
         size_t index = pos - begin();
-
-        // Make sure we have enough capacity to insert the element
         if (m_size == m_capacity) {
-            grow(); // Grow the vector if necessary
+            grow();
         }
-
-        // Shift elements to the right starting from the last element
         for (size_t i = m_size; i > index; --i) {
-            new (m_data + i) T(std::move(m_data[i - 1])); // Move the element to the right
-            m_data[i - 1].~T();                           // Destroy the old element
+            new (m_data + i) T(std::move(m_data[i - 1]));
+            m_data[i - 1].~T();
         }
-
-        // Insert the new element
         new (m_data + index) T(value);
-        ++m_size; // Increase the size of the vector
-
-        return m_data + index; // Return the iterator to the inserted element
+        ++m_size;
+        return m_data + index;
     }
 
     /**
@@ -376,25 +442,17 @@ public:
      */
     iterator insert(const_iterator pos, T &&value)
     {
-        // Calculate the index to insert at
         size_t index = pos - begin();
-
-        // Make sure we have enough capacity to insert the element
         if (m_size == m_capacity) {
-            grow(); // Grow the vector if necessary
+            grow();
         }
-
-        // Shift elements to the right starting from the last element
         for (size_t i = m_size; i > index; --i) {
-            new (m_data + i) T(std::move(m_data[i - 1])); // Move the element to the right
-            m_data[i - 1].~T();                           // Destroy the old element
+            new (m_data + i) T(std::move(m_data[i - 1]));
+            m_data[i - 1].~T();
         }
-
-        // Insert the new element
         new (m_data + index) T(std::move(value));
-        ++m_size; // Increase the size of the vector
-
-        return m_data + index; // Return the iterator to the inserted element
+        ++m_size;
+        return m_data + index;
     }
 
     /**
@@ -407,26 +465,21 @@ public:
     template <typename InputIt>
     iterator insert(const_iterator pos, InputIt first, InputIt last)
     {
-        size_t index{pos - begin()};              // Calculate the index to insert at
-        size_t count{std::distance(first, last)}; // Number of elements to insert
-
+        size_t index = pos - begin();
+        size_t count = std::distance(first, last);
         if (m_size + count > m_capacity) {
-            grow(); // Ensure enough capacity
+            size_t new_capacity = GrowthPolicy::next(std::max(m_capacity, m_size + count));
+            reserve(new_capacity);
         }
-
-        // Shift elements to the right starting from the last element
         for (size_t i = m_size + count - 1; i >= index + count; --i) {
-            new (m_data + i) T(std::move(m_data[i - count])); // Move element to the right
-            m_data[i - count].~T();                           // Destroy the old element
+            new (m_data + i) T(std::move(m_data[i - count]));
+            m_data[i - count].~T();
         }
-
-        // Insert the range
         size_t i = 0;
         for (; first != last; ++first, ++i) {
-            new (m_data + index + i) T(*first); // Insert each element in the range
+            new (m_data + index + i) T(*first);
         }
-
-        m_size += count; // Increase size
+        m_size += count;
         return m_data + index;
     }
 
@@ -437,23 +490,15 @@ private:
     void grow()
     {
         size_t new_capacity = GrowthPolicy::next(m_capacity);
-        T *new_data = static_cast<T *>(::operator new[](new_capacity * sizeof(T)));
-        for (size_t i = 0; i < m_size; ++i) {
-            new (new_data + i) T(std::move_if_noexcept(m_data[i]));
-            m_data[i].~T();
-        }
-        if (m_data != stack_data()) {
-            ::operator delete[](m_data);
-        }
-        m_data = new_data;
-        m_capacity = new_capacity;
+        reserve(new_capacity);
     }
 
     /**
      * @brief Returns pointer to the start of the internal stack buffer.
      * @return Pointer to stack data.
      */
-    T *stack_data() { return reinterpret_cast<T *>(m_stack_buffer); }
+    T *stack_data() noexcept { return std::launder(reinterpret_cast<T *>(m_stack_buffer)); }
+    const T *stack_data() const noexcept { return std::launder(reinterpret_cast<const T *>(m_stack_buffer)); }
 
     size_t m_size;
     size_t m_capacity;
