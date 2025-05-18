@@ -6,8 +6,9 @@
  */
 #include "core/settings_manager.hpp"
 
+#include <utility>
+
 #include "debug/logger.hpp"
-#include "utils/filesystem.hpp"
 
 // Definition of to_json and from_json for WindowSize
 void to_json(nlohmann::json &json_data, const WindowSize &window_size)
@@ -62,8 +63,8 @@ void from_json(const nlohmann::json &json_data, ApplicationSettings &settings)
     }
 }
 
-SettingsManager::SettingsManager(FilePath filepath, bool auto_save, bool auto_load)
-    : m_settings{}, m_filepath{filepath}, m_auto_save{auto_save}, m_is_valid{false}
+SettingsManager::SettingsManager(FilePath filepath, const bool auto_save, const bool auto_load)
+    : m_filepath{std::move(filepath)}, m_auto_save{auto_save}, m_is_valid{false}
 {
     if (auto_load) {
         Load();
@@ -137,7 +138,7 @@ void SettingsManager::Save() const
     }
 
     try {
-        nlohmann::json json_data = m_settings; // Should be a JSON object
+        const nlohmann::json json_data = m_settings; // Should be a JSON object
         file << json_data.dump(4);             // Pretty print with indentation
     }
     catch (const std::exception &e) {
@@ -152,7 +153,7 @@ ApplicationSettings SettingsManager::GetSettings() const { return m_settings; }
 void SettingsManager::SetSettings(const ApplicationSettings &new_settings)
 {
     if (new_settings.size.area() == 0) {
-        APP_LOG_ERROR("New window size cannot have zero dimentions: {}x{}.", new_settings.size.width,
+        APP_LOG_ERROR("New window size cannot have zero dimensions: {}x{}.", new_settings.size.width,
                       new_settings.size.height);
         return;
     }
@@ -166,7 +167,7 @@ void SettingsManager::SetSettings(const ApplicationSettings &new_settings)
 void SettingsManager::SetWindowSize(WindowSize new_size)
 {
     if (new_size.area() == 0) {
-        APP_LOG_ERROR("New window size cannot have zero dimentions: {}x{}.", new_size.width, new_size.height);
+        APP_LOG_ERROR("New window size cannot have zero dimensions: {}x{}.", new_size.width, new_size.height);
         return;
     }
 
@@ -177,14 +178,14 @@ void SettingsManager::SetWindowSize(WindowSize new_size)
     }
 }
 
-void SettingsManager::SetFullScreen(bool enabled)
+void SettingsManager::SetFullScreen(const bool enabled)
 {
     m_settings.fullscreen = enabled;
     if (m_auto_save) {
         Save();
     }
 }
-void SettingsManager::SetVsync(bool enabled)
+void SettingsManager::SetVsync(const bool enabled)
 {
     m_settings.vsync = enabled;
     if (m_auto_save) {
@@ -192,7 +193,7 @@ void SettingsManager::SetVsync(bool enabled)
     }
 }
 
-void SettingsManager::SetRefreshRate(u16 rate)
+void SettingsManager::SetRefreshRate(const u16 rate)
 {
     if (rate == 0) {
         APP_LOG_ERROR("New refresh rate (fps) cannot be zero.");

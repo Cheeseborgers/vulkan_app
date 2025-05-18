@@ -1,6 +1,6 @@
 #pragma once
 /**
- * @file component/animation_component.hpp
+ * @file animation_component.hpp
  * @author GoudaCheeseburgers
  * @date 2025-05-07
  * @brief Application animation component module
@@ -20,13 +20,14 @@
 #include "renderers/render_data.hpp"
 
 struct Animation {
-    std::string name{};
+    String name;
     gouda::Vector<gouda::math::Vec4> frames{}; // List of UV rects
     gouda::Vector<f32> frame_durations{};      // Seconds per frame
     bool looping = true;
 
     constexpr Animation() = default;
-    Animation(std::string_view name_, gouda::Vector<gouda::math::Vec4> frames_, gouda::Vector<f32> frame_durations_,
+    Animation(StringView name_, gouda::Vector<gouda::math::Vec4> frames_,
+              const gouda::Vector<f32> &frame_durations_,
               bool looping);
 };
 

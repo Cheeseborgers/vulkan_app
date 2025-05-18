@@ -1,6 +1,6 @@
 #pragma once
 /**
- * @file renderers/vulkan/vk_texture.hpp
+ * @file vk_texture.hpp
  * @author GoudaCheeseburgers
  * @date 2025-04-24
  * @brief Engine Vulkan texture module
@@ -13,14 +13,12 @@
 #include <vulkan/vulkan.h>
 
 #include "core/types.hpp"
-#include "math/vector.hpp"
-#include "renderers/common.hpp"
 
 namespace gouda::vk {
 
 class Device;
 
-// TODO: Change to class
+
 struct Texture {
     Texture();
 
@@ -37,12 +35,12 @@ struct Texture {
 
 [[nodiscard]] constexpr int get_bytes_per_texture_format(VkFormat Format) noexcept;
 
-[[nodiscard]] constexpr bool has_stencil_component(VkFormat Format) noexcept
+[[nodiscard]] constexpr bool has_stencil_component(const VkFormat Format) noexcept
 {
     return ((Format == VK_FORMAT_D32_SFLOAT_S8_UINT) || (Format == VK_FORMAT_D24_UNORM_S8_UINT));
 }
 
-[[nodiscard]] constexpr VkFormat image_channels_to_vk_format(int channels)
+[[nodiscard]] constexpr VkFormat image_channels_to_vk_format(const int channels)
 {
     switch (channels) {
         case 1:
@@ -56,7 +54,7 @@ struct Texture {
     }
 }
 
-[[nodiscard]] constexpr u32 vk_format_to_channel_count(VkFormat format)
+[[nodiscard]] constexpr u32 vk_format_to_channel_count(const VkFormat format)
 {
     switch (format) {
         case VK_FORMAT_R8_UNORM:

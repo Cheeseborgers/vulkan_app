@@ -15,7 +15,7 @@
 
 struct Player : public Entity {
 public:
-    Player(gouda::InstanceData instance_data, gouda::math::Vec2 velocity_, f32 speed_);
+    Player(const gouda::InstanceData &instance_data, gouda::math::Vec2 velocity_, f32 speed_);
     ~Player();
 
     gouda::math::Vec2 velocity; ///< Movement velocity

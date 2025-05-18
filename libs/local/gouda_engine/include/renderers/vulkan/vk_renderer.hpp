@@ -24,6 +24,7 @@
 #include "renderers/vulkan/vk_device.hpp"
 #include "renderers/vulkan/vk_queue.hpp"
 #include "renderers/vulkan/vk_swapchain.hpp"
+#include "renderers/vulkan/vk_texture_manager.hpp"
 
 namespace gouda::vk {
 
@@ -42,46 +43,47 @@ public:
     Renderer();
     ~Renderer();
 
-    void Initialize(GLFWwindow *window_ptr, std::string_view app_name, SemVer vulkan_api_version = {1, 3, 0, 0},
+    void Initialize(GLFWwindow *window_ptr, StringView app_name, SemVer vulkan_api_version = {1, 3, 0, 0},
                     VSyncMode vsync_mode = VSyncMode::Enabled);
 
     void RecordCommandBuffer(VkCommandBuffer command_buffer, u32 image_index, u32 quad_instance_count,
-                             u32 text_instance_count, u32 particle_instance_count, ImDrawData *draw_data);
+                             u32 text_instance_count, u32 particle_instance_count, ImDrawData *draw_data) const;
 
     void Render(f32 delta_time, const UniformData &uniform_data, const std::vector<InstanceData> &quad_instances,
                 const std::vector<TextData> &text_instances, const std::vector<ParticleData> &particle_instances);
 
     void UpdateComputeUniformBuffer(u32 image_index, f32 delta_time);
-    void UpdateParticleStorageBuffer(u32 image_index, const std::vector<ParticleData> &particle_instances);
-    void ClearParticleBuffers(u32 image_index);
+    void UpdateParticleStorageBuffer(u32 image_index, const std::vector<ParticleData> &particle_instances) const;
+    void ClearParticleBuffers(u32 image_index) const;
 
     void ToggleComputeParticles();
     bool UseComputeParticles() const { return m_use_compute_particles; }
 
-    void DrawText(std::string_view text, Vec2 position, f32 scale, u32 font_id, std::vector<TextData> &text_instances);
+    void DrawText(StringView text, Vec2 position, f32 scale, u32 font_id, std::vector<TextData> &text_instances);
 
-    void SetupPipelines(std::string_view quad_vertex_shader_path, std::string_view quad_fragment_shader_path,
-                        std::string_view text_vertex_shader_path, std::string_view text_fragment_shader_path,
-                        std::string_view particle_vertex_shader_path, std::string_view particle_fragment_shader_path,
-                        std::string_view particle_compute_shader_path);
+    void SetupPipelines(StringView quad_vertex_shader_path, StringView quad_fragment_shader_path,
+                        StringView text_vertex_shader_path, StringView text_fragment_shader_path,
+                        StringView particle_vertex_shader_path, StringView particle_fragment_shader_path,
+                        StringView particle_compute_shader_path);
 
     void CreateFramebuffers();
     void DestroyFramebuffers();
     void CreateCommandBuffers();
     void CreateUniformBuffers(size_t data_size);
 
-    BufferManager *GetBufferManager() { return p_buffer_manager.get(); }
+    BufferManager *GetBufferManager() const { return p_buffer_manager.get(); }
     FrameBufferSize GetFramebufferSize() const { return m_framebuffer_size; }
-    VkDevice GetDevice() { return p_device->GetDevice(); }
-    Buffer *GetStaticVertexBuffer() { return p_quad_vertex_buffer.get(); }
+    VkDevice GetDevice() const { return p_device->GetDevice(); }
+    Buffer *GetStaticVertexBuffer() const { return p_quad_vertex_buffer.get(); }
     const std::vector<Buffer> &GetInstanceBuffers() { return m_quad_instance_buffers; }
     const std::vector<std::unique_ptr<Texture>> &GetTextures() { return m_textures; }
+    const Vector<std::unique_ptr<Texture>> &GetFontTextures() { return m_font_textures; }
 
-    u32 LoadTexture(std::string_view filepath);
-    u32 LoadMSDFFont(std::string_view image_filepath, std::string_view json_filepath);
+    u32 LoadTexture(StringView filepath, const std::optional<StringView> &json_filepath = std::nullopt);
+    u32 LoadMSDFFont(StringView image_filepath, StringView json_filepath);
     void SetClearColour(const Colour<f32> &colour);
     void ReCreateSwapchain();
-    void DeviceWait() { p_device->Wait(); }
+    void DeviceWait() const { p_device->Wait(); }
 
 private:
     struct RenderStatistics {
@@ -92,21 +94,22 @@ private:
         u32 particle_count;
         u32 glyph_count;
         u32 texture_count;
+        u32 font_count;
     };
 
 private:
-    void InitializeCore(GLFWwindow *window_ptr, std::string_view app_name, SemVer vulkan_api_version);
+    void InitializeCore(GLFWwindow *window_ptr, StringView app_name, SemVer vulkan_api_version);
     void InitializeSwapchainAndQueue(VSyncMode vsync_mode);
     void InitializeDefaultResources();
     void InitializeRenderResources();
-    VkRenderPass CreateRenderPass();
+    VkRenderPass CreateRenderPass() const;
     void CreateFences();
     void CacheFrameBufferSize();
     void CreateInstanceBuffers();
     void InitializeImGUIIfEnabled();
-    ImDrawData *RenderImGUI(const RenderStatistics &stats);
+    ImDrawData *RenderImGUI(const RenderStatistics &stats) const;
     void UpdateTextureDescriptors();
-    void DestroyImGUI();
+    void DestroyImGUI() const;
     void DestroyBuffers();
 
 private:
@@ -133,6 +136,8 @@ private:
     std::unique_ptr<Shader> p_particle_fragment_shader;
     std::unique_ptr<Shader> p_particle_compute_shader;
 
+    std::unique_ptr<TextureManager> p_texture_manager;
+
     GLFWwindow *p_window;
     VkRenderPass p_render_pass;
     VkCommandBuffer p_copy_command_buffer;
@@ -140,8 +145,8 @@ private:
     Queue m_queue;
 
     std::vector<Fence> m_frame_fences;
-    std::vector<VkFramebuffer> m_framebuffers;
-    std::vector<VkCommandBuffer> m_command_buffers;
+    Vector<VkFramebuffer> m_framebuffers;
+    Vector<VkCommandBuffer> m_command_buffers;
 
     std::vector<Buffer> m_uniform_buffers;
     std::vector<Buffer> m_compute_uniform_buffers;
@@ -158,6 +163,7 @@ private:
     std::vector<ParticleData> m_particles_instances;
 
     std::vector<std::unique_ptr<Texture>> m_textures;
+    Vector<std::unique_ptr<Texture>> m_font_textures;
     std::unordered_map<u32, std::unordered_map<char, Glyph>> m_fonts;
 
     FrameBufferSize m_framebuffer_size;
@@ -175,6 +181,7 @@ private:
     bool m_is_initialized;
     bool m_use_compute_particles;
     bool m_textures_dirty;
+    bool m_font_textures_dirty;
 };
 
 } // namespace gouda::vk

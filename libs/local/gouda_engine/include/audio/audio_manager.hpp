@@ -1,10 +1,12 @@
 #pragma once
 
-#include <vector>
+#include <AL/al.h>
+#include <AL/alc.h>
 
 #include "core/types.hpp"
 #include "music_track.hpp"
 #include "sound_effect.hpp"
+#include "containers/small_vector.hpp"
 
 // TODO: Add paused state m_music_paused
 // TODO: Test all functions
@@ -15,8 +17,8 @@
 // TODO: Move each audio effect init logic to own seperate functions?
 // TODO: Add comments to the rest of functions and members in this file
 
-namespace gouda {
-namespace audio {
+
+namespace gouda::audio {
 
 /**
  * @brief Represents a 3D vector used for sound positioning.
@@ -107,7 +109,7 @@ public:
      *
      * @note This function plays the sound effect using a free audio source from the pool.
      */
-    void PlaySoundEffect(const SoundEffect &sound, const std::vector<AudioEffectType> &effects = {}, f32 volume = 1.0f,
+    void PlaySoundEffect(const SoundEffect &sound, const Vector<AudioEffectType> &effects = {}, f32 volume = 1.0f,
                          f32 pitch = 1.0f);
 
     /**
@@ -123,7 +125,7 @@ public:
      * @note This function plays the sound effect at the given position using a free audio source.
      */
     void PlaySoundEffectAt(const SoundEffect &sound, const Vec3 &position,
-                           const std::vector<AudioEffectType> &effects = {}, f32 volume = 1.0f, f32 pitch = 1.0f,
+                           const Vector<AudioEffectType> &effects = {}, f32 volume = 1.0f, f32 pitch = 1.0f,
                            bool loop = false);
 
     /**
@@ -248,7 +250,7 @@ private:
      * @param slot_id The audio effect slot identifier.
      * @param name The audio effect name.
      */
-    void CleanupEffect(ALuint effect_id, ALuint slot_id, std::string_view name);
+    void CleanupEffect(ALuint effect_id, ALuint slot_id, std::string_view name) const;
 
     /**
      * @brief Destroys and free resources for all loaded OpenAL effects.
@@ -263,7 +265,7 @@ private:
      * @param source The audio source to apply effects on.
      * @param effects A vector of effects to apply to the source.
      */
-    void ApplyAudioEffects(ALuint source, const std::vector<AudioEffectType> &effects);
+    void ApplyAudioEffects(ALuint source, const Vector<AudioEffectType> &effects);
 
     /**
      * @brief Gets a free audio source.
@@ -310,13 +312,13 @@ private:
     ALCcontext *p_context; ///< OpenAL context for controlling audio output.
 
     // Sound effect members
-    std::vector<ALuint> m_source_pool;    ///< Pool of available sources for sound effects.
-    std::vector<ALuint> m_active_sources; ///< Sources currently playing sound effects.
+    Vector<ALuint> m_source_pool;    ///< Pool of available sources for sound effects.
+    Vector<ALuint> m_active_sources; ///< Sources currently playing sound effects.
 
     // Music streaming members
     ALuint m_music_source;                            ///< Dedicated source for music playback.
-    std::vector<ALuint> m_music_buffers;              ///< Buffers for streaming music chunks.
-    std::vector<MusicTrack *> m_music_tracks;         ///< Queue of music tracks to be played.
+    Vector<ALuint> m_music_buffers;              ///< Buffers for streaming music chunks.
+    Vector<MusicTrack *> m_music_tracks;         ///< Queue of music tracks to be played.
     size_t m_current_index = 0;                       ///< Index of the next track to play in the queue.
     MusicTrack *p_current_track;                      ///< The current music track being streamed.
     static constexpr size_t NUM_STREAM_BUFFERS = 3;   ///< Number of buffers for music streaming.
@@ -334,4 +336,4 @@ private:
 };
 
 } // namespace audio end
-} // namespace gouda end
+// namespace gouda end

@@ -8,23 +8,25 @@ namespace gouda::vk {
 
 Buffer::Buffer() : p_buffer{nullptr}, p_memory{nullptr}, m_allocation_size{0} {}
 
-void *Buffer::MapPersistent(VkDevice device)
+void *Buffer::MapPersistent(const VkDevice device) const
 {
-    void *data;
+    void *data{nullptr};
     vkMapMemory(device, p_memory, 0, m_allocation_size, 0, &data);
     return data;
 }
 
-void Buffer::Update(VkDevice device, const void *data, size_t size)
+void Buffer::Update(const VkDevice device, const void *data, const size_t size) const
 {
     void *mapped{nullptr};
-    VkResult result{vkMapMemory(device, p_memory, 0, size, 0, &mapped)};
-    CHECK_VK_RESULT(result, "vkMapMemory");
+    if (const VkResult result{vkMapMemory(device, p_memory, 0, size, 0, &mapped)}; result != VK_SUCCESS) {
+        CHECK_VK_RESULT(result, "vkMapMemory");
+    }
+
     memcpy(mapped, data, size);
     vkUnmapMemory(device, p_memory);
 }
 
-void Buffer::Destroy(VkDevice device)
+void Buffer::Destroy(const VkDevice device)
 {
     if (p_buffer != VK_NULL_HANDLE) {
         vkDestroyBuffer(device, p_buffer, nullptr);

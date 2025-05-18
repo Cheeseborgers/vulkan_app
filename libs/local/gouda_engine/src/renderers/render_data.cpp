@@ -1,5 +1,5 @@
 /**
- * @file renderers/render_data.cpp
+ * @file render_data.cpp
  * @author GoudaCheeseburgers
  * @date 2025-05-07
  * @brief Engine shared render data module implementation
@@ -8,8 +8,10 @@
 
 namespace gouda {
 
+
+
 InstanceData::InstanceData()
-    : position{0.0f, 0.0f, 0.0f}, size{1.0f, 1.0f}, rotation{0.0f}, texture_index{0}, colour{1.0f}
+    : position{0.0f, 0.0f, 0.0f}, size{1.0f, 1.0f}, rotation{0.0f}, texture_index{0}, colour{1.0f}, is_atlas(0)
 {
 }
 

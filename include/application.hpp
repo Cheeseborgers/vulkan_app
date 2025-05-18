@@ -35,7 +35,7 @@ public:
     ~Application();
 
     void Initialize();
-    void Update(f32 delta_time);
+    void Update(f32 delta_time) const;
     void RenderScene(f32 delta_time);
     void Execute();
 

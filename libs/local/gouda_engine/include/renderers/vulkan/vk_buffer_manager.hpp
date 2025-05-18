@@ -1,7 +1,7 @@
 #pragma once
 
 /**
- * @file gouda_vk_buffer_manager.hpp
+ * @file vk_buffer_manager.hpp
  * @author GoudaCheeseburgers
  * @date 2025-03-15
  * @brief Engine module
@@ -31,10 +31,10 @@ public:
     ~BufferManager();
 
     // Create a generic buffer with specified usage and properties
-    Buffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
+    Buffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties) const;
 
     // Create a vertex buffer with staging
-    Buffer CreateVertexBuffer(const void *data, VkDeviceSize size);
+    Buffer CreateVertexBuffer(const void *data, VkDeviceSize size) const;
 
     Buffer CreateDynamicVertexBuffer(VkDeviceSize size);
 
@@ -42,18 +42,18 @@ public:
     Buffer CreateUniformBuffer(size_t size);
 
     // Create a index buffer
-    Buffer CreateIndexBuffer(const void *data, VkDeviceSize size);
+    Buffer CreateIndexBuffer(const void *data, VkDeviceSize size) const;
 
     // Create a storage buffer
-    Buffer CreateStorageBuffer(VkDeviceSize size);
+    Buffer CreateStorageBuffer(VkDeviceSize size) const;
 
     // Create and allocate memory for an image
-    void CreateImage(Texture &texture, VkImageCreateInfo &image_info, VkMemoryPropertyFlags memory_properties);
+    void CreateImage(Texture &texture, const VkImageCreateInfo &image_info, VkMemoryPropertyFlags memory_properties) const;
 
     void CreateDepthImage(Texture &texture, ImageSize size, VkFormat format);
 
     // Utility to copy data between buffers
-    void CopyBufferToBuffer(VkBuffer destination, VkBuffer source, VkDeviceSize size, VkCommandBuffer command_buffer);
+    void CopyBufferToBuffer(VkBuffer destination, VkBuffer source, VkDeviceSize size, VkCommandBuffer command_buffer) const;
 
     void CreateTextureImageFromData(Texture &texture, const void *pixels_ptr, ImageSize image_size,
                                     VkFormat texture_format, u32 layer_count, VkImageCreateFlags create_flags);
@@ -64,24 +64,24 @@ public:
 
     void CreateTextureImage(Texture &texture, ImageSize size, VkFormat format, u32 mipLevels, u32 layerCount,
                             VkImageCreateFlags flags);
-    void UpdateTextureImage(Texture &texture, ImageSize size, VkFormat format, u32 layerCount, const void *data,
+    void UpdateTextureImage(const Texture &texture, ImageSize size, VkFormat format, u32 layerCount, const void *data,
                             VkImageLayout initialLayout);
-    void CopyBufferToImage(VkBuffer source, VkImage destination, ImageSize imageSize, u32 layerCount);
+    void CopyBufferToImage(VkBuffer source, VkImage destination, ImageSize imageSize, u32 layerCount) const;
     void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout,
-                               u32 layerCount, u32 mipLevels);
+                               u32 layerCount, u32 mipLevels) const;
     VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags,
-                                VkImageViewType viewType, u32 layerCount, u32 mipLevels);
-    VkSampler CreateTextureSampler(VkFilter minFilter, VkFilter magFilter, VkSamplerAddressMode addressMode);
+                                VkImageViewType viewType, u32 layerCount, u32 mipLevels) const;
+    VkSampler CreateTextureSampler(VkFilter minFilter, VkFilter magFilter, VkSamplerAddressMode addressMode) const;
 
 private:
     // Helper to find suitable memory type
-    Expect<u32, std::string> GetMemoryTypeIndex(u32 memory_type_bits, VkMemoryPropertyFlags required_properties);
+    Expect<u32, std::string> GetMemoryTypeIndex(u32 memory_type_bits, VkMemoryPropertyFlags required_properties) const;
 
     // Command buffer management for staging
-    void BeginCommandBuffer(VkCommandBuffer command_buffer, VkCommandBufferUsageFlags usage);
-    void SubmitCopyCommand(VkCommandBuffer command_buffer);
+    void BeginCommandBuffer(VkCommandBuffer command_buffer, VkCommandBufferUsageFlags usage) const;
+    void SubmitCopyCommand(VkCommandBuffer command_buffer) const;
 
-    Buffer CreateAndUploadStagingBuffer(const void *data, VkDeviceSize size);
+    Buffer CreateAndUploadStagingBuffer(const void *data, VkDeviceSize size) const;
 
 private:
     Device *p_device;

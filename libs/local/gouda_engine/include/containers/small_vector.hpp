@@ -15,6 +15,7 @@
 #include <iterator>
 #include <memory>
 #include <new> // For std::launder
+#include "debug/assert.hpp"
 
 namespace gouda {
 
@@ -269,6 +270,19 @@ public:
     }
 
     /**
+    * @brief Removes the last element from the vector.
+    * @pre The vector must not be empty.
+    */
+    void pop_back()
+    {
+        if (m_size > 0) {
+            // Call the destructor for the last element
+            m_data[m_size - 1].~T();
+            --m_size;
+        }
+    }
+
+    /**
      * @brief Ensures that the vector has at least the specified capacity.
      * @param new_cap New minimum capacity.
      */
@@ -314,6 +328,27 @@ public:
             reserve(new_size);
             for (size_t i = m_size; i < new_size; ++i) {
                 new (m_data + i) T();
+            }
+        }
+        m_size = new_size;
+    }
+
+    /**
+     * @brief Resizes the vector to the specified size and fills new elements with a given value.
+     * @param new_size New size of the vector.
+     * @param value The value to initialize new elements with.
+     */
+    void resize(size_t new_size, const T &value)
+    {
+        if (new_size < m_size) {
+            for (size_t i = new_size; i < m_size; ++i) {
+                m_data[i].~T();
+            }
+        }
+        else if (new_size > m_size) {
+            reserve(new_size);
+            for (size_t i = m_size; i < new_size; ++i) {
+                new (m_data + i) T(value);
             }
         }
         m_size = new_size;
@@ -385,19 +420,19 @@ public:
      * @brief Returns current number of elements.
      * @return Current size of the vector.
      */
-    constexpr size_t size() const noexcept { return m_size; }
+    [[nodiscard]] constexpr size_t size() const noexcept { return m_size; }
 
     /**
      * @brief Returns current capacity.
      * @return Current capacity of the vector.
      */
-    constexpr size_t capacity() const noexcept { return m_capacity; }
+    [[nodiscard]] constexpr size_t capacity() const noexcept { return m_capacity; }
 
     /**
      * @brief Checks whether the vector is empty.
      * @return True if empty, false otherwise.
      */
-    bool empty() const noexcept { return m_size == 0; }
+    [[nodiscard]] bool empty() const noexcept { return m_size == 0; }
 
     /**
      * @brief Destroys all elements and resets size to zero.
@@ -409,6 +444,63 @@ public:
         }
         m_size = 0;
     }
+
+    /**
+    * @brief Accesses the first element.
+    * @return Reference to the first element.
+    * @pre The vector must not be empty.
+    * @note constexpr if T is trivially copyable.
+    * @note This function is noexcept.
+    */
+    constexpr T &front() noexcept
+        requires std::is_trivially_copyable_v<T>
+    {
+        ASSERT(m_size > 0, "front on empty SmallVector");
+        return *std::launder(m_data);
+    }
+
+    /**
+     * @brief Accesses the first element (const).
+     * @return Const reference to the first element.
+     * @pre The vector must not be empty.
+     * @note constexpr if T is trivially copyable.
+     * @note This function is noexcept.
+     */
+    constexpr const T &front() const noexcept
+        requires std::is_trivially_copyable_v<T>
+    {
+        ASSERT(m_size > 0, "front on empty SmallVector");
+        return *std::launder(m_data);
+    }
+
+    /**
+     * @brief Accesses the last element.
+     * @return Reference to the last element.
+     * @pre The vector must not be empty.
+     * @note constexpr if T is trivially copyable.
+     * @note This function is noexcept.
+     */
+    constexpr T &back() noexcept
+        requires std::is_trivially_copyable_v<T>
+    {
+        ASSERT(m_size > 0, "back on empty SmallVector");
+        return *std::launder(m_data + m_size - 1);
+    }
+
+    /**
+     * @brief Accesses the last element (const).
+     * @return Const reference to the last element.
+     * @pre The vector must not be empty.
+     * @note constexpr if T is trivially copyable.
+     * @note This function is noexcept.
+     */
+    constexpr const T &back() const noexcept
+        requires std::is_trivially_copyable_v<T>
+    {
+        ASSERT(m_size > 0, "back on empty SmallVector");
+        return *std::launder(m_data + m_size - 1);
+    }
+
 
     /**
      * @brief Provides direct access to the underlying data array.
@@ -506,9 +598,9 @@ public:
     iterator insert(const_iterator pos, InputIt first, InputIt last)
     {
         size_t index = pos - begin();
-        size_t count = std::distance(first, last);
+        const size_t count = std::distance(first, last);
         if (m_size + count > m_capacity) {
-            size_t new_capacity = GrowthPolicy::next(std::max(m_capacity, m_size + count));
+            const size_t new_capacity = GrowthPolicy::next(std::max(m_capacity, m_size + count));
             reserve(new_capacity);
         }
         for (size_t i = m_size + count - 1; i >= index + count; --i) {
@@ -523,13 +615,61 @@ public:
         return m_data + index;
     }
 
+    /**
+ * @brief Erases the element at the given position.
+ * @param pos Iterator to the element to remove.
+ * @return Iterator following the removed element.
+ */
+    iterator erase(const_iterator pos)
+    {
+        size_t index = pos - begin();
+        m_data[index].~T(); // Destroy the element
+
+        // Move elements to fill the gap
+        for (size_t i = index; i < m_size - 1; ++i) {
+            new (m_data + i) T(std::move(m_data[i + 1]));
+            m_data[i + 1].~T();
+        }
+
+        --m_size;
+        return m_data + index;
+    }
+
+    /**
+ * @brief Erases elements in the range [first, last).
+ * @param first Iterator to the first element to remove.
+ * @param last Iterator to one past the last element to remove.
+ * @return Iterator following the last removed element.
+ */
+    iterator erase(const_iterator first, const_iterator last)
+    {
+        size_t start = first - begin();
+        const size_t end = last - begin();
+        size_t count = end - start;
+
+        // Destroy the range
+        for (size_t i = start; i < end; ++i) {
+            m_data[i].~T();
+        }
+
+        // Move elements to fill the gap
+        for (size_t i = end; i < m_size; ++i) {
+            new (m_data + i - count) T(std::move(m_data[i]));
+            m_data[i].~T();
+        }
+
+        m_size -= count;
+        return m_data + start;
+    }
+
+
 private:
     /**
      * @brief Grows the capacity using the selected GrowthPolicy.
      */
     void grow()
     {
-        size_t new_capacity = GrowthPolicy::next(m_capacity);
+        const size_t new_capacity = GrowthPolicy::next(m_capacity);
         reserve(new_capacity);
     }
 

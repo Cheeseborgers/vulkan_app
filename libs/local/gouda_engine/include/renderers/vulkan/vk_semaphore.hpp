@@ -25,7 +25,7 @@ public:
     bool Create();
     void Destroy();
 
-    VkSemaphore Get() const noexcept { return p_semaphore; };
+    [[nodiscard]] VkSemaphore Get() const noexcept { return p_semaphore; }
 
 private:
     VkSemaphore p_semaphore;

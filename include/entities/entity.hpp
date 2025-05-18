@@ -23,7 +23,6 @@
 #include <optional>
 
 #include "math/math.hpp"
-#include "renderers/vulkan/vk_renderer.hpp"
 
 #include "components/animation_component.hpp"
 
@@ -36,7 +35,7 @@ enum class EntityType : u8 {
 };
 
 struct Entity {
-    Entity(const gouda::InstanceData &instance_data, EntityType type_ = EntityType::Quad)
+    explicit Entity(const gouda::InstanceData &instance_data, const EntityType type_ = EntityType::Quad)
         : type{type_}, render_data{instance_data}
     {
     }

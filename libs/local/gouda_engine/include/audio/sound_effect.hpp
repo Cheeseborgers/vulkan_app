@@ -2,8 +2,7 @@
 
 #include "audio_common.hpp"
 
-namespace gouda {
-namespace audio {
+namespace gouda::audio {
 
 /**
  * @class SoundEffect
@@ -68,11 +67,10 @@ public:
      *
      * @return The OpenAL buffer identifier.
      */
-    ALuint GetBuffer() const { return m_buffer; }
+    [[nodiscard]] ALuint GetBuffer() const { return m_buffer; }
 
 private:
     ALuint m_buffer; ///< OpenAL buffer that stores the sound effect data.
 };
 
-} // namespace audio end
-} // namespace gouda end
+}

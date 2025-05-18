@@ -5,19 +5,17 @@
 #include "core/types.hpp"
 
 namespace gouda {
-namespace internal {
-namespace constants {
+namespace internal::constants {
 
-static constexpr const char *X11 = "X11";
-static constexpr const char *Wayland = "Wayland";
-static constexpr const char *Windows = "Windows";
-static constexpr const char *MacOS = "MacOS";
-static constexpr const char *Headless = "Headless";
-static constexpr const char *SystemDefault = "System default";
-static constexpr const char *Unknown = "Unknown";
+static constexpr auto X11 = "X11";
+static constexpr auto Wayland = "Wayland";
+static constexpr auto Windows = "Windows";
+static constexpr auto MacOS = "MacOS";
+static constexpr auto Headless = "Headless";
+static constexpr auto SystemDefault = "System default";
+static constexpr auto Unknown = "Unknown";
 
-} // namespace constants end
-} // namespace internal end
+}
 
 enum class Platform : u8 { X11, Wayland, Windows, Headless, SystemDefault };
 enum class Renderer : u8 { Vulkan, OpenGL };
@@ -33,8 +31,7 @@ struct WindowConfig {
     Platform platform;
 
     WindowConfig()
-        : title{""},
-          resizable{true},
+        : resizable{true},
           fullscreen{false},
           vsync{false},
           refresh_rate{60},

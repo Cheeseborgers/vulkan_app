@@ -1,5 +1,5 @@
 /**
- * @file renderers/vulkan/vk_device.cpp
+ * @file vk_device.cpp
  * @author GoudaCheeseburgers
  * @date 2025-04-24
  * @brief Engine Vulkan device implementation
@@ -13,7 +13,7 @@
 
 template <>
 struct std::formatter<VkFormat> : std::formatter<std::string> {
-    auto format(VkFormat format, std::format_context &ctx) const
+    static auto format(const VkFormat format, std::format_context &ctx)
     {
         return std::format_to(ctx.out(), "{:#x}", static_cast<u32>(format));
     }
@@ -21,7 +21,7 @@ struct std::formatter<VkFormat> : std::formatter<std::string> {
 
 template <>
 struct std::formatter<VkColorSpaceKHR> : std::formatter<std::string> {
-    auto format(VkColorSpaceKHR colorspace, std::format_context &ctx) const
+    static auto format(const VkColorSpaceKHR colorspace, std::format_context &ctx)
     {
         return std::format_to(ctx.out(), "{:#x}", static_cast<u32>(colorspace));
     }
@@ -30,17 +30,18 @@ struct std::formatter<VkColorSpaceKHR> : std::formatter<std::string> {
 namespace gouda::vk {
 
 namespace internal {
-static VkFormat FindDepthFormat(VkPhysicalDevice device_ptr)
+static VkFormat find_depth_format(VkPhysicalDevice device_ptr)
 {
-    std::vector<VkFormat> candidates{VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
-    VkFormat depth_format{FindSupportedFormat(device_ptr, candidates, VK_IMAGE_TILING_OPTIMAL,
+    const Vector<VkFormat> candidates{VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
+                                           VK_FORMAT_D24_UNORM_S8_UINT};
+    const VkFormat depth_format{find_supported_format(device_ptr, candidates, VK_IMAGE_TILING_OPTIMAL,
                                               VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)};
 
     return depth_format;
 }
 
 // Vulkan Format to String Map
-std::string VkFormatToString(VkFormat format)
+std::string vk_format_to_string(const VkFormat format)
 {
     static const std::unordered_map<VkFormat, std::string> format_map = {
         {VK_FORMAT_UNDEFINED, "VK_FORMAT_UNDEFINED"},
@@ -56,7 +57,7 @@ std::string VkFormatToString(VkFormat format)
         // Add more as needed
     };
 
-    if (auto it = format_map.find(format); it != format_map.end()) {
+    if (const auto it = format_map.find(format); it != format_map.end()) {
         return it->second;
     }
     return "Unknown VkFormat (" + std::to_string(static_cast<u32>(format)) + ")";
@@ -77,7 +78,7 @@ std::string VkColorSpaceToString(VkColorSpaceKHR color_space)
         {VK_COLOR_SPACE_ADOBERGB_NONLINEAR_EXT, "VK_COLOR_SPACE_ADOBERGB_NONLINEAR_EXT"},
     };
 
-    if (auto it = color_space_map.find(color_space); it != color_space_map.end()) {
+    if (const auto it = color_space_map.find(color_space); it != color_space_map.end()) {
         return it->second;
     }
     return "Unknown VkColorSpace (" + std::to_string(static_cast<u32>(color_space)) + ")";
@@ -158,7 +159,7 @@ void VulkanPhysicalDevices::Initialize(const Instance &instance, const VkSurface
     }
 
     m_devices.resize(number_of_devices);
-    std::vector<VkPhysicalDevice> devices(number_of_devices);
+    Vector<VkPhysicalDevice> devices(number_of_devices);
     result = vkEnumeratePhysicalDevices(instance.GetInstance(), &number_of_devices, devices.data());
     if (result != VK_SUCCESS) {
         CHECK_VK_RESULT(result, "vkEnumeratePhysicalDevices error (2)");
@@ -171,7 +172,7 @@ void VulkanPhysicalDevices::Initialize(const Instance &instance, const VkSurface
         vkGetPhysicalDeviceProperties(physical_device, &device_info.m_device_properties);
         ENGINE_LOG_DEBUG("Device name: {}", device_info.m_device_properties.deviceName);
 
-        u32 api_version{device_info.m_device_properties.apiVersion};
+        const u32 api_version{device_info.m_device_properties.apiVersion};
         ENGINE_LOG_DEBUG("API version: {}.{}.{}.{}", VK_API_VERSION_VARIANT(api_version),
                          VK_API_VERSION_MAJOR(api_version), VK_API_VERSION_MINOR(api_version),
                          VK_API_VERSION_PATCH(api_version));
@@ -216,7 +217,7 @@ void VulkanPhysicalDevices::Initialize(const Instance &instance, const VkSurface
         }
 
         for (const auto &surface_format : device_info.m_surface_formats) {
-            ENGINE_LOG_DEBUG("Format: {}, Color Space: {}", internal::VkFormatToString(surface_format.format),
+            ENGINE_LOG_DEBUG("Format: {}, Color Space: {}", internal::vk_format_to_string(surface_format.format),
                              internal::VkColorSpaceToString(surface_format.colorSpace));
         }
 
@@ -232,13 +233,18 @@ void VulkanPhysicalDevices::Initialize(const Instance &instance, const VkSurface
         // Present Modes -------------------------------------------------------------------------------------------
         u32 present_mode_count{0};
         result = vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, nullptr);
-        CHECK_VK_RESULT(result, "vkGetPhysicalDeviceSurfacePresentModesKHR (1)");
+        if (result != VK_SUCCESS) {
+            CHECK_VK_RESULT(result, "vkGetPhysicalDeviceSurfacePresentModesKHR (1)");
+        }
+
         ASSERT(present_mode_count != 0, "Number of device present modes cannot be zero");
 
         device_info.m_present_modes.resize(present_mode_count);
         result = vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count,
                                                            device_info.m_present_modes.data());
-        CHECK_VK_RESULT(result, "vkGetPhysicalDeviceSurfacePresentModesKHR (2)");
+        if (result != VK_SUCCESS) {
+            CHECK_VK_RESULT(result, "vkGetPhysicalDeviceSurfacePresentModesKHR (2)");
+        }
 
         ENGINE_LOG_DEBUG("Presentation modes count: {}", present_mode_count);
 
@@ -261,7 +267,7 @@ void VulkanPhysicalDevices::Initialize(const Instance &instance, const VkSurface
         vkGetPhysicalDeviceFeatures(device_info.m_physical_device, &device_info.m_features);
 
         // Depth format ------------------------------------------------------------------------------------------
-        device_info.m_depth_format = internal::FindDepthFormat(physical_device);
+        device_info.m_depth_format = internal::find_depth_format(physical_device);
     }
 }
 
@@ -270,10 +276,10 @@ u32 VulkanPhysicalDevices::SelectDevice(VkQueueFlags required_queue_type, bool s
     for (u32 i = 0; i < m_devices.size(); i++) {
 
         for (u32 j = 0; j < m_devices[i].m_queue_family_properties.size(); j++) {
-            const VkQueueFamilyProperties &queue_family_properties = m_devices[i].m_queue_family_properties[j];
 
-            if ((queue_family_properties.queueFlags & required_queue_type) &&
-                (static_cast<bool>(m_devices[i].m_queue_supports_present[j]) == supports_present)) {
+            if (const VkQueueFamilyProperties &queue_family_properties = m_devices[i].m_queue_family_properties[j];
+                queue_family_properties.queueFlags & required_queue_type &&
+                static_cast<bool>(m_devices[i].m_queue_supports_present[j]) == supports_present) {
 
                 m_dev_index = static_cast<int>(i);
                 u32 queue_family{j};
@@ -303,7 +309,7 @@ const PhysicalDevice &VulkanPhysicalDevices::Selected() const
 
 // Device implementation ------------------------------------------------------------------------------
 Device::Device(const Instance &instance, VkQueueFlags requiredQueueFlags)
-    : p_device{VK_NULL_HANDLE}, m_physical_devices{}, m_queue_family{0}
+    : p_device{VK_NULL_HANDLE}, m_queue_family{0}
 {
     m_physical_devices.Initialize(instance, instance.GetSurface());
     m_queue_family = m_physical_devices.SelectDevice(requiredQueueFlags, true);
@@ -333,7 +339,7 @@ Device::~Device()
 
 void Device::CreateDevice(VkQueueFlags requiredQueueFlags)
 {
-    f32 queue_priorities[]{1.0f};
+    const f32 queue_priorities[]{1.0f};
     VkDeviceQueueCreateInfo device_queue_create_info{};
     device_queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     device_queue_create_info.queueFamilyIndex = m_queue_family;

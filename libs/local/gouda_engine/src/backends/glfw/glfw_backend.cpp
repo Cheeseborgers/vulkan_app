@@ -10,6 +10,8 @@
 #include "imgui_impl_glfw.h"   // GLFW backend (if using GLFW for windowing)
 #include "imgui_impl_vulkan.h" // Vulkan backend for ImGui
 
+#include "backends/event_types.hpp"
+
 namespace gouda {
 namespace glfw {
 
@@ -105,7 +107,7 @@ void GLFWBackend::RegisterCallbacks(GLFWwindow *window)
 
 void GLFWBackend::PollEvents() { glfwPollEvents(); }
 
-Key glfw::GLFWBackend::ConvertKey(int glfw_key)
+Key GLFWBackend::ConvertKey(int glfw_key)
 {
     static const std::unordered_map<int, Key> glfwToKeyMap = {{GLFW_KEY_SPACE, Key::Space},
                                                               {GLFW_KEY_A, Key::A},

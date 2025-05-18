@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "backends/input_backend.hpp"
+#include "backends/event_types.hpp"
 #include "core/types.hpp"
 
 struct GLFWwindow;

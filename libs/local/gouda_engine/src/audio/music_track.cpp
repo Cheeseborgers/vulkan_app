@@ -1,6 +1,6 @@
 #include "audio/music_track.hpp"
 
-#include <stdexcept>
+#include <alext.h>
 
 #include "debug/logger.hpp"
 
@@ -112,7 +112,7 @@ size_t MusicTrack::ReadFrames(float *buffer, size_t frames)
         return 0;
     }
 
-    sf_count_t read{sf_readf_float(p_sndfile, buffer, frames)};
+    const sf_count_t read{sf_readf_float(p_sndfile, buffer, frames)};
     if (read < static_cast<sf_count_t>(frames)) {
         m_finished = true;
         ENGINE_LOG_DEBUG("Reached end of music track");

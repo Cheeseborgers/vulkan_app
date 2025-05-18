@@ -15,7 +15,7 @@
 namespace gouda::vk {
 
 DepthResources::DepthResources(Device *device, Instance *instance, BufferManager *buffer_manager, Swapchain *swapchain)
-    : p_device{device}, p_instance{instance}, p_buffer_manager{buffer_manager}, p_swapchain{swapchain}
+    : p_swapchain{swapchain}, p_device{device}, p_instance{instance}, p_buffer_manager{buffer_manager}
 {
     Create();
 }
@@ -29,9 +29,9 @@ void DepthResources::Create()
     ASSERT(p_buffer_manager, "Buffer manager cannot be a null pointer.");
     ASSERT(p_swapchain, "Swapchain cannot be a null pointer.");
 
-    int swapchain_image_count{static_cast<int>(p_swapchain->GetImages().size())};
+    const int swapchain_image_count{static_cast<int>(p_swapchain->GetImages().size())};
 
-    VkFormat depth_format{p_device->GetSelectedPhysicalDevice().m_depth_format};
+    const VkFormat depth_format{p_device->GetSelectedPhysicalDevice().m_depth_format};
     ASSERT(depth_format != VK_FORMAT_UNDEFINED, "Depth format is not set properly!");
 
     ImageSize image_size{p_swapchain->GetFramebufferSize()};

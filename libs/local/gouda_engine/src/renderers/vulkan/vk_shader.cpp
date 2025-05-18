@@ -49,7 +49,7 @@ struct GlslProgramDeleter {
     void operator()(glslang_program_t *program) const { glslang_program_delete(program); }
 };
 
-[[nodiscard]] constexpr std::string_view vk_format_to_string_view(VkFormat format)
+[[nodiscard]] constexpr StringView vk_format_to_string_view(const VkFormat format)
 {
     switch (format) {
         // Float formats
@@ -99,7 +99,7 @@ struct GlslProgramDeleter {
     }
 }
 
-[[nodiscard]] constexpr glslang_stage_t glslang_shader_stage_from_filename(std::string_view file_name) noexcept
+[[nodiscard]] constexpr glslang_stage_t glslang_shader_stage_from_filename(StringView file_name) noexcept
 {
     if consteval {
         // Compile-time checks for known extensions
@@ -115,7 +115,7 @@ struct GlslProgramDeleter {
             return GLSLANG_STAGE_TESSCONTROL;
         if (file_name.ends_with(".tese"))
             return GLSLANG_STAGE_TESSEVALUATION;
-        throw "Unknown shader stage";
+        ENGINE_THROW("Unknown shader stage");
     }
     else {
         // Runtime fallback
@@ -136,7 +136,7 @@ struct GlslProgramDeleter {
     }
 }
 
-[[nodiscard]] VkShaderStageFlagBits vk_shader_stage_from_filename(std::string_view file_name) noexcept
+[[nodiscard]] VkShaderStageFlagBits vk_shader_stage_from_filename(StringView file_name) noexcept
 {
     if (file_name.ends_with(".vert") || file_name.ends_with(".vert.spv"))
         return VK_SHADER_STAGE_VERTEX_BIT;
@@ -154,7 +154,7 @@ struct GlslProgramDeleter {
     return VK_SHADER_STAGE_ALL;
 }
 
-constexpr ShaderFormat infer_shader_format_from_extension(std::string_view file_name) noexcept
+constexpr ShaderFormat infer_shader_format_from_extension(StringView file_name) noexcept
 {
     if (file_name.ends_with(".spv"))
         return ShaderFormat::Binary;
@@ -320,16 +320,16 @@ ShaderReflection reflect_shader(const std::vector<u32> &spirv, VkShaderStageFlag
 
         // Specialization Constants
         std::unordered_set<u32> seen_constant_ids;
-        for (const auto &spec : compiler.get_specialization_constants()) {
-            if (!seen_constant_ids.insert(spec.constant_id).second) {
-                ENGINE_LOG_ERROR("Duplicate specialization constant_id {} in stage {}", spec.constant_id,
+        for (const auto &[id, constant_id] : compiler.get_specialization_constants()) {
+            if (!seen_constant_ids.insert(constant_id).second) {
+                ENGINE_LOG_ERROR("Duplicate specialization constant_id {} in stage {}", constant_id,
                                  vk_shader_stage_as_string_view(stage));
             }
 
             ShaderSpecializationConstant constant{};
-            constant.constant_id = spec.constant_id;
-            constant.name = compiler.get_name(spec.id);
-            spirv_cross::SPIRConstant constant_value = compiler.get_constant(spec.id);
+            constant.constant_id = constant_id;
+            constant.name = compiler.get_name(id);
+            const spirv_cross::SPIRConstant& constant_value = compiler.get_constant(id);
             const auto &type = compiler.get_type(constant_value.constant_type); // Use constant_type
             constant.type = type.basetype == spirv_cross::SPIRType::Int     ? VkConstantType::VK_CONSTANT_TYPE_INT
                             : type.basetype == spirv_cross::SPIRType::Float ? VkConstantType::VK_CONSTANT_TYPE_FLOAT
@@ -376,8 +376,8 @@ ShaderReflection reflect_shader(const std::vector<u32> &spirv, VkShaderStageFlag
     return reflection;
 }
 
-size_t compile_shader(VkDevice device, glslang_stage_t stage, std::string_view shader_code,
-                      internal::ShaderModule &shader_module) noexcept
+size_t compile_shader(const VkDevice device, const glslang_stage_t stage, StringView shader_code,
+                      ShaderModule &shader_module) noexcept
 {
     ENGINE_PROFILE_SCOPE("Compile Shader");
 
@@ -394,7 +394,7 @@ size_t compile_shader(VkDevice device, glslang_stage_t stage, std::string_view s
     input.messages = GLSLANG_MSG_DEFAULT_BIT;
     input.resource = glslang_default_resource();
 
-    std::unique_ptr<glslang_shader_t, internal::GlslShaderDeleter> shader{glslang_shader_create(&input)};
+    const std::unique_ptr<glslang_shader_t, GlslShaderDeleter> shader{glslang_shader_create(&input)};
     if (!glslang_shader_preprocess(shader.get(), &input)) {
         ENGINE_LOG_ERROR("GLSL Preprocessing failed: info log: {}, debug log: {}",
                          glslang_shader_get_info_log(shader.get()), glslang_shader_get_info_debug_log(shader.get()));
@@ -409,7 +409,7 @@ size_t compile_shader(VkDevice device, glslang_stage_t stage, std::string_view s
         return 0;
     }
 
-    std::unique_ptr<glslang_program_t, internal::GlslProgramDeleter> program{glslang_program_create()};
+    const std::unique_ptr<glslang_program_t, GlslProgramDeleter> program{glslang_program_create()};
     glslang_program_add_shader(program.get(), shader.get());
 
     if (!glslang_program_link(program.get(), GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT)) {
@@ -486,7 +486,7 @@ size_t compile_shader(VkDevice device, glslang_stage_t stage, std::string_view s
 Shader::Shader(Device &device, std::string_view file_name, ShaderFormat format)
     : m_device(device), m_format(format), m_stage(internal::vk_shader_stage_from_filename(file_name))
 {
-    auto result = (format == ShaderFormat::Binary) ? CreateShaderModuleFromBinary(file_name)
+    auto result = format == ShaderFormat::Binary ? CreateShaderModuleFromBinary(file_name)
                                                    : CreateShaderModuleFromText(file_name);
     if (!result) {
         ENGINE_LOG_ERROR("Failed to create shader module for '{}': {}", file_name,
@@ -535,7 +535,7 @@ Expect<VkShaderModule, ShaderError> Shader::CreateShaderModuleFromBinary(std::st
                                                                               : ShaderError::FileReadError);
     }
 
-    std::span<const std::byte> shader_code{*file_result};
+    const std::span<const std::byte> shader_code{*file_result};
     if (shader_code.empty()) {
         ENGINE_LOG_ERROR("Shader code is empty: {}", file_name);
         return std::unexpected(ShaderError::FileReadError);
@@ -547,7 +547,7 @@ Expect<VkShaderModule, ShaderError> Shader::CreateShaderModuleFromBinary(std::st
         return std::unexpected(ShaderError::FileReadError);
     }
 
-    std::vector<u32> spirv(reinterpret_cast<const u32 *>(shader_code.data()),
+    const std::vector<u32> spirv(reinterpret_cast<const u32 *>(shader_code.data()),
                            reinterpret_cast<const u32 *>(shader_code.data() + shader_code.size()));
 
     VkShaderModuleCreateInfo shader_create_info{};
@@ -556,7 +556,7 @@ Expect<VkShaderModule, ShaderError> Shader::CreateShaderModuleFromBinary(std::st
     shader_create_info.pCode = reinterpret_cast<const u32 *>(shader_code.data());
 
     VkShaderModule shader_module{VK_NULL_HANDLE};
-    VkResult result{vkCreateShaderModule(m_device.GetDevice(), &shader_create_info, nullptr, &shader_module)};
+    const VkResult result{vkCreateShaderModule(m_device.GetDevice(), &shader_create_info, nullptr, &shader_module)};
     if (result != VK_SUCCESS) {
         ENGINE_LOG_ERROR("Failed to create shader module from '{}': {}", file_name, vk_result_to_string(result));
         return std::unexpected(ShaderError::VulkanError);
@@ -584,8 +584,8 @@ Expect<VkShaderModule, ShaderError> Shader::CreateShaderModuleFromText(std::stri
 
     glslang_initialize_process();
     internal::ShaderModule shader;
-    glslang_stage_t shader_stage{internal::glslang_shader_stage_from_filename(file_name)};
-    size_t shader_size{internal::compile_shader(m_device.GetDevice(), shader_stage, *file_result, shader)};
+    const glslang_stage_t shader_stage{internal::glslang_shader_stage_from_filename(file_name)};
+    const size_t shader_size{internal::compile_shader(m_device.GetDevice(), shader_stage, *file_result, shader)};
 
     if (shader_size == 0) {
         glslang_finalize_process();

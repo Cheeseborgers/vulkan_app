@@ -48,13 +48,16 @@ public:
     [[nodiscard]] const std::vector<VkImage> &GetImages() const { return m_images; }
     [[nodiscard]] size_t GetImageCount() const { return m_images.size(); }
     [[nodiscard]] const std::vector<VkImageView> &GetImageViews() const { return m_image_views; }
-    [[nodiscard]] VkExtent2D GetExtent() { return m_extent; }
-    [[nodiscard]] FrameBufferSize GetFramebufferSize() { return FrameBufferSize(m_extent.width, m_extent.height); }
-    [[nodiscard]] VkSurfaceFormatKHR GetSurfaceFormat() { return m_surface_format; }
+    [[nodiscard]] VkExtent2D GetExtent() const { return m_extent; }
+    [[nodiscard]] FrameBufferSize GetFramebufferSize() const
+    {
+        return FrameBufferSize(static_cast<int>(m_extent.width), static_cast<int>(m_extent.height));
+    }
+    [[nodiscard]] VkSurfaceFormatKHR GetSurfaceFormat() const { return m_surface_format; }
 
     void SetInvalid() noexcept { m_is_valid.store(false, std::memory_order_release); }
     void SetValid() noexcept { m_is_valid.store(true, std::memory_order_release); }
-    bool IsValid() const noexcept { return m_is_valid.load(std::memory_order_acquire); }
+    [[nodiscard]] bool IsValid() const noexcept { return m_is_valid.load(std::memory_order_acquire); }
 
 private:
     void UpdateExtent();

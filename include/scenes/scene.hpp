@@ -29,7 +29,7 @@ struct GridPos {
 
 class Scene {
 public:
-    Scene(gouda::OrthographicCamera *camera_ptr);
+    explicit Scene(gouda::OrthographicCamera *camera_ptr);
     ~Scene() = default;
 
     void Update(f32 delta_time);
@@ -37,8 +37,8 @@ public:
 
     void DrawUI(gouda::vk::Renderer &renderer);
 
-    void LoadFromJSON(std::string_view filepath);
-    void SaveToJSON(std::string_view filepath);
+    void LoadFromJSON(StringView filepath);
+    void SaveToJSON(StringView filepath);
 
     // Particle methods
     void SpawnParticle(const gouda::Vec3 &position, const gouda::Vec2 &size, const gouda::Vec3 &velocity, f32 lifetime,
@@ -46,7 +46,7 @@ public:
 
     Player &GetPlayer() { return m_player; }
 
-    void SetFontID(u32 id) { m_font_id = id; }
+    void SetFontID(const u32 id) { m_font_id = id; }
 
 private:
     void SetupEntities();
@@ -59,7 +59,7 @@ private:
     gouda::OrthographicCamera *p_camera;
 
     Player m_player;
-    std::vector<Entity> m_entities;
+    gouda::Vector<Entity> m_entities;
 
     std::vector<gouda::InstanceData> m_visible_quad_instances;
     std::vector<gouda::TextData> m_text_instances;
@@ -68,5 +68,5 @@ private:
 
     u32 m_font_id;
 
-    std::unordered_map<GridPos, std::vector<size_t>, GridPos::Hash> m_spatial_grid;
+    std::unordered_map<GridPos, gouda::Vector<size_t>, GridPos::Hash> m_spatial_grid;
 };

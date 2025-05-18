@@ -10,9 +10,8 @@
  * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
  * See <https://www.gnu.org/licenses/> for more information.
  */
-#include <vector>
-
 #include "renderers/vulkan/vk_texture.hpp"
+#include "containers/small_vector.hpp"
 
 namespace gouda::vk {
 
@@ -30,7 +29,7 @@ public:
     void Recreate();
     void Destroy();
 
-    [[nodiscard]] const std::vector<Texture> &GetDepthImages() const { return m_depth_images; }
+    [[nodiscard]] const Vector<Texture> &GetDepthImages() const { return m_depth_images; }
 
 private:
     Swapchain *p_swapchain;
@@ -38,7 +37,7 @@ private:
     Instance *p_instance;
     BufferManager *p_buffer_manager;
 
-    std::vector<Texture> m_depth_images;
+    Vector<Texture> m_depth_images;
 };
 
-} // namespace gouda
+} // namespace gouda::vk

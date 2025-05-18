@@ -1,5 +1,5 @@
 /**
- * @file gouda_vk_buffer_manager.cpp
+ * @file vk_buffer_manager.cpp
  * @author GoudaCheeseburgers
  * @date 2025-03-15
  * @brief Engine vulkan buffer manager implementation
@@ -12,6 +12,7 @@
 #include "renderers/vulkan/vk_fence.hpp"
 #include "renderers/vulkan/vk_queue.hpp"
 #include "renderers/vulkan/vk_texture.hpp"
+#include "renderers/vulkan/vk_utils.hpp"
 #include "utils/defer.hpp"
 #include "utils/image.hpp"
 
@@ -46,8 +47,7 @@ BufferManager::BufferManager(Device *device, Queue *queue)
     }
 
     p_copy_fence = std::make_unique<Fence>(p_device);
-    VkFenceCreateFlags fence_flags{VK_FENCE_CREATE_SIGNALED_BIT};
-    if (!p_copy_fence->Create(fence_flags)) {
+    if (constexpr VkFenceCreateFlags fence_flags{VK_FENCE_CREATE_SIGNALED_BIT}; !p_copy_fence->Create(fence_flags)) {
         ENGINE_THROW("Failed to create copy fence.");
     }
 }
@@ -70,15 +70,17 @@ BufferManager::~BufferManager()
     }
 }
 
-Buffer BufferManager::CreateAndUploadStagingBuffer(const void *data, VkDeviceSize size)
+Buffer BufferManager::CreateAndUploadStagingBuffer(const void *data, const VkDeviceSize size) const
 {
-    Buffer staging_buffer{CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
+    const Buffer staging_buffer{
+        CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)};
     staging_buffer.Update(p_device->GetDevice(), data, size);
     return staging_buffer;
 }
 
-Buffer BufferManager::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties)
+Buffer BufferManager::CreateBuffer(const VkDeviceSize size, const VkBufferUsageFlags usage,
+                                   const VkMemoryPropertyFlags properties) const
 {
     VkBufferCreateInfo buffer_info{};
     buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -115,25 +117,25 @@ Buffer BufferManager::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
     return buffer;
 }
 
-Buffer BufferManager::CreateVertexBuffer(const void *vertices_ptr, VkDeviceSize size)
+Buffer BufferManager::CreateVertexBuffer(const void *data, const VkDeviceSize size) const
 {
     // Create a staging buffer and defer its destruction
-    Buffer staging_buffer{CreateAndUploadStagingBuffer(vertices_ptr, size)};
+    Buffer staging_buffer{CreateAndUploadStagingBuffer(data, size)};
     DEFER { staging_buffer.Destroy(p_device->GetDevice()); });
 
-    Buffer vertex_buffer{CreateBuffer(
+    const Buffer vertex_buffer{CreateBuffer(
         size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)};
 
     CopyBufferToBuffer(vertex_buffer.p_buffer, staging_buffer.p_buffer, size, p_copy_command_buffer);
 
     // Wait for the copy to complete
-    p_copy_fence->WaitFor(Constants::u64_max);
+    p_copy_fence->WaitFor(constants::u64_max);
 
     return vertex_buffer;
 }
 
-Buffer BufferManager::CreateDynamicVertexBuffer(VkDeviceSize size)
+Buffer BufferManager::CreateDynamicVertexBuffer(const VkDeviceSize size)
 {
     return CreateBuffer(size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -145,32 +147,33 @@ Buffer BufferManager::CreateUniformBuffer(size_t size)
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 }
 
-Buffer BufferManager::CreateIndexBuffer(const void *data, VkDeviceSize size)
+Buffer BufferManager::CreateIndexBuffer(const void *data, const VkDeviceSize size) const
 {
     // Create a staging buffer and defer its destruction
     Buffer staging_buffer{CreateAndUploadStagingBuffer(data, size)};
     DEFER { staging_buffer.Destroy(p_device->GetDevice()); });
 
-    Buffer index_buffer{CreateBuffer(size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)};
+    const Buffer index_buffer{CreateBuffer(size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)};
 
     CopyBufferToBuffer(index_buffer.p_buffer, staging_buffer.p_buffer, size, p_copy_command_buffer);
 
     // Wait for the copy to complete
-    p_copy_fence->WaitFor(Constants::u64_max);
+    p_copy_fence->WaitFor(constants::u64_max);
 
     return index_buffer;
 }
 
-Buffer BufferManager::CreateStorageBuffer(VkDeviceSize size)
+Buffer BufferManager::CreateStorageBuffer(const VkDeviceSize size) const
 {
-    VkBufferUsageFlags usage{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT};
-    VkMemoryPropertyFlags properties{VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
+    constexpr VkBufferUsageFlags usage{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT};
+    constexpr VkMemoryPropertyFlags properties{VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
     return CreateBuffer(size, usage, properties);
 }
 
-void BufferManager::CreateImage(Texture &texture, VkImageCreateInfo &image_info,
-                                VkMemoryPropertyFlags memory_properties)
+void BufferManager::CreateImage(Texture &texture, const VkImageCreateInfo &image_info,
+                                const VkMemoryPropertyFlags memory_properties) const
 {
     VkResult result{vkCreateImage(p_device->GetDevice(), &image_info, nullptr, &texture.p_image)};
     if (result != VK_SUCCESS) {
@@ -185,9 +188,9 @@ void BufferManager::CreateImage(Texture &texture, VkImageCreateInfo &image_info,
         ENGINE_THROW("Memory type selection failed: {}", memory_type_index.error());
     }
 
-    VkMemoryAllocateInfo memory_allocate_info{.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-                                              .allocationSize = memory_requirements.size,
-                                              .memoryTypeIndex = *memory_type_index};
+    const VkMemoryAllocateInfo memory_allocate_info{.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                                                    .allocationSize = memory_requirements.size,
+                                                    .memoryTypeIndex = *memory_type_index};
 
     result = vkAllocateMemory(p_device->GetDevice(), &memory_allocate_info, nullptr, &texture.p_memory);
     if (result != VK_SUCCESS) {
@@ -197,7 +200,7 @@ void BufferManager::CreateImage(Texture &texture, VkImageCreateInfo &image_info,
     vkBindImageMemory(p_device->GetDevice(), texture.p_image, texture.p_memory, 0);
 }
 
-void BufferManager::CreateDepthImage(Texture &texture, ImageSize size, VkFormat format)
+void BufferManager::CreateDepthImage(Texture &texture, const ImageSize size, const VkFormat format)
 {
     VkImageCreateInfo image_info{};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -215,36 +218,36 @@ void BufferManager::CreateDepthImage(Texture &texture, ImageSize size, VkFormat 
     CreateImage(texture, image_info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 }
 
-void BufferManager::CopyBufferToBuffer(VkBuffer destination, VkBuffer source, VkDeviceSize size,
-                                       VkCommandBuffer command_buffer)
+void BufferManager::CopyBufferToBuffer(VkBuffer destination, VkBuffer source, const VkDeviceSize size,
+                                       VkCommandBuffer command_buffer) const
 {
     BeginCommandBuffer(command_buffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    VkBufferCopy copy_region{.srcOffset = 0, .dstOffset = 0, .size = size};
+    const VkBufferCopy copy_region{.srcOffset = 0, .dstOffset = 0, .size = size};
     vkCmdCopyBuffer(command_buffer, source, destination, 1, &copy_region);
 
     SubmitCopyCommand(command_buffer);
 }
 
-void BufferManager::CreateTextureImageFromData(Texture &texture, const void *pixels_data_ptr, ImageSize image_size,
-                                               VkFormat texture_format, u32 layer_count,
-                                               VkImageCreateFlags create_flags)
+void BufferManager::CreateTextureImageFromData(Texture &texture, const void *pixels_ptr,
+                                               const ImageSize image_size, const VkFormat texture_format,
+                                               const u32 layer_count, const VkImageCreateFlags create_flags)
 {
     CreateTextureImage(texture, image_size, texture_format, 1, layer_count, create_flags);
-    UpdateTextureImage(texture, image_size, texture_format, layer_count, pixels_data_ptr, VK_IMAGE_LAYOUT_UNDEFINED);
+    UpdateTextureImage(texture, image_size, texture_format, layer_count, pixels_ptr, VK_IMAGE_LAYOUT_UNDEFINED);
 }
 
 std::unique_ptr<Texture> BufferManager::CreateTexture(std::string_view fileName)
 {
-    auto image_result = Image::Load(fileName, 4);
+    const auto image_result = Image::Load(fileName, 4);
     if (!image_result) {
         ENGINE_LOG_ERROR("Failed to load texture: {}. Using default texture instead.", fileName);
         return CreateDefaultTexture(); // Fallback to default texture
     }
 
-    auto image = image_result.value();
+    const auto& image = image_result.value();
     auto texture = std::make_unique<Texture>();
-    VkFormat format{image_channels_to_vk_format(image.GetChannels())};
+    const VkFormat format{image_channels_to_vk_format(image.GetChannels())};
 
     CreateTextureImage(*texture, image.GetSize(), format, 1, 1, 0);
     UpdateTextureImage(*texture, image.GetSize(), format, 1, image.data().data(), VK_IMAGE_LAYOUT_UNDEFINED);
@@ -258,8 +261,8 @@ std::unique_ptr<Texture> BufferManager::CreateTexture(std::string_view fileName)
 std::unique_ptr<Texture> BufferManager::CreateDefaultTexture()
 {
     // Create a 1x1 white texture
-    u32 white_pixel{0xFFFFFFFF}; // RGBA white
-    VkDeviceSize image_size{sizeof(u32)};
+    constexpr u32 white_pixel{0xFFFFFFFF}; // RGBA white
+    constexpr VkDeviceSize image_size{sizeof(u32)};
 
     // Create a staging buffer and defer its destruction
     Buffer staging_buffer{CreateAndUploadStagingBuffer(&white_pixel, image_size)};
@@ -284,7 +287,7 @@ std::unique_ptr<Texture> BufferManager::CreateDefaultTexture()
     // Transition layout and copy data
     TransitionImageLayout(texture->p_image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED,
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, 1);
-    CopyBufferToImage(staging_buffer.p_buffer, texture->p_image, {1, 1}, 1);
+    CopyBufferToImage(staging_buffer.p_buffer, texture->p_image, ImageSize{1, 1}, 1);
     TransitionImageLayout(texture->p_image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1, 1);
 
@@ -298,8 +301,8 @@ std::unique_ptr<Texture> BufferManager::CreateDefaultTexture()
     return texture;
 }
 
-void BufferManager::CreateTextureImage(Texture &texture, ImageSize size, VkFormat format, u32 mip_levels,
-                                       u32 layer_count, VkImageCreateFlags flags)
+void BufferManager::CreateTextureImage(Texture &texture, ImageSize size, const VkFormat format, const u32 mip_levels,
+                                       const u32 layer_count, const VkImageCreateFlags flags)
 {
     VkImageCreateInfo image_info{};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -318,11 +321,12 @@ void BufferManager::CreateTextureImage(Texture &texture, ImageSize size, VkForma
     CreateImage(texture, image_info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 }
 
-void BufferManager::UpdateTextureImage(Texture &texture, ImageSize size, VkFormat format, u32 layer_count,
-                                       const void *data, VkImageLayout initial_layout)
+void BufferManager::UpdateTextureImage(const Texture &texture, const ImageSize size, const VkFormat format,
+                                       const u32 layer_count,
+                                       const void *data, const VkImageLayout initial_layout)
 {
-    u32 image_channel_count{vk_format_to_channel_count(format)};
-    VkDeviceSize image_size{size.area() * image_channel_count};
+    const u32 image_channel_count{vk_format_to_channel_count(format)};
+    const VkDeviceSize image_size{size.area() * image_channel_count};
 
     // Create a staging buffer and defer its destruction
     Buffer staging_buffer{CreateAndUploadStagingBuffer(data, image_size)};
@@ -335,23 +339,25 @@ void BufferManager::UpdateTextureImage(Texture &texture, ImageSize size, VkForma
                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, layer_count, 1);
 }
 
-void BufferManager::CopyBufferToImage(VkBuffer source, VkImage destination, ImageSize image_size, u32 layer_count)
+void BufferManager::CopyBufferToImage(VkBuffer source, VkImage destination, const ImageSize image_size,
+                                      const u32 layer_count) const
 {
     BeginCommandBuffer(p_copy_command_buffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    VkBufferImageCopy region{.bufferOffset = 0,
-                             .bufferRowLength = 0,
-                             .bufferImageHeight = 0,
-                             .imageSubresource = VkImageSubresourceLayers{VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, layer_count},
-                             .imageOffset = {0, 0, 0},
-                             .imageExtent = {image_size.width, image_size.height, 1}};
+    const VkBufferImageCopy region{
+        .bufferOffset = 0,
+        .bufferRowLength = 0,
+        .bufferImageHeight = 0,
+        .imageSubresource = VkImageSubresourceLayers{VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, layer_count},
+        .imageOffset = {0, 0, 0},
+        .imageExtent = {static_cast<u32>(image_size.width), static_cast<u32>(image_size.height), 1}};
 
     vkCmdCopyBufferToImage(p_copy_command_buffer, source, destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
                            &region);
     SubmitCopyCommand(p_copy_command_buffer);
 }
 
-void BufferManager::TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout old_layout,
-                                          VkImageLayout new_layout, u32 layer_count, u32 mip_levels)
+void BufferManager::TransitionImageLayout(VkImage image, const VkFormat format, const VkImageLayout old_layout,
+                                          const VkImageLayout new_layout, const u32 layer_count, const u32 mip_levels) const
 {
     BeginCommandBuffer(p_copy_command_buffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -364,8 +370,8 @@ void BufferManager::TransitionImageLayout(VkImage image, VkFormat format, VkImag
     barrier.image = image;
     barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, mip_levels, 0, layer_count};
 
-    VkPipelineStageFlags source_stage;
-    VkPipelineStageFlags destination_stage;
+    VkPipelineStageFlags source_stage{0};
+    VkPipelineStageFlags destination_stage{0};
 
     if (new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL || (format == VK_FORMAT_D16_UNORM) ||
         (format == VK_FORMAT_X8_D24_UNORM_PACK32) || (format == VK_FORMAT_D32_SFLOAT) ||
@@ -403,7 +409,7 @@ void BufferManager::TransitionImageLayout(VkImage image, VkFormat format, VkImag
         destination_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
     }
 
-    // Convert back from read-only to updateable
+    // Convert back from read-only to updatable
     else if (old_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
              new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
         barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -413,7 +419,7 @@ void BufferManager::TransitionImageLayout(VkImage image, VkFormat format, VkImag
         destination_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
     }
 
-    // Convert from updateable texture to shader read-only
+    // Convert from updatable texture to shader read-only
     else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
              new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -438,11 +444,7 @@ void BufferManager::TransitionImageLayout(VkImage image, VkFormat format, VkImag
              new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
         barrier.srcAccessMask = 0; // VK_ACCESS_SHADER_READ_BIT;
         barrier.dstAccessMask = 0;
-        /*
-                source_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        ///		destination_stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-                destination_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        */
+
         source_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         destination_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
@@ -457,7 +459,7 @@ void BufferManager::TransitionImageLayout(VkImage image, VkFormat format, VkImag
         destination_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     }
 
-    // Convert from updateable texture to shader read-only
+    // Convert from updatable texture to shader read-only
     else if (old_layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
              new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
         barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
@@ -477,7 +479,7 @@ void BufferManager::TransitionImageLayout(VkImage image, VkFormat format, VkImag
         destination_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
     }
 
-    // Convert from updateable depth texture to shader read-only
+    // Convert from updatable depth texture to shader read-only
     else if (old_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL &&
              new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
         barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
@@ -492,14 +494,14 @@ void BufferManager::TransitionImageLayout(VkImage image, VkFormat format, VkImag
     SubmitCopyCommand(p_copy_command_buffer);
 }
 
-VkImageView BufferManager::CreateImageView(VkImage image_ptr, VkFormat format, VkImageAspectFlags aspect_flags,
-                                           VkImageViewType view_type, u32 layer_count, u32 mip_levels)
+VkImageView BufferManager::CreateImageView(VkImage image, const VkFormat format, const VkImageAspectFlags aspect_flags,
+                                           const VkImageViewType view_type, const u32 layer_count, const u32 mip_levels) const
 {
     VkImageViewCreateInfo view_info{};
     view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     view_info.pNext = nullptr;
     view_info.flags = 0;
-    view_info.image = image_ptr;
+    view_info.image = image;
     view_info.viewType = view_type;
     view_info.format = format;
     view_info.components = {.r = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -513,14 +515,15 @@ VkImageView BufferManager::CreateImageView(VkImage image_ptr, VkFormat format, V
                                   .layerCount = layer_count};
 
     VkImageView image_view{VK_NULL_HANDLE};
-    VkResult result{vkCreateImageView(p_device->GetDevice(), &view_info, nullptr, &image_view)};
-    if (result != VK_SUCCESS) {
+    if (const VkResult result{vkCreateImageView(p_device->GetDevice(), &view_info, nullptr, &image_view)};
+        result != VK_SUCCESS) {
         ENGINE_THROW("Failed to create image view in BufferManager");
     }
     return image_view;
 }
 
-VkSampler BufferManager::CreateTextureSampler(VkFilter minFilter, VkFilter magFilter, VkSamplerAddressMode addressMode)
+VkSampler BufferManager::CreateTextureSampler(const VkFilter minFilter, const VkFilter magFilter,
+                                              const VkSamplerAddressMode addressMode) const
 {
     VkSamplerCreateInfo samplerInfo{};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -541,8 +544,8 @@ VkSampler BufferManager::CreateTextureSampler(VkFilter minFilter, VkFilter magFi
     samplerInfo.maxLod = 0.0f;
 
     VkSampler sampler{VK_NULL_HANDLE};
-    VkResult result{vkCreateSampler(p_device->GetDevice(), &samplerInfo, nullptr, &sampler)};
-    if (result != VK_SUCCESS) {
+    if (const VkResult result{vkCreateSampler(p_device->GetDevice(), &samplerInfo, nullptr, &sampler)};
+        result != VK_SUCCESS) {
         ENGINE_THROW("Failed to create texture sampler in BufferManager");
     }
 
@@ -551,7 +554,7 @@ VkSampler BufferManager::CreateTextureSampler(VkFilter minFilter, VkFilter magFi
 
 // Private functions -----------------------------------------------------------------------------------
 Expect<u32, std::string> BufferManager::GetMemoryTypeIndex(u32 memory_type_bits,
-                                                           VkMemoryPropertyFlags required_properties)
+                                                           VkMemoryPropertyFlags required_properties) const
 {
     const VkPhysicalDeviceMemoryProperties &mem_properties{p_device->GetSelectedPhysicalDevice().m_memory_properties};
     for (u32 i = 0; i < mem_properties.memoryTypeCount; i++) {
@@ -563,14 +566,14 @@ Expect<u32, std::string> BufferManager::GetMemoryTypeIndex(u32 memory_type_bits,
     return std::unexpected("Cannot find memory type for type: " + std::to_string(memory_type_bits));
 }
 
-void BufferManager::BeginCommandBuffer(VkCommandBuffer command_buffer, VkCommandBufferUsageFlags usage)
+void BufferManager::BeginCommandBuffer(VkCommandBuffer command_buffer, const VkCommandBufferUsageFlags usage) const
 {
-    p_copy_fence->WaitFor(Constants::u64_max);
-    VkCommandBufferBeginInfo begin_info{.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = usage};
+    p_copy_fence->WaitFor(constants::u64_max);
+    const VkCommandBufferBeginInfo begin_info{.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = usage};
     vkBeginCommandBuffer(command_buffer, &begin_info);
 }
 
-void BufferManager::SubmitCopyCommand(VkCommandBuffer command_buffer)
+void BufferManager::SubmitCopyCommand(VkCommandBuffer command_buffer) const
 {
     vkEndCommandBuffer(command_buffer);
     p_copy_fence->Reset();

@@ -10,6 +10,7 @@
 #include "debug/logger.hpp"
 #include "math/collision.hpp"
 #include "math/vector.hpp"
+#include "renderers/common.hpp"
 
 struct GridRange {
     int min_x;
@@ -20,26 +21,26 @@ struct GridRange {
 
 GridRange GetGridRange(const Rect<f32> &bounds, f32 cell_size)
 {
-    return {static_cast<int>(gouda::math::floor(bounds.left / cell_size)),
-            static_cast<int>(gouda::math::floor(bounds.right / cell_size)),
-            static_cast<int>(gouda::math::floor(bounds.bottom / cell_size)),
-            static_cast<int>(gouda::math::floor(bounds.top / cell_size))};
+    return {(gouda::math::floor(bounds.left / cell_size)),
+            (gouda::math::floor(bounds.right / cell_size)),
+            (gouda::math::floor(bounds.bottom / cell_size)),
+            (gouda::math::floor(bounds.top / cell_size))};
 }
 
 bool IsInFrustum(const gouda::Vec3 &position, const gouda::Vec2 &size,
                  const gouda::OrthographicCamera::FrustrumData &frustum)
 {
-    gouda::math::AABB2D frustum_bounds{{frustum.left + frustum.position.x, frustum.top + frustum.position.y},
-                                       {frustum.right + frustum.position.x, frustum.bottom + frustum.position.y}};
-    gouda::math::AABB2D object_bounds{{position.x, position.y}, {position.x + size.x, position.y + size.y}};
+    const gouda::math::AABB2D frustum_bounds{{frustum.left + frustum.position.x, frustum.top + frustum.position.y},
+                                             {frustum.right + frustum.position.x, frustum.bottom + frustum.position.y}};
+    const gouda::math::AABB2D object_bounds{{position.x, position.y}, {position.x + size.x, position.y + size.y}};
 
     return object_bounds.Intersects(frustum_bounds);
 }
 // Scene ---------------------------------------------------------------------------------------
 Scene::Scene(gouda::OrthographicCamera *camera_ptr)
-    : p_camera{camera_ptr}, m_player{gouda::InstanceData{}, {0.0f}, 0.0f}, m_instances_dirty{true}, m_font_id{5}
+    : p_camera{camera_ptr}, m_player{gouda::InstanceData{}, {0.0f}, 0.0f}, m_instances_dirty{true}, m_font_id{1}
 {
-    std::vector<gouda::InstanceData> instances = {
+    const std::vector<gouda::InstanceData> instances = {
         {{2945.3f, 3048.8f, -0.3f}, {81.9f, 453.95f}, 0.0f, 4},
         {{200.3f, 200.8f, -0.3f}, {281.9f, 453.95f}, 0.0f, 4},
         {{1182.08f, 69.08f, -0.8f}, {188.0f, 101.51f}, 0.0f, 2},
@@ -107,7 +108,7 @@ Scene::Scene(gouda::OrthographicCamera *camera_ptr)
     m_particles_instances.reserve(1000); // Reserve space for particles
 }
 
-void Scene::Update(f32 delta_time)
+void Scene::Update(const f32 delta_time)
 {
     p_camera->Update(delta_time);
 
@@ -125,7 +126,7 @@ void Scene::Update(f32 delta_time)
                                                                                      m_player.render_data.position.z}};
 
     // Player collision bounds
-    Rect<f32> player_bounds{new_position.x, new_position.x + m_player.render_data.size.x, new_position.y,
+    const Rect<f32> player_bounds{new_position.x, new_position.x + m_player.render_data.size.x, new_position.y,
                             new_position.y + m_player.render_data.size.y};
 
     // Spatial grid query for collision
@@ -143,10 +144,10 @@ void Scene::Update(f32 delta_time)
     }
 
     // Collision detection and resolution
-    for (size_t entity_idx : nearby_entities) {
+    for (const size_t entity_idx : nearby_entities) {
         auto &entity = m_entities[entity_idx];
-        const gouda::math::Vec2 &entity_size{entity.render_data.size};
-        if (CheckCollision(new_position, m_player.render_data.size, entity.render_data.position, entity_size)) {
+        if (const gouda::math::Vec2 & entity_size{entity.render_data.size};
+            CheckCollision(new_position, m_player.render_data.size, entity.render_data.position, entity_size)) {
 
             Rect<f32> entity_bounds{entity.render_data.position.x, entity.render_data.position.x + entity_size.x,
                                     entity.render_data.position.y, entity.render_data.position.y + entity_size.y};
@@ -155,7 +156,7 @@ void Scene::Update(f32 delta_time)
                 player_bounds.right - entity_bounds.left, entity_bounds.right - player_bounds.left,
                 player_bounds.top - entity_bounds.bottom, entity_bounds.top - player_bounds.bottom};
 
-            f32 min_penetration{Constants::f32_max};
+            f32 min_penetration{constants::f32_max};
             enum class Direction : u8 { None, Left, Right, Bottom, Top } resolve_dir = Direction::None;
 
             if (penetration_bounds.left > 0 && m_player.velocity.x > 0) {
@@ -238,7 +239,7 @@ void Scene::LoadFromJSON(std::string_view filepath)
 void Scene::SaveToJSON(std::string_view filepath) {}
 
 void Scene::SpawnParticle(const gouda::Vec3 &position, const gouda::Vec2 &size, const gouda::Vec3 &velocity,
-                          f32 lifetime, u32 texture_index, const gouda::Vec4 &colour)
+                          const f32 lifetime, const u32 texture_index, const gouda::Vec4 &colour)
 {
     m_particles_instances.push_back({.position = position,
                                      .size = size,
@@ -254,10 +255,18 @@ void Scene::SetupEntities() {}
 void Scene::SetupPlayer()
 {
     m_player.render_data.position = {500.0f, 500.0f, 0.0f};
-    m_player.render_data.size = {25.0f, 25.0f};
-    m_player.render_data.texture_index = 1;
+    m_player.render_data.size = {32.0f, 32.0f};
+    m_player.render_data.texture_index = 5;
+    m_player.render_data.colour = {1.0f, 1.0f, 1.0f, 0.0f};
     m_player.velocity = {0.0f};
     m_player.speed = 200.0f;
+    m_player.render_data.is_atlas = true;
+
+    const auto sprite_rect =
+        gouda::get_normalized_sprite_rect(64.0f, 0.0f, 32.0f, 32.0f,
+                                    128.0f, 128.0f);
+
+    m_player.render_data.sprite_rect = sprite_rect;
 
     // todo: load player animations from json
 
@@ -282,12 +291,12 @@ void Scene::BuildSpatialGrid()
 
     for (size_t i = 0; i < m_entities.size(); ++i) {
         const auto &entity = m_entities[i];
-        Rect<f32> bounds{entity.render_data.position.x, entity.render_data.position.x + entity.render_data.size.x,
+        Rect bounds{entity.render_data.position.x, entity.render_data.position.x + entity.render_data.size.x,
                          entity.render_data.position.y, entity.render_data.position.y + entity.render_data.size.y};
 
-        auto range = GetGridRange(bounds, cell_size);
-        for (int x = range.min_x; x <= range.max_x; ++x) {
-            for (int y = range.min_y; y <= range.max_y; ++y) {
+        auto [min_x, max_x, min_y, max_y] = GetGridRange(bounds, cell_size);
+        for (int x = min_x; x <= max_x; ++x) {
+            for (int y = min_y; y <= max_y; ++y) {
                 m_spatial_grid[GridPos{x, y}].push_back(i);
             }
         }
@@ -308,10 +317,10 @@ void Scene::UpdateVisibleInstances()
     }
 }
 
-void Scene::UpdateParticles(f32 delta_time)
+void Scene::UpdateParticles(const f32 delta_time)
 {
     for (auto it = m_particles_instances.begin(); it != m_particles_instances.end();) {
-        it->velocity += gouda::math::Vec3{0.0f, -9.81f, 0.0f} * delta_time; // Gravity
+        it->velocity += gouda::math::Vec3{0.0f, constants::gravity, 0.0f} * delta_time; // Gravity
         it->position += it->velocity * delta_time;
         it->lifetime -= delta_time;
         if (it->lifetime <= 0.0f) {

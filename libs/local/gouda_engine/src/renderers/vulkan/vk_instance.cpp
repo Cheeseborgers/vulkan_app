@@ -4,12 +4,14 @@
 
 #include "debug/logger.hpp"
 #include "debug/throw.hpp"
+#include "renderers/vulkan/vk_utils.hpp"
+#include "containers/small_vector.hpp"
 
 namespace gouda::vk {
 
 namespace internal {
 
-constexpr std::string_view get_debug_severity_as_string_view(VkDebugUtilsMessageSeverityFlagBitsEXT severity)
+constexpr StringView get_debug_severity_as_string_view(const VkDebugUtilsMessageSeverityFlagBitsEXT severity)
 {
     switch (severity) {
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
@@ -31,7 +33,7 @@ constexpr std::string_view get_debug_severity_as_string_view(VkDebugUtilsMessage
     return "No such severity!";
 }
 
-constexpr std::string_view get_debug_type_as_string_view(VkDebugUtilsMessageTypeFlagsEXT type)
+constexpr StringView get_debug_type_as_string_view(VkDebugUtilsMessageTypeFlagsEXT type)
 {
     switch (type) {
         case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT:
@@ -49,8 +51,6 @@ constexpr std::string_view get_debug_type_as_string_view(VkDebugUtilsMessageType
         default:
             ENGINE_THROW("Invalid debug type code: {}.", static_cast<int>(type));
     }
-
-    return "No such type!";
 }
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -83,7 +83,7 @@ Instance::Instance(std::string_view app_name, SemVer vulkan_api_version, GLFWwin
 Instance::~Instance()
 {
     if (p_instance != VK_NULL_HANDLE) {
-        PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessenger =
+        const auto vkDestroyDebugUtilsMessenger =
             reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
                 vkGetInstanceProcAddr(p_instance, "vkDestroyDebugUtilsMessengerEXT"));
         if (vkDestroyDebugUtilsMessenger) {
@@ -97,8 +97,8 @@ Instance::~Instance()
 
 void Instance::CreateInstance(std::string_view app_name, SemVer vulkan_api_version)
 {
-    std::vector<const char *> layers{"VK_LAYER_KHRONOS_validation"};
-    std::vector<const char *> extensions{
+    Vector<const char *> layers{"VK_LAYER_KHRONOS_validation"};
+    Vector<const char *> extensions{
         VK_KHR_SURFACE_EXTENSION_NAME,
 #if defined(_WIN32)
         "VK_KHR_win32_surface",
@@ -121,15 +121,17 @@ void Instance::CreateInstance(std::string_view app_name, SemVer vulkan_api_versi
                                            VK_MAKE_API_VERSION(vulkan_api_version.variant, vulkan_api_version.major,
                                                                vulkan_api_version.minor, vulkan_api_version.patch)};
 
-    VkInstanceCreateInfo instance_create_info{.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+    const VkInstanceCreateInfo instance_create_info{.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
                                               .pApplicationInfo = &application_info,
                                               .enabledLayerCount = static_cast<u32>(layers.size()),
                                               .ppEnabledLayerNames = layers.data(),
                                               .enabledExtensionCount = static_cast<u32>(extensions.size()),
                                               .ppEnabledExtensionNames = extensions.data()};
 
-    VkResult result{vkCreateInstance(&instance_create_info, nullptr, &p_instance)};
-    CHECK_VK_RESULT(result, "vkCreateInstance");
+    if (const VkResult result{vkCreateInstance(&instance_create_info, nullptr, &p_instance)}; result != VK_SUCCESS) {
+        CHECK_VK_RESULT(result, "vkCreateInstance", __FILE__, __LINE__);
+    }
+
     ENGINE_LOG_DEBUG("Vulkan instance created");
 }
 

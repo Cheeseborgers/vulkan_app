@@ -16,7 +16,7 @@
 
 namespace gouda::vk {
 
-inline void check_vk_result(VkResult res, const char *msg, const char *file, int line)
+inline void check_vk_result(const VkResult res, const char *msg, const char *file, int line)
 {
     if (res != VK_SUCCESS) {
         ENGINE_LOG_FATAL("Error in {}:{} - {}, code {:#x}", file, line, msg, static_cast<int>(res));
@@ -25,7 +25,7 @@ inline void check_vk_result(VkResult res, const char *msg, const char *file, int
 }
 
 template <typename... Args>
-inline void check_vk_result(VkResult res, const char *msg, const char *file, int line, Args &&...args)
+void check_vk_result(const VkResult res, const char *msg, const char *file, int line, Args &&...args)
 {
     if (res != VK_SUCCESS) {
         ENGINE_LOG_FATAL("Error in {}:{} - {}, code {:#x} - ", file, line, msg, static_cast<int>(res));
@@ -39,7 +39,7 @@ inline void check_vk_result(VkResult res, const char *msg, const char *file, int
 // TODO: Change the case of the two functions bellow
 void PrintVKExtensions();
 
-VkFormat FindSupportedFormat(VkPhysicalDevice device, const std::vector<VkFormat> &candidates, VkImageTiling tiling,
+VkFormat find_supported_format(VkPhysicalDevice device, const Vector<VkFormat> &candidates, VkImageTiling tiling,
                              VkFormatFeatureFlags features);
 
 std::string_view vk_result_to_string(VkResult result);

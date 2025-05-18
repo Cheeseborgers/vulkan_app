@@ -30,8 +30,7 @@
 #include <cpuid.h>
 #endif
 
-namespace gouda {
-namespace math {
+namespace gouda::math {
 
 // Enumeration to define available SIMD levels (NONE, SSE2, AVX, AVX2)
 enum class SIMDLevel : uint8_t { NONE, SSE2, AVX, AVX2 };
@@ -39,9 +38,8 @@ enum class SIMDLevel : uint8_t { NONE, SSE2, AVX, AVX2 };
 // Function to detect available SIMD capabilities of the CPU
 inline SIMDLevel DetectSIMD()
 {
-    int cpuInfo[4] = {0};
-
 #if defined(_MSC_VER) // MSVC Version
+    int cpuInfo[4] = {};
     __cpuid(cpuInfo, 0);
     if (cpuInfo[0] >= 7) {
         __cpuidex(cpuInfo, 7, 0);
@@ -59,13 +57,13 @@ inline SIMDLevel DetectSIMD()
     if (__get_cpuid(0, &eax, &ebx, &ecx, &edx)) {
         if (eax >= 7) {
             __get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx);
-            if (ebx & (1 << 5))
+            if (ebx & 1 << 5)
                 return SIMDLevel::AVX2;
         }
         __get_cpuid(1, &eax, &ebx, &ecx, &edx);
-        if (ecx & (1 << 28))
+        if (ecx & 1 << 28)
             return SIMDLevel::AVX;
-        if (edx & (1 << 26))
+        if (edx & 1 << 26)
             return SIMDLevel::SSE2;
     }
 #endif
@@ -76,5 +74,4 @@ inline SIMDLevel DetectSIMD()
 // Detect and store the SIMD level at compile-time
 static const SIMDLevel simdLevel = DetectSIMD();
 
-} // namespace math
-} // namespace gouda
+}

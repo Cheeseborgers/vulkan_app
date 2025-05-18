@@ -40,10 +40,10 @@ public:
     [[nodiscard]] bool Create(VkFenceCreateFlags flags = 0);
 
     // Waits for the fence to be signaled with an optional timeout
-    [[nodiscard]] bool WaitFor(uint64_t timeout = UINT64_MAX);
+    void WaitFor(uint64_t timeout = UINT64_MAX) const;
 
     // Resets the fence, allowing it to be reused
-    [[nodiscard]] bool Reset();
+    void Reset() const;
 
     // Checks if the fence is signaled
     [[nodiscard]] bool IsSignaled() const;

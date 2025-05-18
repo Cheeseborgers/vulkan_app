@@ -6,12 +6,15 @@
 
 #include <sndfile.h>
 
+#include <AL/al.h>
+#include <AL/alc.h>
+#include <AL/alext.h>
+
+
 #include "debug/logger.hpp"
 #include "math/math.hpp"
-#include "utils/filesystem.hpp"
 
-namespace gouda {
-namespace audio {
+namespace gouda::audio {
 
 SoundEffect::SoundEffect() : m_buffer{0}
 {
@@ -158,5 +161,4 @@ bool SoundEffect::Load(std::string_view filepath)
     return true;
 }
 
-} // namespace audio end
-} // namespace gouda end
+}

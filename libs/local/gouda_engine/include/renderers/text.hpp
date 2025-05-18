@@ -20,11 +20,9 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-#include <string_view>
 #include <unordered_map>
 
 #include "core/types.hpp"
-#include "math/math.hpp"
 
 namespace gouda {
 
@@ -36,6 +34,6 @@ struct Glyph {
     Rect<f32> atlas_bounds;
 };
 
-std::unordered_map<char, Glyph> load_msdf_glyphs(std::string_view json_path);
+std::unordered_map<char, Glyph> load_msdf_glyphs(StringView json_path);
 
 } // namespace gouda

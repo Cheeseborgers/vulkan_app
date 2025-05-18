@@ -25,8 +25,8 @@ public:
     ~CommandBufferManager();
 
     void CreatePool();
-    void AllocateBuffers(u32 count, VkCommandBuffer *buffers);
-    void FreeBuffers(u32 count, const VkCommandBuffer *buffers);
+    void AllocateBuffers(u32 count, VkCommandBuffer *buffers) const;
+    void FreeBuffers(u32 count, const VkCommandBuffer *buffers) const;
 
 private:
     Device *p_device;

@@ -25,6 +25,8 @@
 #include "math/matrix4x4.hpp"
 #include "math/simd.hpp"
 #include "math/vector.hpp"
+#include "core/types.hpp"
+#include "debug/assert.hpp"
 
 namespace gouda {
 
@@ -39,13 +41,35 @@ namespace math {
 // Bit manipulation using C++23 <bit>
 constexpr u32 bit_shift(int x) noexcept { return std::bit_cast<u32>(1U << x); }
 
-constexpr u64 bytes_to_kb(u64 bytes) { return bytes / 1024ULL; }
-constexpr u64 bytes_to_mb(u64 bytes) { return bytes / (1024ULL * 1024); }
-constexpr u64 bytes_to_gb(u64 bytes) { return bytes / (1024ULL * 1024 * 1024); }
-constexpr size_t mb_to_bytes(size_t mb) { return mb * 1024 * 1024; }
-constexpr size_t gb_to_bytes(size_t gb) { return gb * 1024 * 1024 * 1024; }
-constexpr size_t set_size_in_mb(size_t mb) { return mb_to_bytes(mb); }
-constexpr size_t set_size_in_gb(size_t gb) { return gb_to_bytes(gb); }
+constexpr u64 bytes_to_kb(const u64 bytes) { return bytes / 1024ULL; }
+constexpr u64 bytes_to_mb(const u64 bytes) { return bytes / (1024ULL * 1024); }
+constexpr u64 bytes_to_gb(const u64 bytes) { return bytes / (1024ULL * 1024 * 1024); }
+
+
+constexpr size_t mb_to_bytes(const size_t mb)
+{
+    if (mb > constants::size_t_max / constants::mb) {
+        if consteval {
+            ASSERT(false, "Error");
+        }
+        throw std::overflow_error("Overflow in mb_to_bytes");
+    }
+    return mb * constants::mb;
+}
+
+constexpr size_t gb_to_bytes(const size_t gb)
+{
+    if (gb > constants::size_t_max / constants::gb) {
+        if consteval {
+            ASSERT(false, "Error");
+        }
+        throw std::overflow_error("Overflow in gb_to_bytes");
+    }
+    return gb * constants::gb;
+}
+
+constexpr size_t set_size_in_mb(const size_t mb) { return mb_to_bytes(mb); }
+constexpr size_t set_size_in_gb(const size_t gb) { return gb_to_bytes(gb); }
 
 // Function that returns π with the correct precision
 template <FloatingPointT T>
@@ -132,7 +156,7 @@ constexpr T min(std::initializer_list<T> values)
 }
 
 template <typename T>
-[[nodiscard]] inline f32 aspect_ratio(const T &size) noexcept
+[[nodiscard]] f32 aspect_ratio(const T &size) noexcept
 {
     ASSERT(size.width != 0 && size.height != 0, "Division by zero error");
     return static_cast<f32>(size.width) / size.height;
@@ -140,7 +164,7 @@ template <typename T>
 
 // Clamp with SIMD optimization
 template <NumericT T>
-[[nodiscard]] inline T clamp(T value, T min_val, T max_val) noexcept
+[[nodiscard]] T clamp(T value, T min_val, T max_val) noexcept
 {
     return std::clamp(value, min_val, max_val);
 }
@@ -159,17 +183,17 @@ template <FloatingPointT T>
 
 // Translation matrix
 template <FloatingPointT T>
-[[nodiscard]] inline Matrix4x4<T> translate(const Vector<T, 3> &t) noexcept
+[[nodiscard]] Matrix4x4<T> translate(const Vector<T, 3> &t) noexcept
 {
     Matrix4x4<T> m = Matrix4x4<T>::identity();
 
     if (std::is_same_v<T, float> && simdLevel >= SIMDLevel::AVX) {
         // Load translation components into last column
-        __m128 trans = _mm_set_ps(1.f, t[2], t[1], t[0]);
+        const __m128 trans = _mm_set_ps(1.f, t[2], t[1], t[0]);
         _mm_storeu_ps(&m.data[12], trans); // Store directly into last column (12-15)
     }
     else if (std::is_same_v<T, float> && simdLevel >= SIMDLevel::SSE2) {
-        __m128 trans = _mm_set_ps(1.f, t[2], t[1], t[0]);
+        const __m128 trans = _mm_set_ps(1.f, t[2], t[1], t[0]);
         _mm_storeu_ps(&m.data[12], trans);
     }
     else {
@@ -183,16 +207,16 @@ template <FloatingPointT T>
 
 // Scaling matrix
 template <FloatingPointT T>
-[[nodiscard]] inline Matrix4x4<T> scale(const Vector<T, 3> &s) noexcept
+[[nodiscard]] Matrix4x4<T> scale(const Vector<T, 3> &s) noexcept
 {
     Matrix4x4<T> m = Matrix4x4<T>::identity();
 
     if (std::is_same_v<T, float> && simdLevel >= SIMDLevel::AVX) {
         // Set diagonal elements using SIMD
-        __m128 diag0 = _mm_set_ps(0.f, 0.f, 0.f, s[0]); // m[0][0]
-        __m128 diag1 = _mm_set_ps(0.f, 0.f, s[1], 0.f); // m[1][1]
-        __m128 diag2 = _mm_set_ps(0.f, s[2], 0.f, 0.f); // m[2][2]
-        __m128 diag3 = _mm_set_ps(1.f, 0.f, 0.f, 0.f);  // m[3][3]
+        const __m128 diag0 = _mm_set_ps(0.f, 0.f, 0.f, s[0]); // m[0][0]
+        const __m128 diag1 = _mm_set_ps(0.f, 0.f, s[1], 0.f); // m[1][1]
+        const __m128 diag2 = _mm_set_ps(0.f, s[2], 0.f, 0.f); // m[2][2]
+        const __m128 diag3 = _mm_set_ps(1.f, 0.f, 0.f, 0.f);  // m[3][3]
 
         _mm_storeu_ps(&m.data[0], diag0);
         _mm_storeu_ps(&m.data[4], diag1);
@@ -201,10 +225,10 @@ template <FloatingPointT T>
     }
     else if (std::is_same_v<T, float> && simdLevel >= SIMDLevel::SSE2) {
         // Same as AVX but with SSE
-        __m128 diag0 = _mm_set_ps(0.f, 0.f, 0.f, s[0]);
-        __m128 diag1 = _mm_set_ps(0.f, 0.f, s[1], 0.f);
-        __m128 diag2 = _mm_set_ps(0.f, s[2], 0.f, 0.f);
-        __m128 diag3 = _mm_set_ps(1.f, 0.f, 0.f, 0.f);
+        const __m128 diag0 = _mm_set_ps(0.f, 0.f, 0.f, s[0]);
+        const __m128 diag1 = _mm_set_ps(0.f, 0.f, s[1], 0.f);
+        const __m128 diag2 = _mm_set_ps(0.f, s[2], 0.f, 0.f);
+        const __m128 diag3 = _mm_set_ps(1.f, 0.f, 0.f, 0.f);
 
         _mm_storeu_ps(&m.data[0], diag0);
         _mm_storeu_ps(&m.data[4], diag1);
@@ -222,7 +246,7 @@ template <FloatingPointT T>
 
 // Orthographic projection matrix
 template <FloatingPointT T>
-[[nodiscard]] inline Matrix4x4<T> ortho(T left, T right, T bottom, T top, T near, T far) noexcept
+[[nodiscard]] Matrix4x4<T> ortho(T left, T right, T bottom, T top, T near, T far) noexcept
 {
     Matrix4x4<T> m = Matrix4x4<T>::identity();
 
@@ -242,7 +266,7 @@ template <FloatingPointT T>
 }
 
 template <FloatingPointT T>
-[[nodiscard]] inline Mat4 perspective(T fovy, T aspect, T near, T far) noexcept
+[[nodiscard]] Mat4 perspective(T fovy, T aspect, T near, T far) noexcept
 {
     const T tan_half = std::tan(fovy * T(0.5));
     Matrix4x4<T> m = Matrix4x4<T>::identity();
@@ -257,7 +281,7 @@ template <FloatingPointT T>
 }
 
 template <FloatingPointT T>
-[[nodiscard]] inline Matrix4x4<T> lookAt(const Vector<T, 3> &eye, const Vector<T, 3> &center,
+[[nodiscard]] Matrix4x4<T> lookAt(const Vector<T, 3> &eye, const Vector<T, 3> &center,
                                          const Vector<T, 3> &up) noexcept
 {
     const Vector<T, 3> forward = (center - eye).normalized();
@@ -268,10 +292,10 @@ template <FloatingPointT T>
 
     if (std::is_same_v<T, float> && simdLevel >= SIMDLevel::AVX) {
         // Column-major storage: each __m128 is one column
-        __m128 col0 = _mm_set_ps(0.f, 0.f, 0.f, right[0]);
-        __m128 col1 = _mm_set_ps(0.f, 0.f, 0.f, right[1]);
-        __m128 col2 = _mm_set_ps(0.f, -forward[2], up_adjusted[2], right[2]);
-        __m128 col3 = _mm_set_ps(1.f, forward.dot(eye), -up_adjusted.dot(eye), -right.dot(eye));
+        const __m128 col0 = _mm_set_ps(0.f, 0.f, 0.f, right[0]);
+        const __m128 col1 = _mm_set_ps(0.f, 0.f, 0.f, right[1]);
+        const __m128 col2 = _mm_set_ps(0.f, -forward[2], up_adjusted[2], right[2]);
+        const __m128 col3 = _mm_set_ps(1.f, forward.dot(eye), -up_adjusted.dot(eye), -right.dot(eye));
 
         _mm_storeu_ps(&m.data[0], col0);
         _mm_storeu_ps(&m.data[4], col1);
@@ -279,10 +303,10 @@ template <FloatingPointT T>
         _mm_storeu_ps(&m.data[12], col3);
     }
     else if (std::is_same_v<T, float> && simdLevel >= SIMDLevel::SSE2) {
-        __m128 col0 = _mm_set_ps(0.f, 0.f, 0.f, right[0]);
-        __m128 col1 = _mm_set_ps(0.f, 0.f, 0.f, right[1]);
-        __m128 col2 = _mm_set_ps(0.f, -forward[2], up_adjusted[2], right[2]);
-        __m128 col3 = _mm_set_ps(1.f, forward.dot(eye), -up_adjusted.dot(eye), -right.dot(eye));
+        const __m128 col0 = _mm_set_ps(0.f, 0.f, 0.f, right[0]);
+        const __m128 col1 = _mm_set_ps(0.f, 0.f, 0.f, right[1]);
+        const __m128 col2 = _mm_set_ps(0.f, -forward[2], up_adjusted[2], right[2]);
+        const __m128 col3 = _mm_set_ps(1.f, forward.dot(eye), -up_adjusted.dot(eye), -right.dot(eye));
 
         _mm_storeu_ps(&m.data[0], col0);
         _mm_storeu_ps(&m.data[4], col1);
@@ -309,7 +333,7 @@ template <FloatingPointT T>
 
 // Rotation matrix around an axis
 template <NumericT T>
-[[nodiscard]] inline Matrix4x4<T> rotate(const Vector<T, 3> &axis, T angle) noexcept
+[[nodiscard]] Matrix4x4<T> rotate(const Vector<T, 3> &axis, T angle) noexcept
 {
     Vector<T, 3> n = axis.Normalized();
     T c = std::cos(angle);
@@ -332,7 +356,7 @@ template <NumericT T>
 
 // Transpose of a matrix
 template <NumericT T>
-[[nodiscard]] inline Matrix4x4<T> transpose(const Matrix4x4<T> &m) noexcept
+[[nodiscard]] Matrix4x4<T> transpose(const Matrix4x4<T> &m) noexcept
 {
     Matrix4x4<T> result{};
 
@@ -382,7 +406,7 @@ template <typename T>
 constexpr int floor(T x)
 {
     int i = static_cast<int>(x);
-    return (x < static_cast<T>(0) && static_cast<T>(i) != x) ? i - 1 : i;
+    return x < static_cast<T>(0) && static_cast<T>(i) != x ? i - 1 : i;
 }
 
 // SIMD floor for Vec4
@@ -396,15 +420,15 @@ inline Vec4 floor(const Vec4 &v)
         return result;
     }
     else {
-        return Vec4(std::floor(v.x), std::floor(v.y), std::floor(v.z), std::floor(v.w));
+        return {std::floor(v.x), std::floor(v.y), std::floor(v.z), std::floor(v.w)};
     }
 }
 
 // Floor for Vec3
-inline Vec3 floor(const Vec3 &v) { return Vec3(std::floor(v.x), std::floor(v.y), std::floor(v.z)); }
+inline Vec3 floor(const Vec3 &v) { return {std::floor(v.x), std::floor(v.y), std::floor(v.z)}; }
 
 // Floor for Vec2
-inline Vec2 floor(const Vec2 &v) { return Vec2(std::floor(v.x), std::floor(v.y)); }
+inline Vec2 floor(const Vec2 &v) { return {std::floor(v.x), std::floor(v.y)}; }
 
-} // namespade math
+} // namespace math
 } // namespace gouda::math

@@ -1,12 +1,13 @@
 #include "audio/audio_common.hpp"
 
+#include <alext.h>
+
 #include <string_view>
 #include <unordered_set>
 
 #include "utils/filesystem.hpp"
 
-namespace gouda {
-namespace audio {
+namespace gouda::audio {
 
 const char *FormatName(ALenum format)
 {
@@ -19,8 +20,9 @@ const char *FormatName(ALenum format)
             return "Stereo, S16";
         case AL_FORMAT_STEREO_FLOAT32:
             return "Stereo, Float32";
+        default:
+            return "Unknown Format";
     }
-    return "Unknown Format";
 }
 
 bool IsValidAudioExtension(std::string_view filepath)
@@ -36,5 +38,4 @@ bool HandleError(SNDFILE *&p_file)
     return false;
 }
 
-} // namespace audio
-} // namespace gouda
+}

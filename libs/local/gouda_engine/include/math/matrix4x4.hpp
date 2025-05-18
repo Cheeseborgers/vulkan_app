@@ -40,18 +40,18 @@ public:
     Matrix4x4() { data = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
 
     // Constructor with explicit values
-    Matrix4x4(const std::array<T, 16> &values) : data(values) {}
+    explicit Matrix4x4(const std::array<T, 16> &values) : data(values) {}
 
     static Matrix4x4 identity() { return Matrix4x4(); }
 
     // Access element (row, col)
-    T operator()(size_t row, size_t col) const
+    T operator()(const size_t row, const size_t col) const
     {
         ASSERT(row < 4 && col < 4, "Matrix4x4 index out of bounds");
         return data[col * 4 + row];
     }
 
-    T &operator()(size_t row, size_t col)
+    T &operator()(const size_t row, const size_t col)
     {
         ASSERT(row < 4 && col < 4, "Matrix4x4 index out of bounds");
         return data[col * 4 + row];
@@ -65,10 +65,10 @@ public:
 // TODO: Use sse enum classes
 #if defined(__SSE__)
         for (size_t col = 0; col < 4; ++col) {
-            __m128 bcol = _mm_load_ps(&other.data[col * 4]);
+            const __m128 bcol = _mm_load_ps(&other.data[col * 4]);
             for (size_t row = 0; row < 4; ++row) {
-                __m128 arow = _mm_set_ps(data[row + 12], data[row + 8], data[row + 4], data[row]);
-                __m128 prod = _mm_mul_ps(arow, bcol);
+                const __m128 arow = _mm_set_ps(data[row + 12], data[row + 8], data[row + 4], data[row]);
+                const __m128 prod = _mm_mul_ps(arow, bcol);
                 result(row, col) = _mm_cvtss_f32(_mm_hadd_ps(_mm_hadd_ps(prod, prod), prod));
             }
         }
@@ -95,8 +95,8 @@ public:
 #if defined(__SSE__)
         __m128 v = _mm_load_ps(vec.data());
         for (size_t row = 0; row < 4; ++row) {
-            __m128 mrow = _mm_set_ps(data[row + 12], data[row + 8], data[row + 4], data[row]);
-            __m128 prod = _mm_mul_ps(mrow, v);
+            const __m128 mrow = _mm_set_ps(data[row + 12], data[row + 8], data[row + 4], data[row]);
+            const __m128 prod = _mm_mul_ps(mrow, v);
             result[row] = _mm_cvtss_f32(_mm_hadd_ps(_mm_hadd_ps(prod, prod), prod));
         }
 #else

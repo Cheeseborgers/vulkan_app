@@ -15,6 +15,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include "containers/small_vector.hpp"
 #include "core/types.hpp"
 
 struct GLFWwindow;
@@ -30,7 +31,7 @@ enum class PipelineType : u8 { Quad, Text, Particle };
 
 class GraphicsPipeline {
 public:
-    GraphicsPipeline(Renderer &renderer, GLFWwindow *window_ptr, VkRenderPass render_pass, Shader *vertex_shader,
+    GraphicsPipeline(Renderer &renderer, VkRenderPass render_pass, Shader *vertex_shader,
                      Shader *fragment_shader, int number_of_images, std::vector<Buffer> &uniform_buffers,
                      int uniform_data_size, PipelineType type);
 
@@ -39,12 +40,13 @@ public:
     GraphicsPipeline(const GraphicsPipeline &) = delete;
     GraphicsPipeline &operator=(const GraphicsPipeline &) = delete;
     GraphicsPipeline(GraphicsPipeline &&) = default;
-    GraphicsPipeline &operator=(GraphicsPipeline &&) = default;
+    GraphicsPipeline &operator=(GraphicsPipeline &&) = delete;
 
     void Bind(VkCommandBuffer command_buffer_ptr, size_t image_index) const;
     void Destroy();
 
-    void UpdateTextureDescriptors(int number_of_images, const std::vector<std::unique_ptr<Texture>> &textures);
+    void UpdateTextureDescriptors(size_t number_of_images, const std::vector<std::unique_ptr<Texture>> &textures);
+    void UpdateFontTextureDescriptors(size_t number_of_images, const Vector<std::unique_ptr<Texture>> &font_textures);
 
     [[nodiscard]] constexpr VkPipeline GetPipeline() const noexcept { return p_pipeline; }
     [[nodiscard]] constexpr VkPipelineLayout GetLayout() const noexcept { return p_pipeline_layout; }
@@ -56,6 +58,28 @@ private:
     void AllocateDescriptorSets(int number_of_images);
     void UpdateDescriptorSets(int number_of_images, std::vector<Buffer> &uniform_buffers, int uniform_data_size);
 
+    [[nodiscard]] std::array<VkPipelineShaderStageCreateInfo, 2> SetupShaderStages() const;
+    [[nodiscard]] VkPipelineVertexInputStateCreateInfo SetupVertexInput();
+
+    /**
+     * @brief Sets up pipeline states (input assembly, viewport, rasterization, etc.).
+     * @return Struct containing pipeline state create infos.
+     */
+    struct PipelineStates {
+        VkPipelineInputAssemblyStateCreateInfo input_assembly;
+        VkPipelineViewportStateCreateInfo viewport;
+        VkPipelineRasterizationStateCreateInfo rasterization;
+        VkPipelineMultisampleStateCreateInfo multisample;
+        VkPipelineDepthStencilStateCreateInfo depth_stencil;
+        VkPipelineColorBlendStateCreateInfo color_blend;
+        VkPipelineDynamicStateCreateInfo dynamic;
+        VkPipelineColorBlendAttachmentState blend_attachment;
+    };
+    [[nodiscard]] PipelineStates SetupPipelineStates() const;
+    [[nodiscard]] Vector<VkPushConstantRange> SetupPushConstants();
+
+    void PrintReflection() const;
+
 private:
     Renderer &m_renderer;
     VkDevice p_device;
@@ -63,8 +87,10 @@ private:
     VkPipelineLayout p_pipeline_layout;
 
     VkDescriptorPool p_descriptor_pool;
-    std::vector<VkDescriptorSetLayout> m_descriptor_set_layouts;
-    std::vector<std::vector<VkDescriptorSet>> m_descriptor_sets;
+    Vector<VkDescriptorSetLayout> m_descriptor_set_layouts;
+    Vector<Vector<VkDescriptorSet>> m_descriptor_sets;
+    Vector<VkVertexInputBindingDescription> m_binding_descriptions;
+    Vector<VkVertexInputAttributeDescription> m_attribute_descriptions;
 
     PipelineType m_type;
 

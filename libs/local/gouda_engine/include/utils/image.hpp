@@ -20,15 +20,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 #include <expected>
-#include <memory>
 #include <span>
-#include <string_view>
 #include <vector>
 
-#include "core/types.hpp"
 #include "stb_image.h"
-#include "stb_image_resize.h"
-#include "stb_image_write.h"
+
+#include "core/types.hpp"
 
 namespace gouda {
 
@@ -40,32 +37,32 @@ enum class ImageChannels { RGB, RGBA };
 class Image {
 public:
     /// Loads an image from file.
-    static Expect<Image, std::string> Load(std::string_view filename, int desired_channels = STBI_rgb_alpha);
+    static Expect<Image, String> Load(StringView filename, int desired_channels = STBI_rgb_alpha);
 
     /// Saves the image to a file.
-    bool Save(std::string_view filename) const;
+    [[nodiscard]] bool Save(StringView filename) const;
 
     /// Converts the image to grayscale.
-    Image ToGrayscale() const;
+    [[nodiscard]] Image ToGrayscale() const;
 
     /// Flips the image horizontally.
     void FlipHorizontal();
 
     /// Rotates the image 90 degrees clockwise.
-    Image Rotate90() const;
+    [[nodiscard]] Image Rotate90() const;
 
     /// Resizes the image.
-    Expect<Image, std::string> Resize(int new_width, int new_height) const;
+    [[nodiscard]] Expect<Image, String> Resize(int new_width, int new_height) const;
 
     /// Returns raw pixel data.
-    std::span<const stbi_uc> data() const;
+    [[nodiscard]] std::span<const stbi_uc> data() const;
 
     /// Accessor functions.
-    int GetWidth() const noexcept;
-    int GetHeight() const noexcept;
-    int GetChannels() const noexcept;
-    int GetArea() const noexcept;
-    ImageSize GetSize() const noexcept;
+    [[nodiscard]] int GetWidth() const noexcept;
+    [[nodiscard]] int GetHeight() const noexcept;
+    [[nodiscard]] int GetChannels() const noexcept;
+    [[nodiscard]] int GetArea() const noexcept;
+    [[nodiscard]] ImageSize GetSize() const noexcept;
 
     /// Copy constructor.
     Image(const Image &other);

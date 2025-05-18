@@ -22,6 +22,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 #include "core/types.hpp"
+#include "math/math.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -42,7 +43,7 @@ enum class PrimitiveTopology : u8 {
     None
 };
 
-inline constexpr VkPrimitiveTopology PrimitiveTopologyToVulkan(PrimitiveTopology topology)
+constexpr VkPrimitiveTopology primitive_topology_to_vulkan(const PrimitiveTopology topology)
 {
     switch (topology) {
         case PrimitiveTopology::PointList:
@@ -58,8 +59,25 @@ inline constexpr VkPrimitiveTopology PrimitiveTopologyToVulkan(PrimitiveTopology
         case PrimitiveTopology::TriangleFan:
             return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
         default:
+            ENGINE_LOG_ERROR("Invalid primitive topology");
             return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
     }
+}
+
+inline Vec4 get_normalized_sprite_rect(const f32 x_px, const f32 y_px, const f32 width_px, const f32 height_px,
+                                      const f32 atlas_width, const f32 atlas_height)
+{
+    if (x_px < 0 || y_px < 0 || width_px <= 0 || height_px <= 0 || atlas_width <= 0 || atlas_height <= 0) {
+        ENGINE_LOG_ERROR("Invalid sprite rect parameters");
+        return Vec4{0.0f};
+    }
+
+    const f32 u_min = x_px / atlas_width;
+    const f32 u_max = (x_px + width_px) / atlas_width;
+    const f32 v_min = (atlas_height - (y_px + height_px)) / atlas_height;
+    const f32 v_max = (atlas_height - y_px) / atlas_height;
+
+    return Vec4{u_min, v_min, u_max, v_max};
 }
 
 } // namespace gouda

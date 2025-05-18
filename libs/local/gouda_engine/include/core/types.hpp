@@ -3,7 +3,7 @@
  * @file types.hpp
  * @author GoudaCheeseburgers
  * @date 2025-02-24
- * @brief Engine module
+ * @brief Engine type def module
  *
  * @copyright
  * Copyright (c) 2025 GoudaCheeseburgers <https://github.com/Cheeseborgers>
@@ -11,12 +11,7 @@
  * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
  * See <https://www.gnu.org/licenses/> for more information.
  */
-#ifndef _WIN64
-#include <unistd.h>
-#endif
-
 #include <chrono>
-#include <concepts>
 #include <expected>
 #include <filesystem>
 #include <functional>
@@ -40,12 +35,14 @@ using s64 = int64_t;
 using f32 = float;
 using f64 = double;
 
-struct Constants {
+struct constants {
+    // Unsigned int numerical limits
     static constexpr uint8_t u8_max = std::numeric_limits<uint8_t>::max();
     static constexpr uint16_t u16_max = std::numeric_limits<uint16_t>::max();
     static constexpr uint32_t u32_max = std::numeric_limits<uint32_t>::max();
     static constexpr uint64_t u64_max = std::numeric_limits<uint64_t>::max();
 
+    // Signed int numerical limits
     static constexpr int8_t s8_max = std::numeric_limits<int8_t>::max();
     static constexpr int16_t s16_max = std::numeric_limits<int16_t>::max();
     static constexpr int32_t s32_max = std::numeric_limits<int32_t>::max();
@@ -55,6 +52,14 @@ struct Constants {
     static constexpr double f64_max = std::numeric_limits<double>::max();
 
     static constexpr size_t size_t_max = std::numeric_limits<size_t>::max();
+
+    static constexpr size_t kb = 1024;
+    static constexpr size_t mb = kb * 1024;
+    static constexpr size_t gb = mb * 1024;
+
+    // Gravity on Earth in meters per second squared (m/s²). The negative sign indicates that gravity acts downward.
+    static constexpr float gravity = -9.81f;
+
 };
 
 // Chrono types
@@ -69,6 +74,8 @@ using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
 using DateTime = std::chrono::system_clock::time_point;
 using FloatingPointMicroseconds = std::chrono::duration<double, std::micro>;
 
+using String = std::basic_string<char>;
+using StringView = std::basic_string_view<char>;
 using FilePath = std::filesystem::path;
 
 template <typename A, typename B>
@@ -85,7 +92,7 @@ template <typename T>
 concept FloatingPointT = std::is_floating_point_v<T>;
 
 /**
- * @brief Concept that checks if a type is a integral type.
+ * @brief Concept that checks if a type is an integral type.
  * @tparam T The type to check.
  */
 template <typename T>
@@ -104,7 +111,7 @@ struct SemVer {
     u32 patch{0};
     u32 variant{0}; // Variant is typically 0 for Vulkan
 
-    std::string ToString() const
+    [[nodiscard]] std::string ToString() const
     {
         std::ostringstream oss;
         oss << major << "." << minor << "." << patch;
@@ -127,7 +134,7 @@ struct Dimensions {
     T width;
     T height;
 
-    Dimensions(T w = T(), T h = T()) : width(w), height(h) {}
+    explicit Dimensions(T w = T(), T h = T()) : width(w), height(h) {}
 
     // Equality comparison
     bool operator==(const Dimensions &other) const { return width == other.width && height == other.height; }
@@ -141,13 +148,31 @@ struct Dimensions {
 };
 
 template <NumericT T>
+struct UVRect {
+    T u_min;
+    T v_min;
+    T u_max;
+    T v_max;
+
+    explicit UVRect(T u_min_ = T(), T v_min_ = T(), T u_max_ = T(), T v_max_ = T())
+        : u_min{u_min_}, v_min{v_min_}, u_max{u_max_}, v_max{v_max_}
+    {
+    }
+
+    explicit UVRect(T value = T())
+        : u_min{value}, v_min{value}, u_max{value}, v_max{value}
+    {
+    }
+};
+
+template <NumericT T>
 struct Rect {
     T left;
     T right;
     T bottom;
     T top;
 
-    Rect(T left_ = T(), T right_ = T(), T bottom_ = T(), T top_ = T())
+    explicit Rect(T left_ = T(), T right_ = T(), T bottom_ = T(), T top_ = T())
         : left{left_}, right{right_}, bottom{bottom_}, top{top_}
     {
     }

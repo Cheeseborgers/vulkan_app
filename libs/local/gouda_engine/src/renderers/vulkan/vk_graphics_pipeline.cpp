@@ -1,7 +1,7 @@
 /**
  * @file renderers/vulkan/vk_graphics_pipeline.cpp
  * @author GoudaCheeseburgers
- * @date 2025-04-22
+ * @date 2025-05-12
  * @brief Engine Vulkan graphics pipeline implementation.
  */
 #include "renderers/vulkan/vk_graphics_pipeline.hpp"
@@ -13,6 +13,7 @@
 #include "containers/small_vector.hpp"
 #include "core/types.hpp"
 #include "debug/debug.hpp"
+#include "math/math.hpp"
 #include "renderers/vulkan/vk_buffer.hpp"
 #include "renderers/vulkan/vk_device.hpp"
 #include "renderers/vulkan/vk_renderer.hpp"
@@ -25,7 +26,7 @@ namespace gouda::vk {
 namespace internal {
 // Helper function to map vertex input to struct offsets
 template <typename T>
-u32 get_struct_offset(const std::string &name, VkFormat format, bool &success)
+u32 get_struct_offset(StringView name, VkFormat format, bool &success)
 {
     success = true;
     if constexpr (std::is_same_v<T, Vertex>) {
@@ -78,14 +79,12 @@ u32 get_struct_offset(const std::string &name, VkFormat format, bool &success)
         if (name == "instance_texture_index" && format == VK_FORMAT_R32_UINT)
             return offsetof(TextData, texture_index);
     }
-
     success = false;
     return 0;
 }
 } // namespace internal
 
-// TODO: Rename this
-static constexpr std::string_view to_string(PipelineType type)
+static constexpr std::string_view pipeline_type_to_string(PipelineType type)
 {
     switch (type) {
         case PipelineType::Quad:
@@ -100,7 +99,7 @@ static constexpr std::string_view to_string(PipelineType type)
 }
 
 // GraphicsPipeline implementation -----------------------------------------------------------------
-GraphicsPipeline::GraphicsPipeline(Renderer &renderer, GLFWwindow *p_window, VkRenderPass p_render_pass,
+GraphicsPipeline::GraphicsPipeline(Renderer &renderer, VkRenderPass p_render_pass,
                                    Shader *vertex_shader, Shader *fragment_shader, int number_of_images,
                                    std::vector<Buffer> &uniform_buffers, int uniform_data_size, PipelineType type)
     : m_renderer{renderer},
@@ -117,231 +116,17 @@ GraphicsPipeline::GraphicsPipeline(Renderer &renderer, GLFWwindow *p_window, VkR
 
     CreateDescriptorSets(number_of_images, uniform_buffers, uniform_data_size);
 
-    // Specialization Constants
-    SmallVector<VkSpecializationMapEntry, 4> spec_entries_vertex;
-    SmallVector<u8, 4> spec_data_vertex;
-    for (const auto &spec : vertex_shader->Reflection().specialization_constants) {
-        VkSpecializationMapEntry entry{.constantID = spec.constant_id,
-                                       .offset = static_cast<u32>(spec_data_vertex.size()),
-                                       .size = spec.default_value.size()};
-        spec_entries_vertex.push_back(entry);
-        spec_data_vertex.insert(spec_data_vertex.end(), spec.default_value.begin(), spec.default_value.end());
-    }
-
-    SmallVector<VkSpecializationMapEntry, 4> spec_entries_fragment;
-    SmallVector<u8, 4> spec_data_fragment;
-    for (const auto &spec : fragment_shader->Reflection().specialization_constants) {
-        VkSpecializationMapEntry entry{.constantID = spec.constant_id,
-                                       .offset = static_cast<u32>(spec_data_fragment.size()),
-                                       .size = spec.default_value.size()};
-        spec_entries_fragment.push_back(entry);
-        spec_data_fragment.insert(spec_data_fragment.end(), spec.default_value.begin(), spec.default_value.end());
-    }
-
-    VkSpecializationInfo spec_info_vertex{.mapEntryCount = static_cast<u32>(spec_entries_vertex.size()),
-                                          .pMapEntries =
-                                              spec_entries_vertex.empty() ? nullptr : spec_entries_vertex.data(),
-                                          .dataSize = spec_data_vertex.size(),
-                                          .pData = spec_data_vertex.empty() ? nullptr : spec_data_vertex.data()};
-
-    VkSpecializationInfo spec_info_fragment{.mapEntryCount = static_cast<u32>(spec_entries_fragment.size()),
-                                            .pMapEntries =
-                                                spec_entries_fragment.empty() ? nullptr : spec_entries_fragment.data(),
-                                            .dataSize = spec_data_fragment.size(),
-                                            .pData = spec_data_fragment.empty() ? nullptr : spec_data_fragment.data()};
-
-    // Shader stages
-    std::array<VkPipelineShaderStageCreateInfo, 2> shader_stage_create_info = {
-        VkPipelineShaderStageCreateInfo{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                                        .stage = vertex_shader->Stage(),
-                                        .module = vertex_shader->Get(),
-                                        .pName = vertex_shader->Reflection().entry_point.c_str(),
-                                        .pSpecializationInfo =
-                                            spec_entries_vertex.empty() ? nullptr : &spec_info_vertex},
-        VkPipelineShaderStageCreateInfo{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                                        .stage = fragment_shader->Stage(),
-                                        .module = fragment_shader->Get(),
-                                        .pName = fragment_shader->Reflection().entry_point.c_str(),
-                                        .pSpecializationInfo =
-                                            spec_entries_fragment.empty() ? nullptr : &spec_info_fragment}};
-
-    // Dynamic Vertex Input
-    SmallVector<VkVertexInputBindingDescription, 2> binding_descriptions;
-    SmallVector<VkVertexInputAttributeDescription, 9> attribute_descriptions;
-    u32 attribute_index{0};
-
-    // Binding 0: Per-vertex data (Vertex struct)
-    binding_descriptions.push_back({.binding = 0, .stride = sizeof(Vertex), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX});
-
-    for (const auto &input : vertex_shader->Reflection().vertex_inputs) {
-        if (input.input_rate != VK_VERTEX_INPUT_RATE_VERTEX)
-            continue; // Skip instance inputs
-        bool success{false};
-        u32 offset{internal::get_struct_offset<Vertex>(input.name, input.format, success)};
-        if (!success) {
-            ENGINE_LOG_WARNING("Unsupported vertex input: name={}, format={}", input.name,
-                               vk_format_to_string_view(input.format));
-            continue;
-        }
-        attribute_descriptions.push_back(
-            {.location = input.location, .binding = 0, .format = input.format, .offset = offset});
-        attribute_index++;
-    }
-
-    // Binding 1: Per-instance data (InstanceData or ParticleData)
-    if (type == PipelineType::Quad) {
-        binding_descriptions.push_back(
-            {.binding = 1, .stride = sizeof(InstanceData), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE});
-        for (const auto &input : vertex_shader->Reflection().vertex_inputs) {
-            if (input.input_rate != VK_VERTEX_INPUT_RATE_INSTANCE)
-                continue;
-            bool success{false};
-            u32 offset{internal::get_struct_offset<InstanceData>(input.name, input.format, success)};
-            if (!success) {
-                ENGINE_LOG_WARNING("Unsupported instance input: name={}, format={}", input.name,
-                                   vk_format_to_string_view(input.format));
-                continue;
-            }
-            attribute_descriptions.push_back(
-                {.location = input.location, .binding = 1, .format = input.format, .offset = offset});
-            attribute_index++;
-        }
-    }
-    else if (type == PipelineType::Text) {
-        binding_descriptions.push_back(
-            {.binding = 1, .stride = sizeof(TextData), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE});
-        for (const auto &input : vertex_shader->Reflection().vertex_inputs) {
-            if (input.input_rate != VK_VERTEX_INPUT_RATE_INSTANCE)
-                continue;
-            bool success{false};
-            u32 offset{internal::get_struct_offset<TextData>(input.name, input.format, success)};
-            if (!success) {
-                ENGINE_LOG_WARNING("Unsupported instance input: name={}, format={} in Text Pipeline", input.name,
-                                   vk_format_to_string_view(input.format));
-                continue;
-            }
-            attribute_descriptions.push_back(
-                {.location = input.location, .binding = 1, .format = input.format, .offset = offset});
-            attribute_index++;
-        }
-    }
-    else if (type == PipelineType::Particle) {
-        binding_descriptions.push_back(
-            {.binding = 1, .stride = sizeof(ParticleData), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE});
-        for (const auto &input : vertex_shader->Reflection().vertex_inputs) {
-            if (input.input_rate != VK_VERTEX_INPUT_RATE_INSTANCE)
-                continue;
-            bool success{false};
-            u32 offset{internal::get_struct_offset<ParticleData>(input.name, input.format, success)};
-            if (!success) {
-                ENGINE_LOG_WARNING("Unsupported instance input: name={}, format={}", input.name,
-                                   vk_format_to_string_view(input.format));
-                continue;
-            }
-            attribute_descriptions.push_back(
-                {.location = input.location, .binding = 1, .format = input.format, .offset = offset});
-            attribute_index++;
-        }
-    }
-
-    if (attribute_descriptions.empty()) {
-        ENGINE_LOG_ERROR("No valid vertex or instance inputs found for shader");
-        ENGINE_THROW("Failed to create graphics pipeline: no valid vertex inputs");
-    }
-
-    VkPipelineVertexInputStateCreateInfo vertex_input_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = static_cast<u32>(binding_descriptions.size()),
-        .pVertexBindingDescriptions = binding_descriptions.data(),
-        .vertexAttributeDescriptionCount = static_cast<u32>(attribute_descriptions.size()),
-        .pVertexAttributeDescriptions = attribute_descriptions.data()};
-
-    VkPipelineInputAssemblyStateCreateInfo pipeline_input_assembly_state_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-        .primitiveRestartEnable = VK_FALSE};
-
-    VkDynamicState dynamic_states[]{VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-    VkPipelineDynamicStateCreateInfo dynamic_state_info{.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-                                                        .dynamicStateCount = 2,
-                                                        .pDynamicStates = dynamic_states};
-
-    VkPipelineViewportStateCreateInfo viewport_state_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, .viewportCount = 1, .scissorCount = 1};
-
-    VkPipelineRasterizationStateCreateInfo pipeline_rasterization_state_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-        .polygonMode = VK_POLYGON_MODE_FILL,
-        .cullMode = VK_CULL_MODE_BACK_BIT,
-        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-        .lineWidth = 1.0f};
-
-    VkPipelineMultisampleStateCreateInfo pipeline_multisampler_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT};
-
-    VkPipelineDepthStencilStateCreateInfo depth_stencil_state_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = VK_TRUE,
-        .depthWriteEnable = VK_TRUE,
-        .depthCompareOp = VK_COMPARE_OP_LESS,
-        .depthBoundsTestEnable = VK_FALSE,
-        .stencilTestEnable = VK_FALSE};
-
-    VkPipelineColorBlendAttachmentState blend_attach_state{
-        .blendEnable = (type == PipelineType::Text || type == PipelineType::Particle) ? VK_TRUE : VK_FALSE,
-        .colorWriteMask =
-            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT};
-    if (blend_attach_state.blendEnable) {
-        blend_attach_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-        blend_attach_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-        blend_attach_state.colorBlendOp = VK_BLEND_OP_ADD;
-        blend_attach_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-        blend_attach_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-        blend_attach_state.alphaBlendOp = VK_BLEND_OP_ADD;
-    }
-
-    VkPipelineColorBlendStateCreateInfo blend_create_info{.sType =
-                                                              VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-                                                          .attachmentCount = 1,
-                                                          .pAttachments = &blend_attach_state};
-
-    // Push Constants
-    SmallVector<VkPushConstantRange, 1> push_constant_ranges;
-    std::unordered_map<VkShaderStageFlags, std::unordered_set<u32>> seen_offsets_by_stage;
-    for (const auto &shader : {vertex_shader, fragment_shader}) {
-        auto &seen_offsets = seen_offsets_by_stage[shader->Stage()];
-        for (const auto &pc : shader->Reflection().push_constants) {
-            if (pc.offset % 4 != 0 || pc.size % 4 != 0) {
-                ENGINE_LOG_ERROR("Push constant in shader stage {} has unaligned offset ({}) or size ({})",
-                                 vk_shader_stage_as_string_view(shader->Stage()), pc.offset, pc.size);
-                continue;
-            }
-            u32 range_end{pc.offset + pc.size};
-            for (u32 i = pc.offset; i < range_end; ++i) {
-                if (!seen_offsets.insert(i).second) {
-                    ENGINE_LOG_ERROR("Overlapping push constant offset {} in shader stage {}", i,
-                                     vk_shader_stage_as_string_view(shader->Stage()));
-                }
-            }
-            push_constant_ranges.push_back({.stageFlags = pc.stage_flags, .offset = pc.offset, .size = pc.size});
-        }
-    }
-
-    u32 total_size{0};
-    for (const auto &range : push_constant_ranges) {
-        total_size = std::max(total_size, range.offset + range.size);
-    }
-    if (total_size > 128) {
-        ENGINE_LOG_ERROR("Total push constant size {} exceeds typical limit of 128 bytes", total_size);
-    }
+    auto shader_stages = SetupShaderStages();
+    auto vertex_input = SetupVertexInput();
+    auto pipeline_states = SetupPipelineStates();
+    auto push_constants = SetupPushConstants();
 
     VkPipelineLayoutCreateInfo layout_info{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = static_cast<u32>(m_descriptor_set_layouts.size()),
         .pSetLayouts = m_descriptor_set_layouts.empty() ? nullptr : m_descriptor_set_layouts.data(),
-        .pushConstantRangeCount = static_cast<u32>(push_constant_ranges.size()),
-        .pPushConstantRanges = push_constant_ranges.empty() ? nullptr : push_constant_ranges.data()};
+        .pushConstantRangeCount = static_cast<u32>(push_constants.size()),
+        .pPushConstantRanges = push_constants.empty() ? nullptr : push_constants.data()};
 
     VkResult result{vkCreatePipelineLayout(p_device, &layout_info, nullptr, &p_pipeline_layout)};
     if (result != VK_SUCCESS) {
@@ -350,16 +135,16 @@ GraphicsPipeline::GraphicsPipeline(Renderer &renderer, GLFWwindow *p_window, VkR
     }
 
     VkGraphicsPipelineCreateInfo pipeline_info{.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-                                               .stageCount = static_cast<u32>(shader_stage_create_info.size()),
-                                               .pStages = shader_stage_create_info.data(),
-                                               .pVertexInputState = &vertex_input_info,
-                                               .pInputAssemblyState = &pipeline_input_assembly_state_create_info,
-                                               .pViewportState = &viewport_state_create_info,
-                                               .pRasterizationState = &pipeline_rasterization_state_create_info,
-                                               .pMultisampleState = &pipeline_multisampler_create_info,
-                                               .pDepthStencilState = &depth_stencil_state_create_info,
-                                               .pColorBlendState = &blend_create_info,
-                                               .pDynamicState = &dynamic_state_info,
+                                               .stageCount = static_cast<u32>(shader_stages.size()),
+                                               .pStages = shader_stages.data(),
+                                               .pVertexInputState = &vertex_input,
+                                               .pInputAssemblyState = &pipeline_states.input_assembly,
+                                               .pViewportState = &pipeline_states.viewport,
+                                               .pRasterizationState = &pipeline_states.rasterization,
+                                               .pMultisampleState = &pipeline_states.multisample,
+                                               .pDepthStencilState = &pipeline_states.depth_stencil,
+                                               .pColorBlendState = &pipeline_states.color_blend,
+                                               .pDynamicState = &pipeline_states.dynamic,
                                                .layout = p_pipeline_layout,
                                                .renderPass = p_render_pass,
                                                .subpass = 0};
@@ -370,16 +155,15 @@ GraphicsPipeline::GraphicsPipeline(Renderer &renderer, GLFWwindow *p_window, VkR
         CHECK_VK_RESULT(result, "vkCreateGraphicsPipelines");
     }
     else {
-        ENGINE_LOG_DEBUG("Graphics pipeline created for type: {}", to_string(type));
+        ENGINE_LOG_DEBUG("Graphics pipeline created for type: {}", pipeline_type_to_string(type));
     }
 }
 
 GraphicsPipeline::~GraphicsPipeline() { Destroy(); }
 
-void GraphicsPipeline::Bind(VkCommandBuffer command_buffer_ptr, size_t image_index) const
+void GraphicsPipeline::Bind(VkCommandBuffer command_buffer_ptr, const size_t image_index) const
 {
     vkCmdBindPipeline(command_buffer_ptr, VK_PIPELINE_BIND_POINT_GRAPHICS, p_pipeline);
-
     if (!m_descriptor_sets.empty()) {
         Vector<VkDescriptorSet> sets;
         for (const auto &set : m_descriptor_sets) {
@@ -403,7 +187,6 @@ void GraphicsPipeline::Destroy()
         }
     }
     m_descriptor_set_layouts.clear();
-
     if (p_pipeline_layout != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(p_device, p_pipeline_layout, nullptr);
         p_pipeline_layout = VK_NULL_HANDLE;
@@ -416,60 +199,73 @@ void GraphicsPipeline::Destroy()
         vkDestroyPipeline(p_device, p_pipeline, nullptr);
         p_pipeline = VK_NULL_HANDLE;
     }
-
     m_descriptor_sets.clear();
-
+    m_binding_descriptions.clear();
+    m_attribute_descriptions.clear();
     ENGINE_LOG_DEBUG("Graphics pipeline destroyed");
 }
 
-void GraphicsPipeline::UpdateTextureDescriptors(int number_of_images,
+void GraphicsPipeline::UpdateTextureDescriptors(size_t number_of_images,
                                                 const std::vector<std::unique_ptr<Texture>> &textures)
 {
     ASSERT(!textures.empty(), "Texture vector must contain at least the default texture");
-    Texture *default_texture{textures.front().get()}; // Default 1x1 texture at index 0
+    const Texture *default_texture{textures.front().get()};
+    if (textures.size() > MAX_TEXTURES) {
+        ENGINE_LOG_WARNING("Texture count ({}) exceeds MAX_TEXTURES ({}); capping at MAX_TEXTURES", textures.size(),
+                           MAX_TEXTURES);
+    }
 
     Vector<VkDescriptorImageInfo> image_infos{MAX_TEXTURES};
     for (size_t i = 0; i < MAX_TEXTURES; ++i) {
-        Texture *texture{(i < textures.size()) ? textures[i].get() : default_texture};
+        const Texture *texture{(i < textures.size()) ? textures[i].get() : default_texture};
         image_infos[i] = {.sampler = texture->p_sampler,
                           .imageView = texture->p_view,
                           .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
     }
 
     Vector<VkWriteDescriptorSet> write_descriptor_sets;
-    write_descriptor_sets.reserve(m_descriptor_sets.size() * number_of_images * 4);
+    write_descriptor_sets.reserve(m_descriptor_sets.size() * number_of_images);
 
     for (u32 set = 0; set < m_descriptor_sets.size(); ++set) {
-
         if (m_descriptor_sets[set].empty()) {
+            continue;
+        }
+        bool binding_exists{false};
+        for (const auto &binding : p_fragment_shader->Reflection().descriptor_bindings) {
+            if (binding.set == set && binding.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER &&
+                binding.binding == 3) {
+                binding_exists = true;
+                ENGINE_LOG_DEBUG("Found texture binding: set={}, binding=3, count={}", set, binding.count);
+                break;
+            }
+        }
+        if (!binding_exists) {
             continue;
         }
 
         for (int i = 0; i < number_of_images; ++i) {
-            for (const auto &shader : {p_vertex_shader, p_fragment_shader}) {
-                for (const auto &binding : shader->Reflection().descriptor_bindings) {
-
-                    if (binding.set != set || binding.type != VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-                        continue;
-                    }
-
-                    VkWriteDescriptorSet write_descriptor_set{};
-                    write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                    write_descriptor_set.dstSet = m_descriptor_sets[set][i];
-                    write_descriptor_set.dstBinding = binding.binding;
-                    write_descriptor_set.dstArrayElement = 0;
-                    write_descriptor_set.descriptorCount = binding.count;
-                    write_descriptor_set.descriptorType = binding.type;
-                    write_descriptor_set.pImageInfo = image_infos.data();
-
-                    if (binding.count > MAX_TEXTURES) {
-                        ENGINE_LOG_WARNING("Descriptor set {}, binding {} requests {} samplers, but MAX_TEXTURES is {}",
-                                           binding.set, binding.binding, binding.count, MAX_TEXTURES);
-                        write_descriptor_set.descriptorCount = MAX_TEXTURES;
-                    }
-
-                    write_descriptor_sets.push_back(write_descriptor_set);
+            if (m_type != PipelineType::Quad && m_type != PipelineType::Particle) {
+                continue;
+            }
+            for (const auto &binding : p_fragment_shader->Reflection().descriptor_bindings) {
+                if (binding.set != set || binding.type != VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+                    binding.binding != 3) {
+                    continue;
                 }
+                VkWriteDescriptorSet write_descriptor_set{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                                          .dstSet = m_descriptor_sets[set][i],
+                                                          .dstBinding = binding.binding,
+                                                          .dstArrayElement = 0,
+                                                          .descriptorCount = binding.count,
+                                                          .descriptorType = binding.type,
+                                                          .pImageInfo = image_infos.data()};
+                if (binding.count > MAX_TEXTURES) {
+                    ENGINE_LOG_WARNING(
+                        "Texture descriptor set {}, binding {} requests {} samplers, but MAX_TEXTURES is {}",
+                        binding.set, binding.binding, binding.count, MAX_TEXTURES);
+                    write_descriptor_set.descriptorCount = MAX_TEXTURES;
+                }
+                write_descriptor_sets.push_back(write_descriptor_set);
             }
         }
     }
@@ -477,13 +273,97 @@ void GraphicsPipeline::UpdateTextureDescriptors(int number_of_images,
     if (!write_descriptor_sets.empty()) {
         vkUpdateDescriptorSets(p_device, static_cast<u32>(write_descriptor_sets.size()), write_descriptor_sets.data(),
                                0, nullptr);
+        ENGINE_LOG_DEBUG("Updated {} texture descriptor writes for pipeline type: {}", write_descriptor_sets.size(),
+                         pipeline_type_to_string(m_type));
+    }
+    else {
+        ENGINE_LOG_WARNING(
+            "No texture descriptor writes generated for pipeline type: {}. Expected binding=3 in fragment shader.",
+            pipeline_type_to_string(m_type));
+    }
+}
+
+void GraphicsPipeline::UpdateFontTextureDescriptors(size_t number_of_images,
+                                                    const Vector<std::unique_ptr<Texture>> &font_textures)
+{
+    ASSERT(!font_textures.empty(), "Font texture vector must contain at least the default font texture");
+    const Texture *default_texture{(font_textures[0].get())};
+    if (font_textures.size() > MAX_TEXTURES) {
+        ENGINE_LOG_WARNING("Font texture count ({}) exceeds MAX_TEXTURES ({}); capping at MAX_TEXTURES",
+                           font_textures.size(), MAX_TEXTURES);
+    }
+
+    Vector<VkDescriptorImageInfo> image_infos{MAX_TEXTURES};
+    for (size_t i = 0; i < MAX_TEXTURES; ++i) {
+        const Texture *texture{i < font_textures.size() ? font_textures[i].get() : default_texture};
+        image_infos[i] = {.sampler = texture->p_sampler,
+                          .imageView = texture->p_view,
+                          .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+    }
+
+    Vector<VkWriteDescriptorSet> write_descriptor_sets;
+    write_descriptor_sets.reserve(m_descriptor_sets.size() * number_of_images);
+
+    for (u32 set = 0; set < m_descriptor_sets.size(); ++set) {
+        if (m_descriptor_sets[set].empty()) {
+            continue;
+        }
+        bool binding_exists{false};
+        for (const auto &binding : p_fragment_shader->Reflection().descriptor_bindings) {
+            if (binding.set == set && binding.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER &&
+                binding.binding == 4) {
+                binding_exists = true;
+                ENGINE_LOG_DEBUG("Found font texture binding: set={}, binding=4, count={}", set, binding.count);
+                break;
+            }
+        }
+        if (!binding_exists) {
+            continue;
+        }
+
+        for (int i = 0; i < number_of_images; ++i) {
+            if (m_type != PipelineType::Text) {
+                continue;
+            }
+            for (const auto &binding : p_fragment_shader->Reflection().descriptor_bindings) {
+                if (binding.set != set || binding.type != VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+                    binding.binding != 4) {
+                    continue;
+                }
+                VkWriteDescriptorSet write_descriptor_set{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                                          .dstSet = m_descriptor_sets[set][i],
+                                                          .dstBinding = binding.binding,
+                                                          .dstArrayElement = 0,
+                                                          .descriptorCount = binding.count,
+                                                          .descriptorType = binding.type,
+                                                          .pImageInfo = image_infos.data()};
+                if (binding.count > MAX_TEXTURES) {
+                    ENGINE_LOG_WARNING(
+                        "Font descriptor set {}, binding {} requests {} samplers, but MAX_TEXTURES is {}", binding.set,
+                        binding.binding, binding.count, MAX_TEXTURES);
+                    write_descriptor_set.descriptorCount = MAX_TEXTURES;
+                }
+                write_descriptor_sets.push_back(write_descriptor_set);
+            }
+        }
+    }
+
+    if (!write_descriptor_sets.empty()) {
+        vkUpdateDescriptorSets(p_device, static_cast<u32>(write_descriptor_sets.size()), write_descriptor_sets.data(),
+                               0, nullptr);
+        ENGINE_LOG_DEBUG("Updated {} font texture descriptor writes for pipeline type: {}",
+                         write_descriptor_sets.size(), pipeline_type_to_string(m_type));
+    }
+    else {
+        ENGINE_LOG_WARNING(
+            "No font texture descriptor writes generated for pipeline type: {}. Expected binding=4 in fragment shader.",
+            pipeline_type_to_string(m_type));
     }
 }
 
 // Private functions ---------------------------------------------------------------
 void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
 {
-    // Count descriptors by type across all sets and shaders
     std::unordered_map<VkDescriptorType, u32> pool_size_counts;
     for (const auto &shader : {p_vertex_shader, p_fragment_shader}) {
         for (const auto &binding : shader->Reflection().descriptor_bindings) {
@@ -495,32 +375,31 @@ void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
     for (const auto &[type, count] : pool_size_counts) {
         pool_sizes.push_back({.type = type, .descriptorCount = count});
     }
-
     if (pool_sizes.empty()) {
-        ENGINE_LOG_WARNING("No descriptor bindings found in shaders; creating empty descriptor pool");
+        ENGINE_LOG_WARNING("No descriptor bindings found; creating minimal descriptor pool");
         pool_sizes.push_back({.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1});
     }
 
-    // Calculate total number of sets (max set number + 1, per frame)
     u32 max_set{0};
     for (const auto &shader : {p_vertex_shader, p_fragment_shader}) {
         for (const auto &binding : shader->Reflection().descriptor_bindings) {
             max_set = std::max(max_set, binding.set);
         }
     }
-
     u32 total_sets{(max_set + 1) * number_of_images};
 
-    VkDescriptorPoolCreateInfo descriptor_pool_create_info{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-                                                           .maxSets = total_sets,
-                                                           .poolSizeCount = static_cast<u32>(pool_sizes.size()),
-                                                           .pPoolSizes = pool_sizes.data()};
+    const VkDescriptorPoolCreateInfo pool_info{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+                                         .maxSets = total_sets,
+                                         .poolSizeCount = static_cast<u32>(pool_sizes.size()),
+                                         .pPoolSizes = pool_sizes.data()};
 
-    VkResult result{vkCreateDescriptorPool(p_device, &descriptor_pool_create_info, nullptr, &p_descriptor_pool)};
+    VkResult result{vkCreateDescriptorPool(p_device, &pool_info, nullptr, &p_descriptor_pool)};
     if (result != VK_SUCCESS) {
-        ENGINE_LOG_ERROR("Failed to create descriptor pool. Error code: {}", vk_result_to_string(result));
+        ENGINE_LOG_ERROR("Failed to create descriptor pool. Error: {}", vk_result_to_string(result));
         CHECK_VK_RESULT(result, "vkCreateDescriptorPool");
     }
+
+    ENGINE_LOG_DEBUG("Created descriptor pool with {} sets and {} pool sizes", total_sets, pool_sizes.size());
 }
 
 void GraphicsPipeline::CreateDescriptorSets(int number_of_images, std::vector<Buffer> &uniform_buffers,
@@ -531,20 +410,19 @@ void GraphicsPipeline::CreateDescriptorSets(int number_of_images, std::vector<Bu
     AllocateDescriptorSets(number_of_images);
     UpdateDescriptorSets(number_of_images, uniform_buffers, uniform_data_size);
     UpdateTextureDescriptors(number_of_images, m_renderer.GetTextures());
+    UpdateFontTextureDescriptors(number_of_images, m_renderer.GetFontTextures());
 }
 
 void GraphicsPipeline::CreateDescriptorSetLayout()
 {
-    // Find maximum set number
     u32 max_set{0};
     for (const auto &shader : {p_vertex_shader, p_fragment_shader}) {
         for (const auto &binding : shader->Reflection().descriptor_bindings) {
             max_set = math::max(max_set, binding.set);
         }
     }
-
-    // Create a layout for each set (0 to max_set)
     m_descriptor_set_layouts.resize(max_set + 1, VK_NULL_HANDLE);
+
     for (u32 set = 0; set <= max_set; ++set) {
         Vector<VkDescriptorSetLayoutBinding> layout_bindings;
         std::unordered_set<u32> seen_bindings;
@@ -558,39 +436,26 @@ void GraphicsPipeline::CreateDescriptorSetLayout()
                                        set, vk_shader_stage_as_string_view(shader->Stage()));
                     continue;
                 }
-                VkDescriptorSetLayoutBinding layout_binding{
-                    .binding = binding.binding,
-                    .descriptorType = binding.type,
-                    .descriptorCount = binding.count,
-                    .stageFlags = binding.stage_flags,
-                    .pImmutableSamplers = nullptr // Assume no immutable samplers
-                };
+                VkDescriptorSetLayoutBinding layout_binding{.binding = binding.binding,
+                                                            .descriptorType = binding.type,
+                                                            .descriptorCount = binding.count,
+                                                            .stageFlags = binding.stage_flags,
+                                                            .pImmutableSamplers = nullptr};
                 layout_bindings.push_back(layout_binding);
             }
         }
 
-        if (layout_bindings.empty()) {
-            // Create an empty layout for unused sets to maintain set numbering
-            VkDescriptorSetLayoutCreateInfo layout_info{
-                .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .bindingCount = 0, .pBindings = nullptr};
-            VkResult result{
-                vkCreateDescriptorSetLayout(p_device, &layout_info, nullptr, &m_descriptor_set_layouts[set])};
-            if (result != VK_SUCCESS) {
-                ENGINE_LOG_ERROR("Failed to create descriptor set layout. Error code: {}", vk_result_to_string(result));
-                CHECK_VK_RESULT(result, "vkCreateDescriptorSetLayout");
-            }
-            continue;
-        }
-
         VkDescriptorSetLayoutCreateInfo layout_info{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
                                                     .bindingCount = static_cast<u32>(layout_bindings.size()),
-                                                    .pBindings = layout_bindings.data()};
-
+                                                    .pBindings =
+                                                        layout_bindings.empty() ? nullptr : layout_bindings.data()};
         VkResult result{vkCreateDescriptorSetLayout(p_device, &layout_info, nullptr, &m_descriptor_set_layouts[set])};
         if (result != VK_SUCCESS) {
-            ENGINE_LOG_ERROR("Failed to create descriptor set layout. Error code: {}", vk_result_to_string(result));
+            ENGINE_LOG_ERROR("Failed to create descriptor set layout for set {}. Error: {}", set,
+                             vk_result_to_string(result));
             CHECK_VK_RESULT(result, "vkCreateDescriptorSetLayout");
         }
+        ENGINE_LOG_DEBUG("Created descriptor set layout for set {} with {} bindings", set, layout_bindings.size());
     }
 }
 
@@ -599,7 +464,7 @@ void GraphicsPipeline::AllocateDescriptorSets(int number_of_images)
     m_descriptor_sets.resize(m_descriptor_set_layouts.size());
     for (size_t set = 0; set < m_descriptor_set_layouts.size(); ++set) {
         if (m_descriptor_set_layouts[set] == VK_NULL_HANDLE) {
-            continue; // Skip unused sets
+            continue;
         }
         Vector<VkDescriptorSetLayout> layouts(number_of_images, m_descriptor_set_layouts[set]);
         VkDescriptorSetAllocateInfo alloc_info{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -609,7 +474,7 @@ void GraphicsPipeline::AllocateDescriptorSets(int number_of_images)
         m_descriptor_sets[set].resize(number_of_images);
         VkResult result{vkAllocateDescriptorSets(p_device, &alloc_info, m_descriptor_sets[set].data())};
         if (result != VK_SUCCESS) {
-            ENGINE_LOG_ERROR("Failed to allocate descriptor set. Error code: {}", vk_result_to_string(result));
+            ENGINE_LOG_ERROR("Failed to allocate descriptor set {}. Error: {}", set, vk_result_to_string(result));
             CHECK_VK_RESULT(result, "vkAllocateDescriptorSets");
         }
     }
@@ -625,7 +490,7 @@ void GraphicsPipeline::UpdateDescriptorSets(int number_of_images, std::vector<Bu
 
     for (u32 set = 0; set < m_descriptor_sets.size(); ++set) {
         if (m_descriptor_sets[set].empty()) {
-            continue; // Skip unused sets
+            continue;
         }
         for (int i = 0; i < number_of_images; ++i) {
             for (const auto &shader : {p_vertex_shader, p_fragment_shader}) {
@@ -639,7 +504,6 @@ void GraphicsPipeline::UpdateDescriptorSets(int number_of_images, std::vector<Bu
                                                .dstArrayElement = 0,
                                                .descriptorCount = binding.count,
                                                .descriptorType = binding.type};
-
                     if (binding.type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
                         if (binding.set == 0 && binding.binding == 0) {
                             auto buffer_info = std::make_unique<VkDescriptorBufferInfo>(
@@ -656,7 +520,6 @@ void GraphicsPipeline::UpdateDescriptorSets(int number_of_images, std::vector<Bu
                         }
                     }
                     else if (binding.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-                        // Skip texture bindings during initialization
                         continue;
                     }
                     else {
@@ -665,19 +528,319 @@ void GraphicsPipeline::UpdateDescriptorSets(int number_of_images, std::vector<Bu
                                            binding.binding);
                         continue;
                     }
-
                     write_descriptor_sets.push_back(write);
                 }
             }
         }
     }
 
-    if (write_descriptor_sets.empty()) {
-        ENGINE_LOG_WARNING("No valid descriptor writes generated for pipeline");
+    if (!write_descriptor_sets.empty()) {
+        vkUpdateDescriptorSets(p_device, static_cast<u32>(write_descriptor_sets.size()), write_descriptor_sets.data(),
+                               0, nullptr);
+        ENGINE_LOG_DEBUG("Updated {} uniform buffer descriptor writes", write_descriptor_sets.size());
+    }
+    else {
+        ENGINE_LOG_WARNING("No uniform buffer descriptor writes generated; expected set=0, binding=0");
+    }
+}
+
+std::array<VkPipelineShaderStageCreateInfo, 2> GraphicsPipeline::SetupShaderStages() const
+{
+    SmallVector<VkSpecializationMapEntry, 4> spec_entries_vertex;
+    SmallVector<u8, 4> spec_data_vertex;
+    for (const auto &spec : p_vertex_shader->Reflection().specialization_constants) {
+        VkSpecializationMapEntry entry{.constantID = spec.constant_id,
+                                       .offset = static_cast<u32>(spec_data_vertex.size()),
+                                       .size = spec.default_value.size()};
+        spec_entries_vertex.push_back(entry);
+        spec_data_vertex.insert(spec_data_vertex.end(), spec.default_value.begin(), spec.default_value.end());
     }
 
-    vkUpdateDescriptorSets(p_device, static_cast<u32>(write_descriptor_sets.size()), write_descriptor_sets.data(), 0,
-                           nullptr);
+    SmallVector<VkSpecializationMapEntry, 4> spec_entries_fragment;
+    SmallVector<u8, 4> spec_data_fragment;
+    for (const auto &spec : p_fragment_shader->Reflection().specialization_constants) {
+        VkSpecializationMapEntry entry{.constantID = spec.constant_id,
+                                       .offset = static_cast<u32>(spec_data_fragment.size()),
+                                       .size = spec.default_value.size()};
+        spec_entries_fragment.push_back(entry);
+        spec_data_fragment.insert(spec_data_fragment.end(), spec.default_value.begin(), spec.default_value.end());
+    }
+
+    const VkSpecializationInfo spec_info_vertex{.mapEntryCount = static_cast<u32>(spec_entries_vertex.size()),
+                                                .pMapEntries =
+                                                    spec_entries_vertex.empty() ? nullptr : spec_entries_vertex.data(),
+                                                .dataSize = spec_data_vertex.size(),
+                                                .pData = spec_data_vertex.empty() ? nullptr : spec_data_vertex.data()};
+
+    const VkSpecializationInfo spec_info_fragment{.mapEntryCount = static_cast<u32>(spec_entries_fragment.size()),
+                                            .pMapEntries =
+                                                spec_entries_fragment.empty() ? nullptr : spec_entries_fragment.data(),
+                                            .dataSize = spec_data_fragment.size(),
+                                            .pData = spec_data_fragment.empty() ? nullptr : spec_data_fragment.data()};
+
+    return {VkPipelineShaderStageCreateInfo{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                                            .stage = p_vertex_shader->Stage(),
+                                            .module = p_vertex_shader->Get(),
+                                            .pName = p_vertex_shader->Reflection().entry_point.c_str(),
+                                            .pSpecializationInfo =
+                                                spec_entries_vertex.empty() ? nullptr : &spec_info_vertex},
+            VkPipelineShaderStageCreateInfo{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                                            .stage = p_fragment_shader->Stage(),
+                                            .module = p_fragment_shader->Get(),
+                                            .pName = p_fragment_shader->Reflection().entry_point.c_str(),
+                                            .pSpecializationInfo =
+                                                spec_entries_fragment.empty() ? nullptr : &spec_info_fragment}};
+}
+
+VkPipelineVertexInputStateCreateInfo GraphicsPipeline::SetupVertexInput()
+{
+    m_binding_descriptions.clear();
+    m_attribute_descriptions.clear();
+    u32 attribute_index{0};
+
+    // Binding 0: Per-vertex data (Vertex struct)
+    m_binding_descriptions.push_back(
+        {.binding = 0, .stride = sizeof(Vertex), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX});
+    ENGINE_LOG_DEBUG("Added vertex binding: binding=0, stride={}, inputRate=Vertex", sizeof(Vertex));
+
+    for (const auto &[location, name, format, input_rate] : p_vertex_shader->Reflection().vertex_inputs) {
+        if (input_rate != VK_VERTEX_INPUT_RATE_VERTEX) {
+            continue;
+        }
+        bool success{false};
+        u32 offset = internal::get_struct_offset<Vertex>(name, format, success);
+        if (!success) {
+            ENGINE_LOG_WARNING("Unsupported vertex input: name={}, format={}", name,
+                               vk_format_to_string_view(format));
+            continue;
+        }
+        m_attribute_descriptions.push_back(
+            {.location = location, .binding = 0, .format = format, .offset = offset});
+        ENGINE_LOG_DEBUG("Added vertex attribute: name={}, location={}, format={}, offset={}", name,
+                         location, vk_format_to_string_view(format), offset);
+        attribute_index++;
+    }
+
+    // Binding 1: Per-instance data
+    if (m_type == PipelineType::Quad) {
+        m_binding_descriptions.push_back(
+            {.binding = 1, .stride = sizeof(InstanceData), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE});
+        ENGINE_LOG_DEBUG("Added instance binding (Quad): binding=1, stride={}, inputRate=Instance",
+                         sizeof(InstanceData));
+        for (const auto &[location, name, format, input_rate] : p_vertex_shader->Reflection().vertex_inputs) {
+            if (input_rate != VK_VERTEX_INPUT_RATE_INSTANCE) {
+                continue;
+            }
+            bool success{false};
+            u32 offset = internal::get_struct_offset<InstanceData>(name, format, success);
+            if (!success) {
+                ENGINE_LOG_WARNING("Unsupported instance input (Quad): name={}, format={}", name,
+                                   vk_format_to_string_view(format));
+                continue;
+            }
+            m_attribute_descriptions.push_back(
+                {.location = location, .binding = 1, .format = format, .offset = offset});
+            ENGINE_LOG_DEBUG("Added instance attribute (Quad): name={}, location={}, format={}, offset={}", name,
+                             location, vk_format_to_string_view(format), offset);
+            attribute_index++;
+        }
+    }
+    else if (m_type == PipelineType::Text) {
+        m_binding_descriptions.push_back(
+            {.binding = 1, .stride = sizeof(TextData), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE});
+        ENGINE_LOG_DEBUG("Added instance binding (Text): binding=1, stride={}, inputRate=Instance", sizeof(TextData));
+        for (const auto &[location, name, format, input_rate] : p_vertex_shader->Reflection().vertex_inputs) {
+            if (input_rate != VK_VERTEX_INPUT_RATE_INSTANCE) {
+                continue;
+            }
+            bool success{false};
+            u32 offset = internal::get_struct_offset<TextData>(name, format, success);
+            if (!success) {
+                ENGINE_LOG_WARNING("Unsupported instance input (Text): name={}, format={}", name,
+                                   vk_format_to_string_view(format));
+                continue;
+            }
+            m_attribute_descriptions.push_back(
+                {.location = location, .binding = 1, .format = format, .offset = offset});
+            ENGINE_LOG_DEBUG("Added instance attribute (Text): name={}, location={}, format={}, offset={}", name,
+                             location, vk_format_to_string_view(format), offset);
+            attribute_index++;
+        }
+    }
+    else if (m_type == PipelineType::Particle) {
+        m_binding_descriptions.push_back(
+            {.binding = 1, .stride = sizeof(ParticleData), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE});
+        ENGINE_LOG_DEBUG("Added instance binding (Particle): binding=1, stride={}, inputRate=Instance",
+                         sizeof(ParticleData));
+        for (const auto &[location, name, format, input_rate] : p_vertex_shader->Reflection().vertex_inputs) {
+            if (input_rate != VK_VERTEX_INPUT_RATE_INSTANCE) {
+                continue;
+            }
+            bool success{false};
+            u32 offset = internal::get_struct_offset<ParticleData>(name, format, success);
+            if (!success) {
+                ENGINE_LOG_WARNING("Unsupported instance input (Particle): name={}, format={}", name,
+                                   vk_format_to_string_view(format));
+                continue;
+            }
+            m_attribute_descriptions.push_back(
+                {.location = location, .binding = 1, .format = format, .offset = offset});
+            ENGINE_LOG_DEBUG("Added instance attribute (Particle): name={}, location={}, format={}, offset={}",
+                             name, location, vk_format_to_string_view(format), offset);
+            attribute_index++;
+        }
+    }
+
+    // Validate bindings and attributes
+    std::unordered_set<u32> seen_bindings;
+    for (const auto &[binding, stride, inputRate] : m_binding_descriptions) {
+        if (!seen_bindings.insert(binding).second) {
+            ENGINE_LOG_ERROR("Duplicate binding found: binding={}", binding);
+            ENGINE_THROW("Duplicate binding");
+        }
+        ENGINE_LOG_DEBUG("Final binding: binding={}, stride={}, inputRate={}", binding, stride,
+                         inputRate == VK_VERTEX_INPUT_RATE_VERTEX ? "Vertex" : "Instance");
+    }
+
+    std::unordered_set<u32> seen_locations;
+    for (const auto &attr : m_attribute_descriptions) {
+        if (attr.format == VK_FORMAT_UNDEFINED) {
+            ENGINE_LOG_ERROR("Invalid attribute format: location={}, binding={}", attr.location, attr.binding);
+            ENGINE_THROW("Invalid attribute format");
+        }
+        if (!seen_locations.insert(attr.location).second) {
+            ENGINE_LOG_ERROR("Duplicate attribute location: location={}, binding={}", attr.location, attr.binding);
+            ENGINE_THROW("Duplicate attribute location");
+        }
+        ENGINE_LOG_DEBUG("Final attribute: location={}, binding={}, format={}", attr.location, attr.binding,
+                         vk_format_to_string_view(attr.format));
+    }
+
+    if (m_binding_descriptions.empty()) {
+        ENGINE_LOG_ERROR("No valid vertex bindings defined for pipeline type: {}", pipeline_type_to_string(m_type));
+        ENGINE_THROW("Failed to create graphics pipeline: no valid vertex bindings");
+    }
+    if (m_attribute_descriptions.empty()) {
+        ENGINE_LOG_ERROR("No valid vertex or instance attributes found for pipeline type: {}",
+                         pipeline_type_to_string(m_type));
+        ENGINE_THROW("Failed to create graphics pipeline: no valid vertex attributes");
+    }
+
+    ENGINE_LOG_DEBUG("SetupVertexInput: {} bindings, {} attributes for pipeline type: {}",
+                     m_binding_descriptions.size(), m_attribute_descriptions.size(), pipeline_type_to_string(m_type));
+
+    const VkPipelineVertexInputStateCreateInfo vertex_input_info{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .vertexBindingDescriptionCount = static_cast<u32>(m_binding_descriptions.size()),
+        .pVertexBindingDescriptions = m_binding_descriptions.data(),
+        .vertexAttributeDescriptionCount = static_cast<u32>(m_attribute_descriptions.size()),
+        .pVertexAttributeDescriptions = m_attribute_descriptions.data()};
+
+    ASSERT(vertex_input_info.pVertexBindingDescriptions != nullptr, "Invalid binding descriptions pointer");
+    ASSERT(vertex_input_info.pVertexAttributeDescriptions != nullptr, "Invalid attribute descriptions pointer");
+
+    return vertex_input_info;
+}
+
+GraphicsPipeline::PipelineStates GraphicsPipeline::SetupPipelineStates() const
+{
+    PipelineStates states{};
+    states.input_assembly = {.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+                             .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                             .primitiveRestartEnable = VK_FALSE};
+
+    states.viewport = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+                       .viewportCount = 1,
+                       .pViewports = nullptr,
+                       .scissorCount = 1,
+                       .pScissors = nullptr};
+
+    states.rasterization = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+                            .polygonMode = VK_POLYGON_MODE_FILL,
+                            .cullMode = VK_CULL_MODE_BACK_BIT,
+                            .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                            .lineWidth = 1.0f};
+
+    states.multisample = {.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+                          .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT};
+
+    states.depth_stencil = {.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+                            .depthTestEnable = VK_TRUE,
+                            .depthWriteEnable = VK_TRUE,
+                            .depthCompareOp = VK_COMPARE_OP_LESS,
+                            .depthBoundsTestEnable = VK_FALSE,
+                            .stencilTestEnable = VK_FALSE};
+
+    states.blend_attachment = {
+        .blendEnable = m_type == PipelineType::Text || m_type == PipelineType::Particle ? VK_TRUE : VK_FALSE,
+        .colorWriteMask =
+            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT};
+
+    if (states.blend_attachment.blendEnable) {
+        states.blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        states.blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        states.blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+        states.blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        states.blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        states.blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+    }
+
+    states.color_blend = {.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+                          .attachmentCount = 1,
+                          .pAttachments = &states.blend_attachment};
+
+    static constexpr VkDynamicState dynamic_states[]{VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+    states.dynamic = {.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+                      .dynamicStateCount = 2,
+                      .pDynamicStates = dynamic_states};
+
+    ENGINE_LOG_DEBUG("SetupPipelineStates: {} dynamic states for pipeline type: {}", states.dynamic.dynamicStateCount,
+                     pipeline_type_to_string(m_type));
+
+    return states;
+}
+
+Vector<VkPushConstantRange> GraphicsPipeline::SetupPushConstants()
+{
+    Vector<VkPushConstantRange> push_constant_ranges;
+    std::unordered_map<VkShaderStageFlags, std::unordered_set<u32>> seen_offsets_by_stage;
+    for (const auto &shader : {p_vertex_shader, p_fragment_shader}) {
+        auto &seen_offsets = seen_offsets_by_stage[shader->Stage()];
+        for (const auto &pc : shader->Reflection().push_constants) {
+            if (pc.offset % 4 != 0 || pc.size % 4 != 0) {
+                ENGINE_LOG_ERROR("Push constant in shader stage {} has unaligned offset ({}) or size ({})",
+                                 vk_shader_stage_as_string_view(shader->Stage()), pc.offset, pc.size);
+                continue;
+            }
+            const u32 range_end = pc.offset + pc.size;
+            for (u32 i = pc.offset; i < range_end; ++i) {
+                if (!seen_offsets.insert(i).second) {
+                    ENGINE_LOG_ERROR("Overlapping push constant offset {} in shader stage {}", i,
+                                     vk_shader_stage_as_string_view(shader->Stage()));
+                }
+            }
+            push_constant_ranges.push_back({.stageFlags = pc.stage_flags, .offset = pc.offset, .size = pc.size});
+        }
+    }
+
+    u32 total_size{0};
+    for (const auto &range : push_constant_ranges) {
+        total_size = math::max(total_size, range.offset + range.size);
+    }
+
+    if (total_size > 128) {
+        ENGINE_LOG_ERROR("Total push constant size {} exceeds typical limit of 128 bytes", total_size);
+    }
+    return push_constant_ranges;
+}
+
+void GraphicsPipeline::PrintReflection() const
+{
+    for (const auto &[location, name, format, input_rate] : p_vertex_shader->Reflection().vertex_inputs) {
+        ENGINE_LOG_DEBUG("Vertex input: name={}, location={}, format={}, input_rate={}", name, location,
+                         vk_format_to_string_view(format),
+                         input_rate == VK_VERTEX_INPUT_RATE_VERTEX ? "Vertex" : "Instance");
+    }
 }
 
 } // namespace gouda::vk

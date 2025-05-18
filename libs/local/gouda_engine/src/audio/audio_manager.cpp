@@ -5,20 +5,17 @@
 #include <utility> // for std::exchange
 
 #include "AL/alext.h"
-#include "AL/efx-presets.h"
 
 #include "debug/debug.hpp"
 #include "math/random.hpp"
 
-namespace gouda {
-namespace audio {
+namespace gouda::audio {
 
 AudioManager::AudioManager()
     : p_device{nullptr},
       p_context{nullptr},
       m_music_source{0},
       p_current_track{nullptr},
-      m_current_index{0},
       m_master_sound_volume{1.0f},
       m_master_music_volume{1.0f},
       m_music_looping{false},
@@ -57,7 +54,7 @@ AudioManager::~AudioManager()
     ENGINE_LOG_DEBUG("Audio manager destroyed");
 }
 
-void AudioManager::Initialize(f32 sound_volume, f32 music_volume)
+void AudioManager::Initialize(const f32 sound_volume, const f32 music_volume)
 {
     p_device = alcOpenDevice(nullptr); // Default device
     if (!p_device) {
@@ -97,8 +94,8 @@ void AudioManager::Initialize(f32 sound_volume, f32 music_volume)
     ENGINE_LOG_DEBUG("Audio manager initialized");
 }
 
-void AudioManager::PlaySoundEffect(const SoundEffect &sound, const std::vector<AudioEffectType> &effects, f32 volume,
-                                   f32 pitch)
+void AudioManager::PlaySoundEffect(const SoundEffect &sound, const Vector<AudioEffectType> &effects,
+                                   const f32 volume, const f32 pitch)
 {
     ALuint buffer{sound.GetBuffer()};
     if (!alIsBuffer(buffer)) {
@@ -112,10 +109,10 @@ void AudioManager::PlaySoundEffect(const SoundEffect &sound, const std::vector<A
         return;
     }
 
-    f32 effective_volume{volume * m_master_sound_volume};
+    const f32 effective_volume{volume * m_master_sound_volume};
 
     ENGINE_LOG_DEBUG("Attaching buffer {} to source {}", buffer, source);
-    alSourcei(source, AL_BUFFER, buffer);
+    alSourcei(source, AL_BUFFER, static_cast<ALint>(buffer));
     alSourcef(source, AL_GAIN, effective_volume);
     alSourcef(source, AL_PITCH, pitch);
     alSource3f(source, AL_POSITION, 0.0f, 0.0f, 0.0f); // Center
@@ -127,8 +124,7 @@ void AudioManager::PlaySoundEffect(const SoundEffect &sound, const std::vector<A
     }
 
     alSourcePlay(source);
-    ALenum result{alGetError()};
-    if (result != AL_NO_ERROR) {
+    if (const ALenum result{alGetError()}; result != AL_NO_ERROR) {
         ENGINE_LOG_ERROR("Failed to play sound effect: {}", alGetString(result));
         alDeleteSources(1, &source);
         return;
@@ -141,9 +137,10 @@ void AudioManager::PlaySoundEffect(const SoundEffect &sound, const std::vector<A
 }
 
 void AudioManager::PlaySoundEffectAt(const SoundEffect &sound, const Vec3 &position,
-                                     const std::vector<AudioEffectType> &effects, f32 volume, f32 pitch, bool loop)
+                                     const Vector<AudioEffectType> &effects, const f32 volume, const f32 pitch,
+                                     const bool loop)
 {
-    ALuint source{GetFreeSource()};
+    const ALuint source{GetFreeSource()};
     if (source == 0)
         return;
 
@@ -153,8 +150,8 @@ void AudioManager::PlaySoundEffectAt(const SoundEffect &sound, const Vec3 &posit
         return;
     }
 
-    f32 effective_volume{volume * m_master_sound_volume};
-    alSourcei(source, AL_BUFFER, buffer);
+    const f32 effective_volume{volume * m_master_sound_volume};
+    alSourcei(source, AL_BUFFER, static_cast<ALint>(buffer));
     alSourcef(source, AL_GAIN, effective_volume);
     alSourcef(source, AL_PITCH, pitch);
     alSource3f(source, AL_POSITION, position.x, position.y, position.z);
@@ -165,8 +162,7 @@ void AudioManager::PlaySoundEffectAt(const SoundEffect &sound, const Vec3 &posit
     }
 
     alSourcePlay(source);
-    ALenum result{alGetError()};
-    if (result != AL_NO_ERROR) {
+    if (const ALenum result{alGetError()}; result != AL_NO_ERROR) {
         ENGINE_LOG_ERROR("Failed to play sound effect: {}", alGetString(result));
         alDeleteSources(1, &source);
         return;
@@ -174,7 +170,7 @@ void AudioManager::PlaySoundEffectAt(const SoundEffect &sound, const Vec3 &posit
     m_active_sources.push_back(source);
 }
 
-void AudioManager::QueueMusic(MusicTrack &track, bool play_immediately)
+void AudioManager::QueueMusic(MusicTrack &track, const bool play_immediately)
 {
     m_music_tracks.push_back(&track);
     ENGINE_LOG_DEBUG("Queued music track");
@@ -183,7 +179,7 @@ void AudioManager::QueueMusic(MusicTrack &track, bool play_immediately)
     }
 }
 
-void AudioManager::PlayMusic(bool shuffle)
+void AudioManager::PlayMusic(const bool shuffle)
 {
     if (!p_current_track && !m_music_tracks.empty()) {
         if (shuffle) {
@@ -198,8 +194,7 @@ void AudioManager::PauseMusic()
 {
     if (m_music_source) {
         alSourcePause(m_music_source);
-        ALenum result{alGetError()};
-        if (result != AL_NO_ERROR) {
+        if (const ALenum result{alGetError()}; result != AL_NO_ERROR) {
             ENGINE_LOG_ERROR("Failed to pause music: {}", alGetString(result));
         }
         else {
@@ -212,8 +207,7 @@ void AudioManager::ResumeMusic()
 {
     if (m_music_source) {
         alSourcePlay(m_music_source);
-        ALenum result{alGetError()};
-        if (result != AL_NO_ERROR) {
+        if (const ALenum result{alGetError()}; result != AL_NO_ERROR) {
             ENGINE_LOG_ERROR("Failed to resume music: {}", alGetString(result));
         }
         else {
@@ -297,17 +291,15 @@ void AudioManager::Update()
         while (processed--) {
             ALuint buffer{0};
             alSourceUnqueueBuffers(m_music_source, 1, &buffer);
-            ALenum result{alGetError()};
-            if (result != AL_NO_ERROR) {
+            if (const ALenum result{alGetError()}; result != AL_NO_ERROR) {
                 ENGINE_LOG_ERROR("alSourceUnqueueBuffers failed: {}", alGetString(result));
                 continue;
             }
 
-            std::vector<f32> temp(FRAMES_PER_BUFFER * p_current_track->GetChannels());
-            size_t frames_read{p_current_track->ReadFrames(temp.data(), FRAMES_PER_BUFFER)};
-            if (frames_read > 0) {
+            Vector<f32> temp(FRAMES_PER_BUFFER * p_current_track->GetChannels());
+            if (size_t frames_read{p_current_track->ReadFrames(temp.data(), FRAMES_PER_BUFFER)}; frames_read > 0) {
                 alBufferData(buffer, p_current_track->GetFormat(), temp.data(),
-                             frames_read * p_current_track->GetChannels() * sizeof(f32),
+                             static_cast<ALsizei>(frames_read * p_current_track->GetChannels() * sizeof(f32)),
                              p_current_track->GetSampleRate());
                 alSourceQueueBuffers(m_music_source, 1, &buffer);
             }
@@ -319,7 +311,7 @@ void AudioManager::Update()
                     frames_read = p_current_track->ReadFrames(temp.data(), FRAMES_PER_BUFFER);
                     if (frames_read > 0) {
                         alBufferData(buffer, p_current_track->GetFormat(), temp.data(),
-                                     frames_read * p_current_track->GetChannels() * sizeof(f32),
+                                     static_cast<ALsizei>(frames_read * p_current_track->GetChannels() * sizeof(f32)),
                                      p_current_track->GetSampleRate());
                         alSourceQueueBuffers(m_music_source, 1, &buffer);
                     }
@@ -345,8 +337,7 @@ void AudioManager::SetMusicPitch(f32 pitch)
 {
     if (m_music_source) {
         alSourcef(m_music_source, AL_PITCH, pitch);
-        ALenum result{alGetError()};
-        if (result != AL_NO_ERROR) {
+        if (const ALenum result{alGetError()}; result != AL_NO_ERROR) {
             ENGINE_LOG_ERROR("Failed to set music pitch: {}", alGetString(result));
         }
         else {
@@ -358,13 +349,13 @@ void AudioManager::SetMusicPitch(f32 pitch)
     }
 }
 
-static f32 ClampVolume(f32 volume) { return std::clamp(volume, 0.0f, 1.0f); }
+static f32 ClampVolume(const f32 volume) { return std::clamp(volume, 0.0f, 1.0f); }
 
-void AudioManager::SetMasterSoundVolume(f32 volume)
+void AudioManager::SetMasterSoundVolume(const f32 volume)
 {
     m_master_sound_volume = ClampVolume(volume);
 
-    for (ALuint source : m_active_sources) {
+    for (const ALuint source : m_active_sources) {
         ALint buffer{0};
         alGetSourcei(source, AL_BUFFER, &buffer);
         f32 current_volume{0.0f};
@@ -387,13 +378,12 @@ void AudioManager::SetMasterMusicVolume(f32 volume)
     ENGINE_LOG_DEBUG("Set master music volume to {} (volume): {}", m_master_music_volume, volume);
 }
 
-void AudioManager::SetMusicLooping(bool loop)
+void AudioManager::SetMusicLooping(const bool loop)
 {
     m_music_looping = loop; // Update state even if no source active
     if (m_music_source) {
         alSourcei(m_music_source, AL_LOOPING, loop ? AL_TRUE : AL_FALSE);
-        ALenum result{alGetError()};
-        if (result != AL_NO_ERROR) {
+        if (const ALenum result{alGetError()}; result != AL_NO_ERROR) {
             ENGINE_LOG_ERROR("Failed to set music looping: {}", alGetString(result));
         }
         else {
@@ -411,8 +401,7 @@ void AudioManager::SetQueueLooping(bool loop)
 void AudioManager::SetListenerPosition(const Vec3 &position)
 {
     alListener3f(AL_POSITION, position.x, position.y, position.z);
-    ALenum result{alGetError()};
-    if (result != AL_NO_ERROR) {
+    if (const ALenum result{alGetError()}; result != AL_NO_ERROR) {
         ENGINE_LOG_ERROR("Failed to set listener position: {}", alGetString(result));
     }
 }
@@ -420,8 +409,7 @@ void AudioManager::SetListenerPosition(const Vec3 &position)
 void AudioManager::SetListenerVelocity(const Vec3 &velocity)
 {
     alListener3f(AL_VELOCITY, velocity.x, velocity.y, velocity.z);
-    ALenum result{alGetError()};
-    if (result != AL_NO_ERROR) {
+    if (const ALenum result{alGetError()}; result != AL_NO_ERROR) {
         ENGINE_LOG_ERROR("Failed to set listener velocity: {}", alGetString(result));
     }
 }
@@ -474,19 +462,18 @@ void AudioManager::InitializeSources()
     // Query device for maximum mono sources
     ALCint max_mono_sources{0};
     alcGetIntegerv(p_device, ALC_MONO_SOURCES, 1, &max_mono_sources);
-    ALenum result = alcGetError(p_device);
-    if (result != ALC_NO_ERROR || max_mono_sources <= 0) {
+    if (const ALenum result = alcGetError(p_device); result != ALC_NO_ERROR || max_mono_sources <= 0) {
         ENGINE_LOG_WARNING("Failed to query ALC_MONO_SOURCES or invalid value ({}), falling back to trial",
                            max_mono_sources);
-        max_mono_sources = -1; // Flag to use trial-and-resultor
+        max_mono_sources = -1;
     }
 
-    // Trial-and-resultor if query failed
+
     int detected_max_sources{0};
     constexpr int absolute_max_sources{256};
 
     if (max_mono_sources == -1) {
-        std::vector<ALuint> temp_sources;
+        Vector<ALuint> temp_sources;
         temp_sources.reserve(absolute_max_sources);           // Reasonable upper bound
         while (detected_max_sources < absolute_max_sources) { // Cap at 256 to avoid excessive allocation
             ALuint source;
@@ -510,8 +497,8 @@ void AudioManager::InitializeSources()
     }
 
     // Set pool size (using half the max, capped for safety)
-    const int min_pool_size{16};                   // Minimum reasonable pool
-    const int max_pool_size{absolute_max_sources}; // Maximum reasonable pool
+    constexpr int min_pool_size{16};                   // Minimum reasonable pool
+    constexpr int max_pool_size{absolute_max_sources}; // Maximum reasonable pool
     int initial_pool_size{std::max(min_pool_size, std::min(detected_max_sources / 2, max_pool_size))};
 
     ENGINE_LOG_DEBUG("Audio device supports up to {} sources; setting pool size to {}", detected_max_sources,
@@ -581,7 +568,7 @@ void AudioManager::InitializeAudioEffects()
         CleanupEffect(m_effects.reverb.effect_id, m_effects.reverb.slot_id, "reverb");
         return;
     }
-    alAuxiliaryEffectSloti(m_effects.reverb.slot_id, AL_EFFECTSLOT_EFFECT, m_effects.reverb.effect_id);
+    alAuxiliaryEffectSloti(m_effects.reverb.slot_id, AL_EFFECTSLOT_EFFECT, static_cast<ALint>(m_effects.reverb.effect_id));
     result = alGetError();
     if (result != AL_NO_ERROR) {
         ENGINE_LOG_ERROR("Failed to attach reverb to slot: {}", alGetString(result));
@@ -639,7 +626,7 @@ void AudioManager::InitializeAudioEffects()
         CleanupEffect(m_effects.echo.effect_id, m_effects.echo.slot_id, "echo");
         return;
     }
-    alAuxiliaryEffectSloti(m_effects.echo.slot_id, AL_EFFECTSLOT_EFFECT, m_effects.echo.effect_id);
+    alAuxiliaryEffectSloti(m_effects.echo.slot_id, AL_EFFECTSLOT_EFFECT, static_cast<ALint>(m_effects.echo.effect_id));
     result = alGetError();
     if (result != AL_NO_ERROR) {
         ENGINE_LOG_ERROR("Failed to attach echo to slot: {}", alGetString(result));
@@ -699,7 +686,7 @@ void AudioManager::InitializeAudioEffects()
         CleanupEffect(m_effects.distortion.effect_id, m_effects.distortion.slot_id, "distortion");
         return;
     }
-    alAuxiliaryEffectSloti(m_effects.distortion.slot_id, AL_EFFECTSLOT_EFFECT, m_effects.distortion.effect_id);
+    alAuxiliaryEffectSloti(m_effects.distortion.slot_id, AL_EFFECTSLOT_EFFECT, static_cast<ALint>(m_effects.distortion.effect_id));
     result = alGetError();
     if (result != AL_NO_ERROR) {
         ENGINE_LOG_ERROR("Failed to attach distortion to slot: {}", alGetString(result));
@@ -760,7 +747,7 @@ void AudioManager::InitializeAudioEffects()
         CleanupEffect(m_effects.chorus.effect_id, m_effects.chorus.slot_id, "chorus");
         return;
     }
-    alAuxiliaryEffectSloti(m_effects.chorus.slot_id, AL_EFFECTSLOT_EFFECT, m_effects.chorus.effect_id);
+    alAuxiliaryEffectSloti(m_effects.chorus.slot_id, AL_EFFECTSLOT_EFFECT, static_cast<ALint>(m_effects.chorus.effect_id));
     result = alGetError();
     if (result != AL_NO_ERROR) {
         ENGINE_LOG_ERROR("Failed to attach chorus effect to slot: {}", alGetString(result));
@@ -823,7 +810,7 @@ void AudioManager::InitializeAudioEffects()
         CleanupEffect(m_effects.flanger.effect_id, m_effects.flanger.slot_id, "flanger");
         return;
     }
-    alAuxiliaryEffectSloti(m_effects.flanger.slot_id, AL_EFFECTSLOT_EFFECT, m_effects.flanger.effect_id);
+    alAuxiliaryEffectSloti(m_effects.flanger.slot_id, AL_EFFECTSLOT_EFFECT, static_cast<ALint>(m_effects.flanger.effect_id));
     result = alGetError();
     if (result != AL_NO_ERROR) {
         ENGINE_LOG_ERROR("Failed to attach flanger effect to slot: {}", alGetString(result));
@@ -855,12 +842,11 @@ void AudioManager::InitializeAudioEffects()
     ENGINE_LOG_DEBUG("All audio effects initialized successfully");
 }
 
-void AudioManager::CleanupEffect(ALuint effect_id, ALuint slot_id, std::string_view name)
+void AudioManager::CleanupEffect(ALuint effect_id, ALuint slot_id, std::string_view name) const
 {
     if (effect_id && alDeleteEffects) {
         alDeleteEffects(1, &effect_id);
-        ALenum result = alGetError();
-        if (result != AL_NO_ERROR) {
+        if (const ALenum result = alGetError(); result != AL_NO_ERROR) {
             ENGINE_LOG_ERROR("Failed to delete {} effect: {}", name, alGetString(result));
         }
         else {
@@ -871,8 +857,7 @@ void AudioManager::CleanupEffect(ALuint effect_id, ALuint slot_id, std::string_v
 
     if (slot_id && alDeleteAuxiliaryEffectSlots) {
         alDeleteAuxiliaryEffectSlots(1, &slot_id);
-        ALenum result = alGetError();
-        if (result != AL_NO_ERROR) {
+        if (const ALenum result = alGetError(); result != AL_NO_ERROR) {
             ENGINE_LOG_ERROR("Failed to delete {} slot: {}", name, alGetString(result));
         }
         else {
@@ -895,7 +880,7 @@ void AudioManager::DestroyAudioEffects()
     ENGINE_LOG_DEBUG("Audio effects destroyed");
 }
 
-void AudioManager::ApplyAudioEffects(ALuint source, const std::vector<AudioEffectType> &effects)
+void AudioManager::ApplyAudioEffects(ALuint source, const Vector<AudioEffectType> &effects)
 {
 
     if (source == 0) {
@@ -943,7 +928,7 @@ void AudioManager::ApplyAudioEffects(ALuint source, const std::vector<AudioEffec
         alGetAuxiliaryEffectSloti(slot_id, AL_EFFECTSLOT_GAIN, &slot_gain);
         ENGINE_LOG_DEBUG("Slot {} gain: {}", slot_id, slot_gain);
 
-        alSource3i(source, AL_AUXILIARY_SEND_FILTER, slot_id, static_cast<ALint>(i), AL_FILTER_NULL);
+        alSource3i(source, AL_AUXILIARY_SEND_FILTER, static_cast<ALint>(slot_id), static_cast<ALint>(i), AL_FILTER_NULL);
         result = alGetError();
         if (result != AL_NO_ERROR) {
             ENGINE_LOG_ERROR("Failed to attach effect {} to source {} on send {}: {}", static_cast<int>(effect_type),
@@ -1013,14 +998,14 @@ void AudioManager::PlayNextTrack()
         return;
     }
 
-    std::vector<f32> temp(FRAMES_PER_BUFFER * p_current_track->GetChannels());
+    Vector<f32> temp(FRAMES_PER_BUFFER * p_current_track->GetChannels());
     int buffers_queued{0};
     for (ALuint buffer : m_music_buffers) {
         size_t frames_read{p_current_track->ReadFrames(temp.data(), FRAMES_PER_BUFFER)};
         ENGINE_LOG_DEBUG("Read {} frames for buffer {}", frames_read, buffer);
         if (frames_read > 0) {
             alBufferData(buffer, p_current_track->GetFormat(), temp.data(),
-                         frames_read * p_current_track->GetChannels() * sizeof(f32), p_current_track->GetSampleRate());
+                         static_cast<ALsizei>(frames_read * p_current_track->GetChannels() * sizeof(f32)), p_current_track->GetSampleRate());
             result = alGetError();
             if (result != AL_NO_ERROR) {
                 ENGINE_LOG_ERROR("alBufferData failed: {}", alGetString(result));
@@ -1057,5 +1042,4 @@ void AudioManager::PlayNextTrack()
     }
 }
 
-} // namespace audio end
-} // namespace gouda end
+}

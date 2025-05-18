@@ -4,8 +4,7 @@
 
 #include "sndfile.h"
 
-namespace gouda {
-namespace audio {
+namespace gouda::audio {
 
 /**
  * @class MusicTrack
@@ -82,7 +81,7 @@ public:
      *
      * @return The file handle (`SNDFILE *`) for the track.
      */
-    SNDFILE *GetFile() const { return p_sndfile; }
+    [[nodiscard]] SNDFILE *GetFile() const { return p_sndfile; }
 
     /**
      * @brief Gets the audio format for the track.
@@ -91,7 +90,7 @@ public:
      *
      * @return The audio format (`ALenum`) of the track.
      */
-    ALenum GetFormat() const { return m_format; }
+    [[nodiscard]] ALenum GetFormat() const { return m_format; }
 
     /**
      * @brief Gets the sample rate of the music track.
@@ -100,7 +99,7 @@ public:
      *
      * @return The sample rate (in Hz).
      */
-    int GetSampleRate() const { return m_sample_rate; }
+    [[nodiscard]] int GetSampleRate() const { return m_sample_rate; }
 
     /**
      * @brief Gets the number of channels in the music track.
@@ -109,7 +108,7 @@ public:
      *
      * @return The number of channels (e.g., 1 or 2).
      */
-    int GetChannels() const { return m_channels; }
+    [[nodiscard]] int GetChannels() const { return m_channels; }
 
     /**
      * @brief Checks if the music track has finished playing.
@@ -118,7 +117,7 @@ public:
      *
      * @return True if the track is finished, false otherwise.
      */
-    bool IsFinished() const { return m_finished; }
+    [[nodiscard]] bool IsFinished() const { return m_finished; }
 
     /**
      * @brief Sets the finished status of the music track.
@@ -128,16 +127,15 @@ public:
      *
      * @param finished The status to set (true if finished, false otherwise).
      */
-    void SetFinished(bool finished) { m_finished = finished; }
+    void SetFinished(const bool finished) { m_finished = finished; }
 
 private:
     SNDFILE *p_sndfile; ///< The file handle for the audio file.
-    SF_INFO m_sfinfo;   ///< Information structure containing the file's metadata (e.g., sample rate, channels).
+    SF_INFO m_sfinfo{};   ///< Information structure containing the file's metadata (e.g., sample rate, channels).
     ALenum m_format;    ///< The audio format used by OpenAL.
     int m_sample_rate;  ///< The sample rate of the audio track.
     int m_channels;     ///< The number of channels (mono or stereo).
     bool m_finished;    ///< Whether the track has finished playing or streaming.
 };
 
-} // namespace audio end
-} // namespace gouda end
+}

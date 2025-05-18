@@ -1,5 +1,7 @@
 #include "application.hpp"
 
+#include <utility>
+
 #include "backends/event_types.hpp"
 #include "backends/glfw/glfw_backend.hpp"
 #include "debug/logger.hpp"
@@ -16,9 +18,7 @@ Application::Application()
       m_settings_manager{"config/settings.json", true, true},
       m_is_iconified{false},
       m_framebuffer_size{0, 0},
-      m_time_settings{},
       p_ortho_camera{nullptr},
-      m_uniform_data{},
       m_main_font_id{0},
       p_current_scene{nullptr}
 {
@@ -54,15 +54,14 @@ void Application::Initialize()
     APP_LOG_DEBUG("Application initialization success");
 }
 
-void Application::Update(f32 delta_time) { p_current_scene->Update(delta_time); }
+void Application::Update(const f32 delta_time) const { p_current_scene->Update(delta_time); }
 
-void Application::RenderScene(f32 delta_time) { p_current_scene->Render(delta_time, m_renderer, m_uniform_data); }
+void Application::RenderScene(const f32 delta_time) { p_current_scene->Render(delta_time, m_renderer, m_uniform_data); }
 
 void Application::Execute()
 {
     APP_LOG_INFO("Running...");
 
-    constexpr f64 sleep_duration{0.001}; // Small sleep to reduce CPU usage
     f32 delta_time{0.0f};
 
     gouda::utils::FrameTimer frame_timer;
@@ -80,6 +79,7 @@ void Application::Execute()
     while (!p_window->ShouldClose()) {
 
         if (m_is_iconified) {
+            constexpr f64 sleep_duration{0.001};
             gouda::glfw::wait_events(sleep_duration); // Avoid busy waiting
             p_input_handler->Update();
             m_audio_manager.Update();
@@ -116,7 +116,7 @@ void Application::Execute()
 void Application::SetupTimerSettings(const ApplicationSettings &settings)
 {
     m_time_settings.target_fps = settings.refresh_rate;
-    m_time_settings.fixed_timestep = 1.0f / settings.refresh_rate;
+    m_time_settings.fixed_timestep = 1.0f / static_cast<f32>(settings.refresh_rate);
     m_time_settings.vsync_mode = settings.vsync ? gouda::vk::VSyncMode::Enabled : gouda::vk::VSyncMode::Disabled;
 }
 
@@ -167,7 +167,7 @@ void Application::SetupAudio(const ApplicationSettings &settings)
 
 void Application::SetupCamera()
 {
-    FrameBufferSize framebuffer_size{m_renderer.GetFramebufferSize()};
+    const FrameBufferSize framebuffer_size{m_renderer.GetFramebufferSize()};
     p_ortho_camera = std::make_unique<gouda::OrthographicCamera>(
         0.0f, static_cast<f32>(framebuffer_size.width),  // left = 0, right = width
         static_cast<f32>(framebuffer_size.height), 0.0f, // bottom = height, top = 0
@@ -181,6 +181,7 @@ void Application::LoadTextures()
     m_renderer.LoadTexture("assets/textures/checkerboard2.png");
     m_renderer.LoadTexture("assets/textures/checkerboard3.png");
     m_renderer.LoadTexture("assets/textures/checkerboard4.png");
+    m_renderer.LoadTexture("assets/textures/sprite_sheet.png");
 }
 
 void Application::LoadFonts()
@@ -193,12 +194,12 @@ void Application::LoadFonts()
 void Application::SetupInputSystem()
 {
     auto backend = std::make_unique<gouda::glfw::GLFWBackend>([this](gouda::Event e) {
-        p_input_handler->QueueEvent(e); // Queue raw events directly
+        p_input_handler->QueueEvent(std::move(e)); // Queue raw events directly
     });
 
     p_input_handler = std::make_unique<gouda::InputHandler>(std::move(backend), p_window->GetWindow());
 
-    std::vector<gouda::InputHandler::ActionBinding> game_bindings = {
+    const std::vector<gouda::InputHandler::ActionBinding> game_bindings = {
         {gouda::Key::Escape, gouda::ActionState::Pressed,
          [this]() { glfwSetWindowShouldClose(p_window->GetWindow(), GLFW_TRUE); }},
         {gouda::Key::A, gouda::ActionState::Pressed,
@@ -270,46 +271,46 @@ void Application::SetupInputSystem()
     p_input_handler->SetActiveState("Game");
 
     // Scroll callback
-    p_input_handler->SetScrollCallback([this](double xOffset, double yOffset) {
-        f32 zoom_delta{static_cast<f32>(yOffset) * 0.1f};
+    p_input_handler->SetScrollCallback([this]([[maybe_unused]]double xOffset, const double yOffset) {
+        const f32 zoom_delta{static_cast<f32>(yOffset) * 0.1f};
         p_ortho_camera->AdjustZoom(zoom_delta);
     });
 
     // Character input callback
-    p_input_handler->SetCharCallback([](unsigned int codepoint) {
+    p_input_handler->SetCharCallback([]([[maybe_unused]]unsigned int codepoint) {
         // char c = static_cast<char>(codepoint); // Simple ASCII cast for demo
         // APP_LOG_DEBUG("Character typed: {} (codepoint={})", c, codepoint);
     });
 
     // Cursor enter/leave callback
     p_input_handler->SetCursorEnterCallback(
-        [](bool entered) { // APP_LOG_DEBUG("Cursor {} window", entered ? "entered" : "left");
+        []([[maybe_unused]]bool entered) { // APP_LOG_DEBUG("Cursor {} window", entered ? "entered" : "left");
         });
 
     // Window focus callback
-    p_input_handler->SetWindowFocusCallback([this](bool focused) {
+    p_input_handler->SetWindowFocusCallback([this](const bool focused) {
         m_is_iconified = !focused; // Align with your existing logic
         // APP_LOG_DEBUG("Window {} focus", focused ? "gained" : "lost");
     });
 
     // Framebuffer resized
-    p_input_handler->SetFramebufferSizeCallback([this](int width, int height) {
-        m_framebuffer_size = {width, height};
+    p_input_handler->SetFramebufferSizeCallback([this](const int width, const int height) {
+        m_framebuffer_size = FrameBufferSize{width, height};
         OnFramebufferResize(p_window->GetWindow(), m_framebuffer_size);
     });
 
     // Window resized
-    p_input_handler->SetWindowSizeCallback([this](int width, int height) {
-        WindowSize new_size{width, height};
+    p_input_handler->SetWindowSizeCallback([this](const int width, const int height) {
+        const WindowSize new_size{width, height};
         OnWindowResize(p_window->GetWindow(), new_size);
     });
 
     // Window iconified
     p_input_handler->SetWindowIconifyCallback(
-        [this](bool iconified) { OnWindowIconify(p_window->GetWindow(), iconified); });
+        [this](const bool iconified) { OnWindowIconify(p_window->GetWindow(), iconified); });
 }
 
-void Application::OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_size)
+void Application::OnFramebufferResize([[maybe_unused]] GLFWwindow *window, FrameBufferSize new_size)
 {
     if (new_size.width == 0 || new_size.height == 0) {
         APP_LOG_INFO("Window minimized, skipping swapchain recreation");
@@ -330,7 +331,7 @@ void Application::OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_si
     APP_LOG_DEBUG("Swapchain and framebuffers recreated successfully.");
 }
 
-void Application::OnWindowResize(GLFWwindow *window, WindowSize new_size)
+void Application::OnWindowResize([[maybe_unused]]GLFWwindow *window, WindowSize new_size)
 {
     if (new_size.area() != 0) {
         m_settings_manager.SetWindowSize(new_size);
@@ -339,4 +340,4 @@ void Application::OnWindowResize(GLFWwindow *window, WindowSize new_size)
     APP_LOG_INFO("Window resized: {}x{}", new_size.width, new_size.height);
 }
 
-void Application::OnWindowIconify(GLFWwindow *window, bool iconified) { m_is_iconified = iconified; }
+void Application::OnWindowIconify([[maybe_unused]]GLFWwindow *window, const bool iconified) { m_is_iconified = iconified; }

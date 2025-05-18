@@ -1,5 +1,5 @@
 /**
- * @file renderers/vulkan/vk_command_buffer_manager.cpp
+ * @file vk_command_buffer_manager.cpp
  * @author GoudaCheeseburgers
  * @date 2025-03-19
  * @brief Engine Vulkan command buffer manager implementation
@@ -10,6 +10,7 @@
 #include "renderers/vulkan/vk_queue.hpp"
 
 #include "debug/logger.hpp"
+#include "renderers/vulkan/vk_utils.hpp"
 
 namespace gouda::vk {
 
@@ -35,31 +36,30 @@ void CommandBufferManager::CreatePool()
     pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     pool_info.queueFamilyIndex = m_queue_family;
 
-    VkResult result{vkCreateCommandPool(p_device->GetDevice(), &pool_info, nullptr, &p_pool)};
-    if (result != VK_SUCCESS) {
+    if (const VkResult result{vkCreateCommandPool(p_device->GetDevice(), &pool_info, nullptr, &p_pool)};
+        result != VK_SUCCESS) {
         CHECK_VK_RESULT(result, "vkCreateCommandPool");
     }
 
     ENGINE_LOG_DEBUG("Command buffer pool created.");
 }
 
-void CommandBufferManager::AllocateBuffers(u32 count, VkCommandBuffer *buffers)
+void CommandBufferManager::AllocateBuffers(u32 count, VkCommandBuffer *buffers) const
 {
-    VkCommandBufferAllocateInfo alloc_info{.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    const VkCommandBufferAllocateInfo alloc_info{.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
                                            .pNext = nullptr,
                                            .commandPool = p_pool,
                                            .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
                                            .commandBufferCount = count};
 
-    VkResult result{vkAllocateCommandBuffers(p_device->GetDevice(), &alloc_info, buffers)};
-    if (result != VK_SUCCESS) {
+    if (const VkResult result{vkAllocateCommandBuffers(p_device->GetDevice(), &alloc_info, buffers)}; result != VK_SUCCESS) {
         CHECK_VK_RESULT(result, "vkAllocateCommandBuffers");
     }
 
     ENGINE_LOG_DEBUG("Command buffer(s) created: {}.", count);
 }
 
-void CommandBufferManager::FreeBuffers(u32 count, const VkCommandBuffer *buffers)
+void CommandBufferManager::FreeBuffers(u32 count, const VkCommandBuffer *buffers) const
 {
     if (p_device != nullptr && p_queue != nullptr) {
         p_queue->WaitIdle();

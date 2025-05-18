@@ -11,12 +11,9 @@
  * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
  * See <https://www.gnu.org/licenses/> for more information.
  */
-#include <string_view>
-#include <vector>
-
 #include <vulkan/vulkan.h>
 
-#include "vk_utils.hpp"
+#include "core/types.hpp"
 
 struct GLFWwindow;
 
@@ -24,14 +21,14 @@ namespace gouda::vk {
 
 class Instance {
 public:
-    Instance(std::string_view app_name, SemVer vulkan_api_version, GLFWwindow *window);
+    Instance(StringView app_name, SemVer vulkan_api_version, GLFWwindow *window);
     ~Instance();
 
-    VkInstance GetInstance() const { return p_instance; }
-    VkSurfaceKHR GetSurface() const { return p_surface; }
+    [[nodiscard]] VkInstance GetInstance() const { return p_instance; }
+    [[nodiscard]] VkSurfaceKHR GetSurface() const { return p_surface; }
 
 private:
-    void CreateInstance(std::string_view app_name, SemVer vulkan_api_version);
+    void CreateInstance(StringView app_name, SemVer vulkan_api_version);
     void CreateDebugCallback();
     void CreateSurface();
 

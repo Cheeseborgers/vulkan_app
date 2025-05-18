@@ -17,8 +17,8 @@ namespace gouda::vk {
 struct Buffer {
     Buffer();
 
-    void *MapPersistent(VkDevice device);
-    void Update(VkDevice device, const void *data, size_t size);
+    void *MapPersistent(VkDevice device) const;
+    void Update(VkDevice device, const void *data, size_t size) const;
     void Destroy(VkDevice device);
 
     VkBuffer p_buffer;

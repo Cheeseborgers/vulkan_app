@@ -25,7 +25,7 @@ class Shader;
 
 class ComputePipeline {
 public:
-    ComputePipeline(Renderer &renderer, Shader *compute_shader, const std::vector<Buffer> &storage_buffers,
+    ComputePipeline(Renderer &renderer, const Shader *compute_shader, const std::vector<Buffer> &storage_buffers,
                     const std::vector<Buffer> &uniform_buffers, VkDeviceSize storage_buffer_size,
                     VkDeviceSize uniform_buffer_size);
     ~ComputePipeline();

@@ -21,11 +21,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-#include <cstdint>
+#include "core/types.hpp"
 
 namespace gouda {
 
-enum class Key : u_int16_t {
+enum class Key : u16 {
     None,
     Unknown, // Explicitly handle unknown keys
     Space,

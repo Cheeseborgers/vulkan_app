@@ -32,14 +32,14 @@ public:
 
     [[nodiscard]] u32 AcquireNextImage(u32 frame_index);
 
-    void Submit(VkCommandBuffer command_buffer, u32 frame_index, Fence *fence = nullptr); // For render loop
-    void Submit(VkCommandBuffer command_buffer, Fence *fence = nullptr);                  // For standalone ops
+    void Submit(VkCommandBuffer command_buffer, u32 frame_index, const Fence *fence = nullptr); // For render loop
+    void Submit(VkCommandBuffer command_buffer, const Fence *fence = nullptr) const;                  // For standalone ops
     void SetSwapchain(Swapchain *swapchain) { p_swapchain = swapchain; }
     void Present(u32 image_index, u32 frame_index);
 
-    void WaitIdle();
+    void WaitIdle() const;
 
-    [[nodiscard]] u32 GetMaxFramesInFlight() const noexcept { return MAX_FRAMES_IN_FLIGHT; }
+    [[nodiscard]] static u32 GetMaxFramesInFlight() noexcept { return MAX_FRAMES_IN_FLIGHT; }
 
 private:
     void CreateSemaphores();
@@ -49,7 +49,7 @@ private:
     Swapchain *p_swapchain;
     VkQueue p_queue;
 
-    static constexpr u32 MAX_FRAMES_IN_FLIGHT = 2;
+    static constexpr u32 MAX_FRAMES_IN_FLIGHT = 4;
     SmallVector<VkSemaphore, MAX_FRAMES_IN_FLIGHT> p_present_complete_semaphores;
     SmallVector<VkSemaphore, MAX_FRAMES_IN_FLIGHT> p_render_complete_semaphores;
 };

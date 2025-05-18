@@ -26,11 +26,11 @@
 
 #include "backends/input_backend.hpp"
 #include "core/types.hpp"
+#include "backends/event_types.hpp"
 
-namespace gouda {
-namespace glfw {
+namespace gouda::glfw {
 
-inline void wait_events(f64 timeout) { glfwWaitEventsTimeout(static_cast<f64>(timeout)); }
+inline void wait_events(f64 timeout) { glfwWaitEventsTimeout(timeout); }
 
 class GLFWBackend : public InputBackend {
 public:
@@ -44,5 +44,4 @@ private:
 private:
     std::function<void(Event)> p_callback;
 };
-}
 }

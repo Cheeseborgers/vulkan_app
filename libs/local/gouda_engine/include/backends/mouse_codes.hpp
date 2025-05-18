@@ -21,12 +21,12 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-#include <cstdint>
+
 
 namespace gouda {
 
 // Enum class for mouse buttons
-enum class MouseButton : uint8_t {
+enum class MouseButton : u8 {
     Left = 0,   // GLFW_MOUSE_BUTTON_LEFT
     Right = 1,  // GLFW_MOUSE_BUTTON_RIGHT
     Middle = 2, // GLFW_MOUSE_BUTTON_MIDDLE

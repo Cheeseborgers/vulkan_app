@@ -7,9 +7,9 @@
 
 #include "entities/player.hpp"
 
-Player::Player(gouda::InstanceData instance_data, gouda::math::Vec2 velocity_, f32 speed_)
+Player::Player(const gouda::InstanceData &instance_data, const gouda::math::Vec2 velocity_, const f32 speed_)
     : Entity{instance_data, EntityType::Player}, velocity{velocity_}, speed{speed_}
 {
 }
 
-Player::~Player() {}
+Player::~Player() = default;

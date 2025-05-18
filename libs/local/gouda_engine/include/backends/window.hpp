@@ -1,7 +1,5 @@
 #pragma once
 
-#include "core/types.hpp"
-
 namespace gouda {
 
 /**
@@ -40,7 +38,7 @@ public:
      *
      * @return True if the window should close, otherwise false.
      */
-    virtual bool ShouldClose() const = 0;
+    [[nodiscard]] virtual bool ShouldClose() const = 0;
 
     /**
      * @brief Sets the vertical synchronization (vsync) for the window.

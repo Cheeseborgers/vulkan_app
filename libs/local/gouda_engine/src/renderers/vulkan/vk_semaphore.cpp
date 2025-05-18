@@ -1,5 +1,5 @@
 /**
- * @file renderers/vulkan/vk_semaphore.cpp
+ * @file vk_semaphore.cpp
  * @author GoudaCheeseburgers
  * @date 2025-04-24
  * @brief Engine module implementation
@@ -10,10 +10,11 @@
 
 #include "debug/assert.hpp"
 #include "renderers/vulkan/vk_device.hpp"
+#include "renderers/vulkan/vk_utils.hpp"
 
 namespace gouda::vk {
 
-Semaphore::Semaphore(Device *device) : p_semaphore{VK_NULL_HANDLE}
+Semaphore::Semaphore(Device *device) : p_semaphore{VK_NULL_HANDLE}, p_device{device}
 {
     ASSERT(device, "Device cannot be a null pointer when creating a semaphore.");
 }
@@ -35,8 +36,8 @@ bool Semaphore::Create()
     VkSemaphoreCreateInfo semaphore_create_info{};
     semaphore_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-    VkResult result{vkCreateSemaphore(p_device->GetDevice(), &semaphore_create_info, nullptr, &p_semaphore)};
-    if (result != VK_SUCCESS) {
+    if (const VkResult result{vkCreateSemaphore(p_device->GetDevice(), &semaphore_create_info, nullptr, &p_semaphore)};
+        result != VK_SUCCESS) {
         CHECK_VK_RESULT(result, "vkCreateSemaphore");
         return false;
     }
