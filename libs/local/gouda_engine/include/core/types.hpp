@@ -77,6 +77,7 @@ using FloatingPointMicroseconds = std::chrono::duration<double, std::micro>;
 using String = std::basic_string<char>;
 using StringView = std::basic_string_view<char>;
 using FilePath = std::filesystem::path;
+using FileTimeType = std::filesystem::file_time_type;
 
 template <typename A, typename B>
 using Expect = std::expected<A, B>;
@@ -122,11 +123,6 @@ struct SemVer {
     {
         return major == other.major && minor == other.minor && patch == other.patch && variant == other.variant;
     }
-
-    bool operator<(const SemVer &other) const
-    {
-        return std::tie(major, minor, patch, variant) < std::tie(other.major, other.minor, other.patch, other.variant);
-    }
 };
 
 template <NumericT T>
@@ -144,7 +140,30 @@ struct Dimensions {
 
     T area() const { return width * height; }
 
-    std::string ToString() { return std::string(std::format("{}x{}", width, height)); }
+    [[nodiscard]] std::string ToString() const  { return std::string(std::format("{}x{}", width, height)); }
+};
+
+struct SpriteRect {
+    float x;
+    float y;
+    float width;
+    float height;
+
+    explicit SpriteRect(const float x_ = 0, const float y_ = 0, const float width_ = 0, const float height_ = 0)
+        : x{x_}, y{y_}, width{width_}, height{height_}
+    {
+    }
+
+    explicit SpriteRect(const float value = 0)
+        : x{value}, y{value}, width{value}, height{value}
+    {
+    }
+
+    [[nodiscard]] std::string ToString() const
+    {
+        return std::string(std::format("x: {}, y: {}, width: {}, height: {}", x, y, width, height));
+    }
+
 };
 
 template <NumericT T>
@@ -163,6 +182,12 @@ struct UVRect {
         : u_min{value}, v_min{value}, u_max{value}, v_max{value}
     {
     }
+
+    [[nodiscard]] std::string ToString() const
+    {
+        return std::string(std::format("u_min: {}, v_min: {}, u_max: {}, v_max: {}", u_min, v_min, u_min, v_max));
+    }
+
 };
 
 template <NumericT T>
@@ -186,7 +211,7 @@ struct Rect {
     // Inequality comparison
     bool operator!=(const Rect &other) const { return !(*this == other); }
 
-    std::string ToString()
+    [[nodiscard]] std::string ToString() const
     {
         return std::string(std::format("left: {}, right: {}, bottom: {}, top: {}", left, right, bottom, top));
     }
@@ -208,3 +233,4 @@ struct Colour {
 using FrameBufferSize = Dimensions<int>;
 using WindowSize = Dimensions<int>;
 using ImageSize = Dimensions<int>;
+using AtlasSize = Dimensions<float>;

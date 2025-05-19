@@ -206,10 +206,10 @@ void GraphicsPipeline::Destroy()
 }
 
 void GraphicsPipeline::UpdateTextureDescriptors(const size_t number_of_images,
-                                                const std::vector<std::unique_ptr<Texture>> &textures)
+                                                const Vector<std::unique_ptr<Texture>> &textures)
 {
     ASSERT(!textures.empty(), "Texture vector must contain at least the default texture");
-    const Texture *default_texture{textures.front().get()};
+    const Texture *default_texture{textures[0].get()};
     if (textures.size() > MAX_TEXTURES) {
         ENGINE_LOG_WARNING("Texture count ({}) exceeds MAX_TEXTURES ({}); capping at MAX_TEXTURES", textures.size(),
                            MAX_TEXTURES);
@@ -217,7 +217,7 @@ void GraphicsPipeline::UpdateTextureDescriptors(const size_t number_of_images,
 
     Vector<VkDescriptorImageInfo> image_infos{MAX_TEXTURES};
     for (size_t i = 0; i < MAX_TEXTURES; ++i) {
-        const Texture *texture{(i < textures.size()) ? textures[i].get() : default_texture};
+        const Texture *texture{i < textures.size() ? textures[i].get() : default_texture};
         image_infos[i] = {.sampler = texture->p_sampler,
                           .imageView = texture->p_view,
                           .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};

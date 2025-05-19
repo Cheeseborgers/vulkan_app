@@ -1,15 +1,14 @@
 #include "utils/filesystem.hpp"
 
-#include <cstring>
 #include <fstream>
 
 #include "debug/logger.hpp"
 #include "debug/throw.hpp"
 
-namespace gouda {
-namespace fs {
 
-Expect<void, Error> EnsureDirectoryExists(const FilePath &path, bool create_if_missing)
+namespace gouda::fs {
+
+Expect<void, Error> EnsureDirectoryExists(const FilePath &path, const bool create_if_missing)
 {
     std::filesystem::path directory_path = path;
 
@@ -32,8 +31,7 @@ Expect<void, Error> EnsureDirectoryExists(const FilePath &path, bool create_if_m
     }
 
     if (create_if_missing) {
-        std::error_code ec;
-        if (std::filesystem::create_directories(directory_path, ec)) {
+        if (std::error_code ec; std::filesystem::create_directories(directory_path, ec)) {
             return {}; // Success
         }
         return std::unexpected(Error::DirectoryCreationFailed);
@@ -130,7 +128,7 @@ Expect<void, Error> WriteBinaryFile(std::string_view file_name, const std::vecto
     }
 
     // Safely reinterpret as bytes using std::span
-    auto byte_span = std::as_bytes(std::span<const u32>(data));
+    const auto byte_span = std::as_bytes(std::span<const u32>(data));
     return WriteBinaryFile(file_name, byte_span);
 }
 
@@ -172,8 +170,7 @@ Expect<void, Error> DeleteFile(std::string_view file_path)
 
 Expect<void, Error> DeleteDirectory(std::string_view dir_path)
 {
-    std::uintmax_t removed = std::filesystem::remove_all(dir_path);
-    if (removed > 0) {
+    if (const std::uintmax_t removed = std::filesystem::remove_all(dir_path); removed > 0) {
         return {};
     }
     return std::unexpected(Error::DirectoryDeleteFailed);
@@ -181,9 +178,14 @@ Expect<void, Error> DeleteDirectory(std::string_view dir_path)
 
 std::string GetFileExtension(std::string_view file_path)
 {
-    FilePath path{file_path};
+    const FilePath path{file_path};
     return path.extension().string();
 }
 
-} // namespace fs
-} // namespace gouda
+FileTimeType GetLastWriteTime(std::string_view filepath)
+{
+    return std::filesystem::last_write_time(filepath);
+}
+
+} // namespace gouda::fs
+

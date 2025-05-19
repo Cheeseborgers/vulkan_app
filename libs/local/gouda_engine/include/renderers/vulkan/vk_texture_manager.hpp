@@ -11,7 +11,6 @@
  * See <https://www.gnu.org/licenses/> for more information.
  */
 #include "vk_texture.hpp"
-
 #include "containers/small_vector.hpp"
 #include "core/types.hpp"
 
@@ -27,6 +26,9 @@ public:
 
     u32 LoadSingleTexture(StringView filepath);
     u32 LoadAtlasTexture(StringView image_filepath, StringView json_filepath);
+    bool ReloadTexture(u32 texture_id, bool force = false);
+    bool ReloadAllTextures();
+    bool CheckTextureForUpdate(u32 texture_id);
 
     [[nodiscard]] const Sprite* GetSprite(u32 texture_id, StringView sprite_name) const;
     [[nodiscard]] const TextureMetadata& GetTextureMetadata(u32 texture_id) const;
@@ -36,9 +38,13 @@ public:
     [[nodiscard]] bool IsDirty() const { return m_textures_dirty; }
     void SetClean() { m_textures_dirty = false; }
 
+    [[nodiscard]] bool IsValidTextureId(const u32 id) const {
+        return id < m_textures.size();
+    }
+
 private:
     void ParseAtlasJson(StringView json_filepath, TextureMetadata &metadata);
-    UVRect<f32> NormalizeRect(f32 x, f32 y, f32 w, f32 h, f32 atlas_width, f32 atlas_height);
+    UVRect<f32> NormalizeRect(SpriteRect sprite_rect, AtlasSize atlas_size);
     void CreateDefaultTexture();
 
 private:

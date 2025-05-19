@@ -32,8 +32,7 @@
 
 #include "core/types.hpp"
 
-namespace gouda {
-namespace fs {
+namespace gouda::fs {
 
 /**
  * @enum Error
@@ -169,5 +168,7 @@ constexpr std::string_view error_to_string(Error err) noexcept
  */
 [[nodiscard]] std::string GetFileExtension(std::string_view file_path);
 
-} // namespace fs
-} // namespace gouda
+[[nodiscard]] FileTimeType GetLastWriteTime(std::string_view filepath);
+
+
+}

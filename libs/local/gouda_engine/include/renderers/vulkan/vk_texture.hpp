@@ -12,6 +12,8 @@
  */
 #include <unordered_map>
 #include <vector>
+#include <optional>
+#include <filesystem>
 
 #include <vulkan/vulkan.h>
 
@@ -50,10 +52,15 @@ struct Texture {
 
 struct TextureMetadata {
     TextureMetadata();
+    ~TextureMetadata();
 
     bool is_atlas;
     Texture* texture;
     std::unordered_map<String, Sprite> sprites;
+    String image_filepath;
+    std::optional<String> json_filepath;
+    std::filesystem::file_time_type image_last_modified;
+    std::optional<std::filesystem::file_time_type> json_last_modified;
 };
 
 [[nodiscard]] VkSampler create_texture_sampler(const Device *device, VkFilter min_filter, VkFilter max_filter,

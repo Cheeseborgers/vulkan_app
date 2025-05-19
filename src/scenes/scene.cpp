@@ -131,12 +131,12 @@ void Scene::Update(const f32 delta_time)
 
     // Spatial grid query for collision
     static constexpr f32 cell_size{500.0f};
-    auto range = GetGridRange(player_bounds, cell_size);
+    auto [min_x, max_x, min_y, max_y] = GetGridRange(player_bounds, cell_size);
 
     static std::unordered_set<size_t> nearby_entities;
     nearby_entities.clear();
-    for (int x = range.min_x; x <= range.max_x; ++x) {
-        for (int y = range.min_y; y <= range.max_y; ++y) {
+    for (int x = min_x; x <= max_x; ++x) {
+        for (int y = min_y; y <= max_y; ++y) {
             if (auto it = m_spatial_grid.find(GridPos{x, y}); it != m_spatial_grid.end()) {
                 nearby_entities.insert(it->second.begin(), it->second.end());
             }
@@ -149,7 +149,7 @@ void Scene::Update(const f32 delta_time)
         if (const gouda::math::Vec2 & entity_size{entity.render_data.size};
             CheckCollision(new_position, m_player.render_data.size, entity.render_data.position, entity_size)) {
 
-            Rect<f32> entity_bounds{entity.render_data.position.x, entity.render_data.position.x + entity_size.x,
+            const Rect<f32> entity_bounds{entity.render_data.position.x, entity.render_data.position.x + entity_size.x,
                                     entity.render_data.position.y, entity.render_data.position.y + entity_size.y};
 
             Rect<f32> penetration_bounds{
@@ -287,7 +287,7 @@ void Scene::SetupPlayer()
 void Scene::BuildSpatialGrid()
 {
     m_spatial_grid.clear();
-    static constexpr f32 cell_size = 500.0f;
+    static constexpr f32 cell_size{500.0f};
 
     for (size_t i = 0; i < m_entities.size(); ++i) {
         const auto &entity = m_entities[i];

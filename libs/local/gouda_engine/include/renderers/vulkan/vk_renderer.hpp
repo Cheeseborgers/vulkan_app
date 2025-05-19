@@ -76,18 +76,21 @@ public:
     VkDevice GetDevice() const { return p_device->GetDevice(); }
     Buffer *GetStaticVertexBuffer() const { return p_quad_vertex_buffer.get(); }
     const std::vector<Buffer> &GetInstanceBuffers() { return m_quad_instance_buffers; }
-    const std::vector<std::unique_ptr<Texture>> &GetTextures() { return m_textures; }
-    const Vector<std::unique_ptr<Texture>> &GetFontTextures() { return m_font_textures; }
 
     // Texture functions
+    u32 LoadTexture(StringView filepath, const std::optional<StringView> &json_filepath = std::nullopt) const;
     u32 LoadSingleTexture(StringView filepath) const;
     u32 LoadAtlasTexture(StringView image_filepath, StringView json_filepath) const;
     const Sprite* GetSprite(u32 texture_id, StringView sprite_name) const;
     const TextureMetadata& GetTextureMetadata(u32 texture_id) const;
     u32 GetTextureCount() const;
+    const Vector<std::unique_ptr<Texture>> &GetTextures() const { return p_texture_manager->GetTextures(); }
+    TextureManager* GetTextureManager() const { return p_texture_manager.get(); }
 
-    u32 LoadTexture(StringView filepath, const std::optional<StringView> &json_filepath = std::nullopt);
+    // Text functions
     u32 LoadMSDFFont(StringView image_filepath, StringView json_filepath);
+    const Vector<std::unique_ptr<Texture>> &GetFontTextures() { return m_font_textures; }
+
     void SetClearColour(const Colour<f32> &colour);
     void ReCreateSwapchain();
     void DeviceWait() const { p_device->Wait(); }
@@ -168,7 +171,6 @@ private:
 
     std::vector<ParticleData> m_particles_instances;
 
-    std::vector<std::unique_ptr<Texture>> m_textures;
     Vector<std::unique_ptr<Texture>> m_font_textures;
     std::unordered_map<u32, std::unordered_map<char, Glyph>> m_fonts;
 
@@ -186,7 +188,6 @@ private:
     u32 m_index_count;
     bool m_is_initialized;
     bool m_use_compute_particles;
-    bool m_textures_dirty;
     bool m_font_textures_dirty;
 };
 

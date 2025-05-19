@@ -45,7 +45,7 @@ private:
     void SetupRenderer();
     void SetupAudio(const ApplicationSettings &settings);
     void SetupCamera();
-    void LoadTextures();
+    void LoadTextures() const;
     void LoadFonts();
     void SetupInputSystem();
 

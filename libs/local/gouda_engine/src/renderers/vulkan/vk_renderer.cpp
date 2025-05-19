@@ -66,7 +66,6 @@ Renderer::Renderer()
       m_index_count{0},
       m_is_initialized{false},
       m_use_compute_particles{false},
-      m_textures_dirty{true},
       m_font_textures_dirty{true}
 {
 }
@@ -77,10 +76,6 @@ Renderer::~Renderer()
 
     if (m_is_initialized) {
         DestroyBuffers();
-
-        for (const auto &texture : m_textures) {
-            texture->Destroy(p_device.get());
-        }
 
         for (const auto &texture : m_font_textures) {
             texture->Destroy(p_device.get());
@@ -353,7 +348,7 @@ void Renderer::Render(const f32 delta_time, const UniformData &uniform_data,
         .index_count = m_index_count,
         .particle_count = static_cast<u32>(m_particles_instances.size()),
         .glyph_count = static_cast<u32>(text_instances.size()),
-        .texture_count = static_cast<u32>(m_textures.size()),
+        .texture_count = p_texture_manager->GetTextureCount(),
         .font_count = static_cast<u32>(m_fonts.size()),
     };
     draw_data = RenderImGUI(stats);
@@ -613,27 +608,24 @@ const TextureMetadata &Renderer::GetTextureMetadata(const u32 texture_id) const
 {
     return p_texture_manager->GetTextureMetadata(texture_id);
 }
-u32 Renderer::GetTextureCount() const
-{
-    return  p_texture_manager->GetTextureCount();
-}
+u32 Renderer::GetTextureCount() const { return p_texture_manager->GetTextureCount(); }
 
 // ------------------------------------------------
 
-u32 Renderer::LoadTexture(StringView filepath, const std::optional<StringView> &json_filepath)
+u32 Renderer::LoadTexture(StringView filepath, const std::optional<StringView> &json_filepath) const
 {
-    if (m_textures.size() == MAX_TEXTURES) {
+    if (p_texture_manager->GetTextureCount() >= MAX_TEXTURES) {
         ENGINE_LOG_ERROR("Cannot load texture '{}': max textures ({}) reached", filepath, MAX_TEXTURES);
         return 0;
     }
 
-    const u32 texture_id{static_cast<u32>(m_textures.size())};
-    m_textures.push_back(p_buffer_manager->CreateTexture(filepath));
+    u32 texture_id{0};
     if (json_filepath) {
-        // m_atlas_metadata[texture_id] = parseAtlasJson(*json_filepath);
+        texture_id = p_texture_manager->LoadAtlasTexture(filepath, *json_filepath);
     }
-    m_textures_dirty = true;
-
+    else {
+        texture_id = p_texture_manager->LoadSingleTexture(filepath);
+    }
     return texture_id;
 }
 
@@ -684,10 +676,6 @@ void Renderer::InitializeSwapchainAndQueue(VSyncMode vsync_mode)
 
 void Renderer::InitializeDefaultResources()
 {
-    auto default_texture = p_buffer_manager->CreateDefaultTexture();
-    m_textures.push_back(std::move(default_texture));
-    ENGINE_LOG_DEBUG("Default texture created and added to textures at index 0.");
-
     auto default_font_texture = p_buffer_manager->CreateDefaultTexture();
     m_font_textures.push_back(std::move(default_font_texture));
     ENGINE_LOG_DEBUG("Default font texture created and added to font textures at index 0.");
@@ -1040,10 +1028,10 @@ void Renderer::DestroyImGUI() const
 
 void Renderer::UpdateTextureDescriptors()
 {
-    if (m_textures_dirty) {
-        p_quad_pipeline->UpdateTextureDescriptors(p_swapchain->GetImageCount(), m_textures);
-        p_particle_pipeline->UpdateTextureDescriptors(p_swapchain->GetImageCount(), m_textures);
-        m_textures_dirty = false;
+    if (p_texture_manager->IsDirty()) {
+        p_quad_pipeline->UpdateTextureDescriptors(p_swapchain->GetImageCount(), p_texture_manager->GetTextures());
+        p_particle_pipeline->UpdateTextureDescriptors(p_swapchain->GetImageCount(), p_texture_manager->GetTextures());
+        p_texture_manager->SetClean();
     }
 
     if (m_font_textures_dirty) {

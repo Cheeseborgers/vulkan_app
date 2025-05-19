@@ -45,7 +45,7 @@ public:
     void Bind(VkCommandBuffer command_buffer_ptr, size_t image_index) const;
     void Destroy();
 
-    void UpdateTextureDescriptors(size_t number_of_images, const std::vector<std::unique_ptr<Texture>> &textures);
+    void UpdateTextureDescriptors(size_t number_of_images, const Vector<std::unique_ptr<Texture>> &textures);
     void UpdateFontTextureDescriptors(size_t number_of_images, const Vector<std::unique_ptr<Texture>> &font_textures);
 
     [[nodiscard]] constexpr VkPipeline GetPipeline() const noexcept { return p_pipeline; }

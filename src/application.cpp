@@ -175,15 +175,8 @@ void Application::SetupCamera()
     );
 }
 
-void Application::LoadTextures()
+void Application::LoadTextures() const
 {
-    m_renderer.LoadTexture("assets/textures/checkerboard.png");
-    m_renderer.LoadTexture("assets/textures/checkerboard2.png");
-    m_renderer.LoadTexture("assets/textures/checkerboard3.png");
-    m_renderer.LoadTexture("assets/textures/checkerboard4.png");
-    m_renderer.LoadTexture("assets/textures/sprite_sheet.png");
-
-
     u32 checkerboard_id = m_renderer.LoadSingleTexture("assets/textures/checkerboard.png");
     u32 checkerboard_2_id = m_renderer.LoadSingleTexture("assets/textures/checkerboard2.png");
     u32 checkerboard_3_id = m_renderer.LoadSingleTexture("assets/textures/checkerboard3.png");

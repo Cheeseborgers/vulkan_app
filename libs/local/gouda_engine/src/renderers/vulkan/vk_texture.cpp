@@ -40,6 +40,7 @@ void Texture::Destroy(const Device *device)
 }
 
 TextureMetadata::TextureMetadata() : is_atlas{false}, texture{nullptr} {}
+TextureMetadata::~TextureMetadata() { sprites.clear(); }
 
 // Function declarations --------------------------------------------------------------
 [[nodiscard]] VkSampler create_texture_sampler(const Device *device, const VkFilter min_filter, const VkFilter max_filter,
