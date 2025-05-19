@@ -30,7 +30,7 @@ namespace gouda::vk {
 
 class Device;
 class Fence;
-class Texture;
+struct Texture;
 class Instance;
 class Shader;
 class DepthResources;
@@ -79,6 +79,13 @@ public:
     const std::vector<std::unique_ptr<Texture>> &GetTextures() { return m_textures; }
     const Vector<std::unique_ptr<Texture>> &GetFontTextures() { return m_font_textures; }
 
+    // Texture functions
+    u32 LoadSingleTexture(StringView filepath) const;
+    u32 LoadAtlasTexture(StringView image_filepath, StringView json_filepath) const;
+    const Sprite* GetSprite(u32 texture_id, StringView sprite_name) const;
+    const TextureMetadata& GetTextureMetadata(u32 texture_id) const;
+    u32 GetTextureCount() const;
+
     u32 LoadTexture(StringView filepath, const std::optional<StringView> &json_filepath = std::nullopt);
     u32 LoadMSDFFont(StringView image_filepath, StringView json_filepath);
     void SetClearColour(const Colour<f32> &colour);
@@ -119,6 +126,7 @@ private:
     std::unique_ptr<Swapchain> p_swapchain;
     std::unique_ptr<DepthResources> p_depth_resources;
     std::unique_ptr<CommandBufferManager> p_command_buffer_manager;
+    std::unique_ptr<TextureManager> p_texture_manager;
 
     std::unique_ptr<GraphicsPipeline> p_quad_pipeline;
     std::unique_ptr<GraphicsPipeline> p_text_pipeline;
@@ -135,8 +143,6 @@ private:
     std::unique_ptr<Shader> p_particle_vertex_shader;
     std::unique_ptr<Shader> p_particle_fragment_shader;
     std::unique_ptr<Shader> p_particle_compute_shader;
-
-    std::unique_ptr<TextureManager> p_texture_manager;
 
     GLFWwindow *p_window;
     VkRenderPass p_render_pass;

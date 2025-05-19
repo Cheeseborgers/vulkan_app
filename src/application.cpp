@@ -182,6 +182,18 @@ void Application::LoadTextures()
     m_renderer.LoadTexture("assets/textures/checkerboard3.png");
     m_renderer.LoadTexture("assets/textures/checkerboard4.png");
     m_renderer.LoadTexture("assets/textures/sprite_sheet.png");
+
+
+    u32 checkerboard_id = m_renderer.LoadSingleTexture("assets/textures/checkerboard.png");
+    u32 checkerboard_2_id = m_renderer.LoadSingleTexture("assets/textures/checkerboard2.png");
+    u32 checkerboard_3_id = m_renderer.LoadSingleTexture("assets/textures/checkerboard3.png");
+    u32 checkerboard_4_id = m_renderer.LoadSingleTexture("assets/textures/checkerboard4.png");
+
+    APP_LOG_DEBUG("Loaded textures: {},{},{},{}", checkerboard_id, checkerboard_2_id, checkerboard_3_id, checkerboard_4_id);
+
+    u32 atlas_id = m_renderer.LoadAtlasTexture("assets/textures/sprite_sheet.png", "assets/textures/sprite_sheet.json");
+    APP_LOG_DEBUG("Atlas ID: {}", atlas_id);
+
 }
 
 void Application::LoadFonts()

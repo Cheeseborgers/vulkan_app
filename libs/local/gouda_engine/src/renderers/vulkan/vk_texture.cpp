@@ -7,12 +7,14 @@
 
 namespace gouda::vk {
 
+Sprite::Sprite() : looping{true} {}
+
 Texture::Texture()
     : p_image{VK_NULL_HANDLE}, p_memory{VK_NULL_HANDLE}, p_view{VK_NULL_HANDLE}, p_sampler{VK_NULL_HANDLE}
 {
 }
 
-void Texture::Destroy(Device *device)
+void Texture::Destroy(const Device *device)
 {
     if (device) {
         if (p_sampler) {
@@ -37,9 +39,11 @@ void Texture::Destroy(Device *device)
     }
 }
 
+TextureMetadata::TextureMetadata() : is_atlas{false}, texture{nullptr} {}
+
 // Function declarations --------------------------------------------------------------
-[[nodiscard]] VkSampler create_texture_sampler(Device *device, VkFilter min_filter, VkFilter max_filter,
-                                               VkSamplerAddressMode address_mode)
+[[nodiscard]] VkSampler create_texture_sampler(const Device *device, const VkFilter min_filter, const VkFilter max_filter,
+                                               const VkSamplerAddressMode address_mode)
 {
     const VkSamplerCreateInfo sampler_create_info{.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
                                                   .pNext = nullptr,
@@ -62,8 +66,8 @@ void Texture::Destroy(Device *device)
                                                   .unnormalizedCoordinates = VK_FALSE};
 
     VkSampler sampler{VK_NULL_HANDLE};
-    VkResult result{vkCreateSampler(device->GetDevice(), &sampler_create_info, VK_NULL_HANDLE, &sampler)};
-    if (result != VK_SUCCESS) {
+    if (const VkResult result{vkCreateSampler(device->GetDevice(), &sampler_create_info, VK_NULL_HANDLE, &sampler)};
+        result != VK_SUCCESS) {
         CHECK_VK_RESULT(result, "vkCreateSampler");
     }
 
@@ -79,11 +83,8 @@ void Texture::Destroy(Device *device)
         case VK_FORMAT_R16_SFLOAT:
             return 2;
         case VK_FORMAT_R16G16_SFLOAT:
-            return 4;
         case VK_FORMAT_R16G16_SNORM:
-            return 4;
         case VK_FORMAT_B8G8R8A8_UNORM:
-            return 4;
         case VK_FORMAT_R8G8B8A8_UNORM:
             return 4;
         case VK_FORMAT_R16G16B16A16_SFLOAT:

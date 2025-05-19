@@ -10,19 +10,37 @@
  * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
  * See <https://www.gnu.org/licenses/> for more information.
  */
+#include <unordered_map>
+#include <vector>
+
 #include <vulkan/vulkan.h>
 
 #include "core/types.hpp"
+
+// TODO: Update this to use Vector
 
 namespace gouda::vk {
 
 class Device;
 
+struct SpriteFrame {
+    SpriteFrame() : uv_rect{0.0f,0.0f, 0.0f, 0.0f} {}
+
+    UVRect<f32> uv_rect; // u_min, v_min, u_max, v_max
+};
+
+struct Sprite {
+    Sprite();
+
+    std::vector<SpriteFrame> frames;
+    std::vector<f32> frame_durations;
+    bool looping;
+};
 
 struct Texture {
     Texture();
 
-    void Destroy(Device *device);
+    void Destroy(const Device *device);
 
     VkImage p_image;
     VkDeviceMemory p_memory;
@@ -30,14 +48,22 @@ struct Texture {
     VkSampler p_sampler;
 };
 
-[[nodiscard]] VkSampler create_texture_sampler(Device *device, VkFilter min_filter, VkFilter max_filter,
+struct TextureMetadata {
+    TextureMetadata();
+
+    bool is_atlas;
+    Texture* texture;
+    std::unordered_map<String, Sprite> sprites;
+};
+
+[[nodiscard]] VkSampler create_texture_sampler(const Device *device, VkFilter min_filter, VkFilter max_filter,
                                                VkSamplerAddressMode address_mode);
 
 [[nodiscard]] constexpr int get_bytes_per_texture_format(VkFormat Format) noexcept;
 
 [[nodiscard]] constexpr bool has_stencil_component(const VkFormat Format) noexcept
 {
-    return ((Format == VK_FORMAT_D32_SFLOAT_S8_UINT) || (Format == VK_FORMAT_D24_UNORM_S8_UINT));
+    return Format == VK_FORMAT_D32_SFLOAT_S8_UINT || Format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
 [[nodiscard]] constexpr VkFormat image_channels_to_vk_format(const int channels)

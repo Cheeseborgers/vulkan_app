@@ -18,6 +18,8 @@
 #include "renderers/vulkan/vk_instance.hpp"
 #include "containers/small_vector.hpp"
 
+// TODO: Change this ish to Vector
+
 namespace gouda::vk {
 
 constexpr u32 MAX_TEXTURES{32};
@@ -68,16 +70,19 @@ public:
     [[nodiscard]] VkPhysicalDevice GetPhysicalDevice() const { return m_physical_devices.Selected().m_physical_device; }
     [[nodiscard]] u32 GetQueueFamily() const { return m_queue_family; }
     [[nodiscard]] const PhysicalDevice &GetSelectedPhysicalDevice() const { return m_physical_devices.Selected(); }
+    [[nodiscard]] u32 GetMaxTextures() const { return m_max_textures;}
 
     void Wait() const { vkDeviceWaitIdle(p_device); };
 
 private:
-    void CreateDevice(VkQueueFlags required_queue_flags);
+    void CreateDevice();
 
 private:
     VkDevice p_device;
     VulkanPhysicalDevices m_physical_devices;
     u32 m_queue_family;
+    u32 m_max_textures;
+
 };
 
 } // namespace gouda::vk

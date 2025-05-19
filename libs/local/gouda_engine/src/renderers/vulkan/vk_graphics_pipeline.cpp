@@ -1,5 +1,5 @@
 /**
- * @file renderers/vulkan/vk_graphics_pipeline.cpp
+ * @file vk_graphics_pipeline.cpp
  * @author GoudaCheeseburgers
  * @date 2025-05-12
  * @brief Engine Vulkan graphics pipeline implementation.
@@ -26,7 +26,7 @@ namespace gouda::vk {
 namespace internal {
 // Helper function to map vertex input to struct offsets
 template <typename T>
-u32 get_struct_offset(StringView name, VkFormat format, bool &success)
+u32 get_struct_offset(StringView name, const VkFormat format, bool &success)
 {
     success = true;
     if constexpr (std::is_same_v<T, Vertex>) {
@@ -84,7 +84,7 @@ u32 get_struct_offset(StringView name, VkFormat format, bool &success)
 }
 } // namespace internal
 
-static constexpr std::string_view pipeline_type_to_string(PipelineType type)
+static constexpr std::string_view pipeline_type_to_string(const PipelineType type)
 {
     switch (type) {
         case PipelineType::Quad:
@@ -205,7 +205,7 @@ void GraphicsPipeline::Destroy()
     ENGINE_LOG_DEBUG("Graphics pipeline destroyed");
 }
 
-void GraphicsPipeline::UpdateTextureDescriptors(size_t number_of_images,
+void GraphicsPipeline::UpdateTextureDescriptors(const size_t number_of_images,
                                                 const std::vector<std::unique_ptr<Texture>> &textures)
 {
     ASSERT(!textures.empty(), "Texture vector must contain at least the default texture");
@@ -283,7 +283,7 @@ void GraphicsPipeline::UpdateTextureDescriptors(size_t number_of_images,
     }
 }
 
-void GraphicsPipeline::UpdateFontTextureDescriptors(size_t number_of_images,
+void GraphicsPipeline::UpdateFontTextureDescriptors(const size_t number_of_images,
                                                     const Vector<std::unique_ptr<Texture>> &font_textures)
 {
     ASSERT(!font_textures.empty(), "Font texture vector must contain at least the default font texture");
@@ -362,7 +362,7 @@ void GraphicsPipeline::UpdateFontTextureDescriptors(size_t number_of_images,
 }
 
 // Private functions ---------------------------------------------------------------
-void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
+void GraphicsPipeline::CreateDescriptorPool(const int number_of_images)
 {
     std::unordered_map<VkDescriptorType, u32> pool_size_counts;
     for (const auto &shader : {p_vertex_shader, p_fragment_shader}) {
@@ -383,7 +383,7 @@ void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
     u32 max_set{0};
     for (const auto &shader : {p_vertex_shader, p_fragment_shader}) {
         for (const auto &binding : shader->Reflection().descriptor_bindings) {
-            max_set = std::max(max_set, binding.set);
+            max_set = math::max(max_set, binding.set);
         }
     }
     u32 total_sets{(max_set + 1) * number_of_images};
@@ -393,8 +393,8 @@ void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
                                          .poolSizeCount = static_cast<u32>(pool_sizes.size()),
                                          .pPoolSizes = pool_sizes.data()};
 
-    VkResult result{vkCreateDescriptorPool(p_device, &pool_info, nullptr, &p_descriptor_pool)};
-    if (result != VK_SUCCESS) {
+    if (const VkResult result{vkCreateDescriptorPool(p_device, &pool_info, nullptr, &p_descriptor_pool)};
+        result != VK_SUCCESS) {
         ENGINE_LOG_ERROR("Failed to create descriptor pool. Error: {}", vk_result_to_string(result));
         CHECK_VK_RESULT(result, "vkCreateDescriptorPool");
     }
@@ -402,8 +402,8 @@ void GraphicsPipeline::CreateDescriptorPool(int number_of_images)
     ENGINE_LOG_DEBUG("Created descriptor pool with {} sets and {} pool sizes", total_sets, pool_sizes.size());
 }
 
-void GraphicsPipeline::CreateDescriptorSets(int number_of_images, std::vector<Buffer> &uniform_buffers,
-                                            int uniform_data_size)
+void GraphicsPipeline::CreateDescriptorSets(const int number_of_images, std::vector<Buffer> &uniform_buffers,
+                                            const int uniform_data_size)
 {
     CreateDescriptorPool(number_of_images);
     CreateDescriptorSetLayout();
@@ -449,8 +449,9 @@ void GraphicsPipeline::CreateDescriptorSetLayout()
                                                     .bindingCount = static_cast<u32>(layout_bindings.size()),
                                                     .pBindings =
                                                         layout_bindings.empty() ? nullptr : layout_bindings.data()};
-        VkResult result{vkCreateDescriptorSetLayout(p_device, &layout_info, nullptr, &m_descriptor_set_layouts[set])};
-        if (result != VK_SUCCESS) {
+        if (const VkResult result{
+                vkCreateDescriptorSetLayout(p_device, &layout_info, nullptr, &m_descriptor_set_layouts[set])};
+            result != VK_SUCCESS) {
             ENGINE_LOG_ERROR("Failed to create descriptor set layout for set {}. Error: {}", set,
                              vk_result_to_string(result));
             CHECK_VK_RESULT(result, "vkCreateDescriptorSetLayout");
@@ -472,8 +473,8 @@ void GraphicsPipeline::AllocateDescriptorSets(int number_of_images)
                                                .descriptorSetCount = static_cast<u32>(number_of_images),
                                                .pSetLayouts = layouts.data()};
         m_descriptor_sets[set].resize(number_of_images);
-        VkResult result{vkAllocateDescriptorSets(p_device, &alloc_info, m_descriptor_sets[set].data())};
-        if (result != VK_SUCCESS) {
+        if (const VkResult result{vkAllocateDescriptorSets(p_device, &alloc_info, m_descriptor_sets[set].data())};
+            result != VK_SUCCESS) {
             ENGINE_LOG_ERROR("Failed to allocate descriptor set {}. Error: {}", set, vk_result_to_string(result));
             CHECK_VK_RESULT(result, "vkAllocateDescriptorSets");
         }
@@ -806,20 +807,20 @@ Vector<VkPushConstantRange> GraphicsPipeline::SetupPushConstants()
     std::unordered_map<VkShaderStageFlags, std::unordered_set<u32>> seen_offsets_by_stage;
     for (const auto &shader : {p_vertex_shader, p_fragment_shader}) {
         auto &seen_offsets = seen_offsets_by_stage[shader->Stage()];
-        for (const auto &pc : shader->Reflection().push_constants) {
-            if (pc.offset % 4 != 0 || pc.size % 4 != 0) {
+        for (const auto &[offset, size, stage_flags] : shader->Reflection().push_constants) {
+            if (offset % 4 != 0 || size % 4 != 0) {
                 ENGINE_LOG_ERROR("Push constant in shader stage {} has unaligned offset ({}) or size ({})",
-                                 vk_shader_stage_as_string_view(shader->Stage()), pc.offset, pc.size);
+                                 vk_shader_stage_as_string_view(shader->Stage()), offset, size);
                 continue;
             }
-            const u32 range_end = pc.offset + pc.size;
-            for (u32 i = pc.offset; i < range_end; ++i) {
+            const u32 range_end = offset + size;
+            for (u32 i = offset; i < range_end; ++i) {
                 if (!seen_offsets.insert(i).second) {
                     ENGINE_LOG_ERROR("Overlapping push constant offset {} in shader stage {}", i,
                                      vk_shader_stage_as_string_view(shader->Stage()));
                 }
             }
-            push_constant_ranges.push_back({.stageFlags = pc.stage_flags, .offset = pc.offset, .size = pc.size});
+            push_constant_ranges.push_back({.stageFlags = stage_flags, .offset = offset, .size = size});
         }
     }
 

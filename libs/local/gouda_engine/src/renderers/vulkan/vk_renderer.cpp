@@ -36,6 +36,7 @@ Renderer::Renderer()
       p_swapchain{nullptr},
       p_depth_resources{nullptr},
       p_command_buffer_manager{nullptr},
+      p_texture_manager{nullptr},
       p_quad_pipeline{nullptr},
       p_text_pipeline{nullptr},
       p_particle_pipeline{nullptr},
@@ -49,7 +50,6 @@ Renderer::Renderer()
       p_particle_vertex_shader{nullptr},
       p_particle_fragment_shader{nullptr},
       p_particle_compute_shader{nullptr},
-      p_texture_manager{nullptr},
       p_window{nullptr},
       p_render_pass{VK_NULL_HANDLE},
       p_copy_command_buffer{VK_NULL_HANDLE},
@@ -118,9 +118,9 @@ void Renderer::Initialize(GLFWwindow *window_ptr, StringView app_name, SemVer vu
     ENGINE_LOG_DEBUG("Renderer initialized.");
 }
 
-void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, const u32 image_index,
-                                   const u32 quad_instance_count, const u32 text_instance_count,
-                                   u32 particle_instance_count, ImDrawData *draw_data) const
+void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, const u32 image_index, const u32 quad_instance_count,
+                                   const u32 text_instance_count, u32 particle_instance_count,
+                                   ImDrawData *draw_data) const
 {
     ENGINE_PROFILE_SCOPE("Record command buffer");
 
@@ -264,8 +264,9 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, const u32 ima
     EndCommandBuffer(command_buffer);
 }
 
-void Renderer::Render(const f32 delta_time, const UniformData &uniform_data, const std::vector<InstanceData> &quad_instances,
-                      const std::vector<TextData> &text_instances, const std::vector<ParticleData> &particle_instances)
+void Renderer::Render(const f32 delta_time, const UniformData &uniform_data,
+                      const std::vector<InstanceData> &quad_instances, const std::vector<TextData> &text_instances,
+                      const std::vector<ParticleData> &particle_instances)
 {
 
     /*
@@ -388,8 +389,8 @@ void Renderer::UpdateParticleStorageBuffer(const u32 image_index,
         return;
     }
 
-    const VkDeviceSize particle_instance_size{
-        sizeof(ParticleData) * std::min(particle_instances.size(), m_max_particle_instances)};
+    const VkDeviceSize particle_instance_size{sizeof(ParticleData) *
+                                              math::min(particle_instances.size(), m_max_particle_instances)};
     memcpy(m_mapped_particle_storage_data[image_index], particle_instances.data(), particle_instance_size);
 
     /*
@@ -595,6 +596,30 @@ void Renderer::CreateUniformBuffers(const size_t data_size)
     }
 }
 
+// Texture functions -----------------------------
+u32 Renderer::LoadSingleTexture(StringView filepath) const { return p_texture_manager->LoadSingleTexture(filepath); }
+
+u32 Renderer::LoadAtlasTexture(StringView image_filepath, StringView json_filepath) const
+{
+    return p_texture_manager->LoadAtlasTexture(image_filepath, json_filepath);
+}
+
+const Sprite *Renderer::GetSprite(const u32 texture_id, StringView sprite_name) const
+{
+    return p_texture_manager->GetSprite(texture_id, sprite_name);
+}
+
+const TextureMetadata &Renderer::GetTextureMetadata(const u32 texture_id) const
+{
+    return p_texture_manager->GetTextureMetadata(texture_id);
+}
+u32 Renderer::GetTextureCount() const
+{
+    return  p_texture_manager->GetTextureCount();
+}
+
+// ------------------------------------------------
+
 u32 Renderer::LoadTexture(StringView filepath, const std::optional<StringView> &json_filepath)
 {
     if (m_textures.size() == MAX_TEXTURES) {
@@ -694,6 +719,8 @@ void Renderer::InitializeRenderResources()
 
     p_command_buffer_manager->AllocateBuffers(1, &p_copy_command_buffer);
     CreateCommandBuffers();
+
+    p_texture_manager = std::make_unique<TextureManager>(p_buffer_manager.get(), p_device.get());
 
     p_depth_resources =
         std::make_unique<DepthResources>(p_device.get(), p_instance.get(), p_buffer_manager.get(), p_swapchain.get());

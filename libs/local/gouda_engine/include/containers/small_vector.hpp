@@ -11,11 +11,11 @@
  * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
  * See <https://www.gnu.org/licenses/> for more information.
  */
+#include "debug/assert.hpp"
 #include <algorithm> // For std::uninitialized_copy_n
 #include <iterator>
 #include <memory>
 #include <new> // For std::launder
-#include "debug/assert.hpp"
 
 namespace gouda {
 
@@ -23,21 +23,24 @@ namespace gouda {
  * @brief Growth policy that doubles the capacity each time.
  */
 struct GrowthPolicyDouble {
-    static size_t next(size_t current) { return current ? current * 2 : 1; }
+    static size_t next(const size_t current) { return current ? current * 2 : 1; }
 };
 
 /**
  * @brief Growth policy that increases capacity by 1.5x.
  */
 struct GrowthPolicyOnePointFive {
-    static size_t next(size_t current) { return current < 2 ? 2 : static_cast<size_t>(current * 1.5); }
+    static size_t next(const size_t current)
+    {
+        return current < 2 ? 2 : static_cast<size_t>(static_cast<double>(current) * 1.5);
+    }
 };
 
 /**
  * @brief Growth policy that adds one to the capacity each time.
  */
 struct GrowthPolicyAddOne {
-    static size_t next(size_t current) { return current + 1; }
+    static size_t next(const size_t current) { return current + 1; }
 };
 
 /**
@@ -129,23 +132,24 @@ public:
      * @brief Move constructor transfers ownership from another SmallVector.
      * @param other The SmallVector to move from.
      */
-    SmallVector(SmallVector &&other) noexcept : m_data(other.m_data), m_size(other.m_size), m_capacity(other.m_capacity)
-    {
-        if (m_data == other.stack_data()) {
+    SmallVector(SmallVector&& other) noexcept
+        : m_size(0), m_capacity(N), m_data(stack_data()) {
+        if (other.m_data == other.stack_data()) {
             // Copy stack data to our stack
-            m_data = stack_data();
-            std::uninitialized_copy_n(other.m_data, m_size, m_data);
-            // Clear other's elements to prevent double destruction
-            for (size_t i = 0; i < other.m_size; ++i) {
-                other.m_data[i].~T();
-            }
+            std::uninitialized_copy_n(other.m_data, other.m_size, m_data);
+            m_size = other.m_size;
+            // Clear other's elements
+            for (size_t i = 0; i < other.m_size; ++i) other.m_data[i].~T();
             other.m_size = 0;
-        }
-        else {
+        } else {
             // Take heap data
-            other.m_data = other.stack_data();
+            m_data = other.m_data;
+            m_size = other.m_size;
+            m_capacity = other.m_capacity;
+            other.m_data = nullptr; // Prevent double-free
+            other.m_size = 0;
+            other.m_capacity = 0;
         }
-        other.m_capacity = N;
     }
 
     /**
@@ -153,31 +157,29 @@ public:
      * @param other The SmallVector to move from.
      * @return Reference to this SmallVector.
      */
-    SmallVector &operator=(SmallVector &&other) noexcept
-    {
+    SmallVector& operator=(SmallVector&& other) noexcept {
         if (this != &other) {
             clear();
-            if (m_data != stack_data()) {
-                ::operator delete(m_data);
-            }
-            m_data = other.m_data;
-            m_size = other.m_size;
-            m_capacity = other.m_capacity;
-            if (m_data == other.stack_data()) {
+            if (m_data != stack_data()) ::operator delete(m_data);
+            m_data = stack_data();
+            m_size = 0;
+            m_capacity = N;
+            if (other.m_data == other.stack_data()) {
                 // Copy stack data to our stack
-                m_data = stack_data();
-                std::uninitialized_copy_n(other.m_data, m_size, m_data);
-                // Clear other's elements to prevent double destruction
-                for (size_t i = 0; i < other.m_size; ++i) {
-                    other.m_data[i].~T();
-                }
+                std::uninitialized_copy_n(other.m_data, other.m_size, m_data);
+                m_size = other.m_size;
+                // Clear other's elements
+                for (size_t i = 0; i < other.m_size; ++i) other.m_data[i].~T();
                 other.m_size = 0;
-            }
-            else {
+            } else {
                 // Take heap data
-                other.m_data = other.stack_data();
+                m_data = other.m_data;
+                m_size = other.m_size;
+                m_capacity = other.m_capacity;
+                other.m_data = nullptr; // Prevent double-free
+                other.m_size = 0;
+                other.m_capacity = 0;
             }
-            other.m_capacity = N;
         }
         return *this;
     }
@@ -270,9 +272,9 @@ public:
     }
 
     /**
-    * @brief Removes the last element from the vector.
-    * @pre The vector must not be empty.
-    */
+     * @brief Removes the last element from the vector.
+     * @pre The vector must not be empty.
+     */
     void pop_back()
     {
         if (m_size > 0) {
@@ -446,12 +448,12 @@ public:
     }
 
     /**
-    * @brief Accesses the first element.
-    * @return Reference to the first element.
-    * @pre The vector must not be empty.
-    * @note constexpr if T is trivially copyable.
-    * @note This function is noexcept.
-    */
+     * @brief Accesses the first element.
+     * @return Reference to the first element.
+     * @pre The vector must not be empty.
+     * @note constexpr if T is trivially copyable.
+     * @note This function is noexcept.
+     */
     constexpr T &front() noexcept
         requires std::is_trivially_copyable_v<T>
     {
@@ -500,7 +502,6 @@ public:
         ASSERT(m_size > 0, "back on empty SmallVector");
         return *std::launder(m_data + m_size - 1);
     }
-
 
     /**
      * @brief Provides direct access to the underlying data array.
@@ -616,10 +617,10 @@ public:
     }
 
     /**
- * @brief Erases the element at the given position.
- * @param pos Iterator to the element to remove.
- * @return Iterator following the removed element.
- */
+     * @brief Erases the element at the given position.
+     * @param pos Iterator to the element to remove.
+     * @return Iterator following the removed element.
+     */
     iterator erase(const_iterator pos)
     {
         size_t index = pos - begin();
@@ -636,11 +637,11 @@ public:
     }
 
     /**
- * @brief Erases elements in the range [first, last).
- * @param first Iterator to the first element to remove.
- * @param last Iterator to one past the last element to remove.
- * @return Iterator following the last removed element.
- */
+     * @brief Erases elements in the range [first, last).
+     * @param first Iterator to the first element to remove.
+     * @param last Iterator to one past the last element to remove.
+     * @return Iterator following the last removed element.
+     */
     iterator erase(const_iterator first, const_iterator last)
     {
         size_t start = first - begin();
@@ -661,7 +662,6 @@ public:
         m_size -= count;
         return m_data + start;
     }
-
 
 private:
     /**

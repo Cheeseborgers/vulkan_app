@@ -41,9 +41,9 @@ static VkFormat find_depth_format(VkPhysicalDevice device_ptr)
 }
 
 // Vulkan Format to String Map
-std::string vk_format_to_string(const VkFormat format)
+String vk_format_to_string(const VkFormat format)
 {
-    static const std::unordered_map<VkFormat, std::string> format_map = {
+    static const std::unordered_map<VkFormat, String> format_map = {
         {VK_FORMAT_UNDEFINED, "VK_FORMAT_UNDEFINED"},
         {VK_FORMAT_R8G8B8A8_UNORM, "VK_FORMAT_R8G8B8A8_UNORM"},
         {VK_FORMAT_B8G8R8A8_UNORM, "VK_FORMAT_B8G8R8A8_UNORM"},
@@ -64,9 +64,9 @@ std::string vk_format_to_string(const VkFormat format)
 }
 
 // Vulkan Color Space to String Map
-std::string VkColorSpaceToString(VkColorSpaceKHR color_space)
+String VkColorSpaceToString(const VkColorSpaceKHR color_space)
 {
-    static const std::unordered_map<VkColorSpaceKHR, std::string> color_space_map = {
+    static const std::unordered_map<VkColorSpaceKHR, String> color_space_map = {
         {VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, "VK_COLOR_SPACE_SRGB_NONLINEAR_KHR"},
         {VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT, "VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT"},
         {VK_COLOR_SPACE_HDR10_ST2084_EXT, "VK_COLOR_SPACE_HDR10_ST2084_EXT"},
@@ -81,6 +81,7 @@ std::string VkColorSpaceToString(VkColorSpaceKHR color_space)
     if (const auto it = color_space_map.find(color_space); it != color_space_map.end()) {
         return it->second;
     }
+
     return "Unknown VkColorSpace (" + std::to_string(static_cast<u32>(color_space)) + ")";
 }
 
@@ -115,7 +116,7 @@ static void LogImageUsageFlags(const VkImageUsageFlags &flags)
     }
 }
 
-static void PrintMemoryProperty(VkMemoryPropertyFlags PropertyFlags)
+static void PrintMemoryProperty(const VkMemoryPropertyFlags PropertyFlags)
 {
     if (PropertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
         std::cout << "DEVICE LOCAL ";
@@ -308,11 +309,11 @@ const PhysicalDevice &VulkanPhysicalDevices::Selected() const
 }
 
 // Device implementation ------------------------------------------------------------------------------
-Device::Device(const Instance &instance, VkQueueFlags requiredQueueFlags)
-    : p_device{VK_NULL_HANDLE}, m_queue_family{0}
+Device::Device(const Instance &instance, const VkQueueFlags required_queue_flags)
+    : p_device{VK_NULL_HANDLE}, m_queue_family{0}, m_max_textures{MAX_TEXTURES}
 {
     m_physical_devices.Initialize(instance, instance.GetSurface());
-    m_queue_family = m_physical_devices.SelectDevice(requiredQueueFlags, true);
+    m_queue_family = m_physical_devices.SelectDevice(required_queue_flags, true);
 
     u32 max_samplers{m_physical_devices.Selected().m_device_properties.limits.maxPerStageDescriptorSamplers};
     ENGINE_LOG_DEBUG("Max samplers per stage: {}", max_samplers);
@@ -321,12 +322,10 @@ Device::Device(const Instance &instance, VkQueueFlags requiredQueueFlags)
                          max_samplers);
         ENGINE_THROW("Device does not support required number of texture samplers");
     }
-    else {
-        ENGINE_LOG_DEBUG("MAX_TEXTURES ({}) is supported (maxPerStageDescriptorSamplers: {})", MAX_TEXTURES,
-                         max_samplers);
-    }
 
-    CreateDevice(requiredQueueFlags);
+    ENGINE_LOG_DEBUG("MAX_TEXTURES ({}) is supported (maxPerStageDescriptorSamplers: {})", MAX_TEXTURES, max_samplers);
+
+    CreateDevice();
 }
 
 Device::~Device()
@@ -337,16 +336,16 @@ Device::~Device()
     }
 }
 
-void Device::CreateDevice(VkQueueFlags requiredQueueFlags)
+void Device::CreateDevice()
 {
-    const f32 queue_priorities[]{1.0f};
+    constexpr f32 queue_priorities[]{1.0f};
     VkDeviceQueueCreateInfo device_queue_create_info{};
     device_queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     device_queue_create_info.queueFamilyIndex = m_queue_family;
     device_queue_create_info.queueCount = 1;
     device_queue_create_info.pQueuePriorities = queue_priorities;
 
-    std::vector<const char *> device_extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    const std::vector<const char *> device_extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME,
                                                 VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME};
 
     VkPhysicalDeviceFeatures physical_device_features{};
@@ -361,7 +360,7 @@ void Device::CreateDevice(VkQueueFlags requiredQueueFlags)
     device_create_info.ppEnabledExtensionNames = device_extensions.data();
     device_create_info.pEnabledFeatures = &physical_device_features;
 
-    VkResult result{
+    const VkResult result{
         vkCreateDevice(m_physical_devices.Selected().m_physical_device, &device_create_info, nullptr, &p_device)};
     if (result != VK_SUCCESS) {
         CHECK_VK_RESULT(result, "vkCreateDevice");
