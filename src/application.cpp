@@ -49,7 +49,7 @@ void Application::Initialize()
     LoadTextures();
     LoadFonts();
 
-    p_current_scene = std::make_unique<Scene>(p_ortho_camera.get());
+    p_current_scene = std::make_unique<Scene>(p_ortho_camera.get(), m_renderer.GetTextureManager());
 
     APP_LOG_DEBUG("Application initialization success");
 }
@@ -140,7 +140,7 @@ void Application::SetupWindow(const ApplicationSettings &settings)
 void Application::SetupRenderer()
 {
     // Initialize Vulkan
-    m_renderer.Initialize(p_window->GetWindow(), "Gouda renderer", {1, 3, 0, 0}, m_time_settings.vsync_mode);
+    m_renderer.Initialize(p_window->GetWindow(), "Gouda renderer", SemVer{1, 4, 0, 0}, m_time_settings.vsync_mode);
 
     m_renderer.CreateUniformBuffers(sizeof(gouda::UniformData));
 

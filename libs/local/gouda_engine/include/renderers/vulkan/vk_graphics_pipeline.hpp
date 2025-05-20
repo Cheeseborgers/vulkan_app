@@ -32,7 +32,7 @@ enum class PipelineType : u8 { Quad, Text, Particle };
 class GraphicsPipeline {
 public:
     GraphicsPipeline(Renderer &renderer, VkRenderPass render_pass, Shader *vertex_shader,
-                     Shader *fragment_shader, int number_of_images, std::vector<Buffer> &uniform_buffers,
+                     Shader *fragment_shader, int number_of_images, Vector<Buffer> &uniform_buffers,
                      int uniform_data_size, PipelineType type);
 
     ~GraphicsPipeline();
@@ -53,10 +53,10 @@ public:
 
 private:
     void CreateDescriptorPool(int number_of_images);
-    void CreateDescriptorSets(int number_of_images, std::vector<Buffer> &uniform_buffers, int uniform_data_size);
+    void CreateDescriptorSets(int number_of_images, const Vector<Buffer> &uniform_buffers, int uniform_data_size);
     void CreateDescriptorSetLayout();
     void AllocateDescriptorSets(int number_of_images);
-    void UpdateDescriptorSets(int number_of_images, std::vector<Buffer> &uniform_buffers, int uniform_data_size);
+    void UpdateDescriptorSets(int number_of_images, const Vector<Buffer> &uniform_buffers, int uniform_data_size);
 
     [[nodiscard]] std::array<VkPipelineShaderStageCreateInfo, 2> SetupShaderStages() const;
     [[nodiscard]] VkPipelineVertexInputStateCreateInfo SetupVertexInput();

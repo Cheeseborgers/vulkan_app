@@ -43,7 +43,7 @@ public:
     Renderer();
     ~Renderer();
 
-    void Initialize(GLFWwindow *window_ptr, StringView app_name, SemVer vulkan_api_version = {1, 3, 0, 0},
+    void Initialize(GLFWwindow *window_ptr, StringView app_name, SemVer vulkan_api_version = SemVer{1, 4, 0, 0},
                     VSyncMode vsync_mode = VSyncMode::Enabled);
 
     void RecordCommandBuffer(VkCommandBuffer command_buffer, u32 image_index, u32 quad_instance_count,
@@ -157,12 +157,12 @@ private:
     Vector<VkFramebuffer> m_framebuffers;
     Vector<VkCommandBuffer> m_command_buffers;
 
-    std::vector<Buffer> m_uniform_buffers;
-    std::vector<Buffer> m_compute_uniform_buffers;
+    Vector<Buffer> m_uniform_buffers;
+    Vector<Buffer> m_compute_uniform_buffers;
     std::vector<Buffer> m_quad_instance_buffers;
     std::vector<Buffer> m_text_instance_buffers;
     std::vector<Buffer> m_particle_instance_buffers;
-    std::vector<Buffer> m_particle_storage_buffers;
+    Vector<Buffer> m_particle_storage_buffers;
 
     std::vector<void *> m_mapped_quad_instance_data;
     std::vector<void *> m_mapped_text_instance_data;

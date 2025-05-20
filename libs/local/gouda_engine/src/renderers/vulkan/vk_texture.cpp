@@ -75,7 +75,7 @@ TextureMetadata::~TextureMetadata() { sprites.clear(); }
     return sampler;
 }
 
-[[nodiscard]] constexpr int get_bytes_per_texture_format(VkFormat Format) noexcept
+[[nodiscard]] constexpr int get_bytes_per_texture_format(const VkFormat Format) noexcept
 {
     switch (Format) {
         case VK_FORMAT_R8_SINT:

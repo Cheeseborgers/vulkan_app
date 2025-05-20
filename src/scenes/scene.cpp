@@ -6,6 +6,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "containers/small_vector.hpp"
 #include "core/types.hpp"
 #include "debug/logger.hpp"
 #include "math/collision.hpp"
@@ -21,10 +22,8 @@ struct GridRange {
 
 GridRange GetGridRange(const Rect<f32> &bounds, f32 cell_size)
 {
-    return {(gouda::math::floor(bounds.left / cell_size)),
-            (gouda::math::floor(bounds.right / cell_size)),
-            (gouda::math::floor(bounds.bottom / cell_size)),
-            (gouda::math::floor(bounds.top / cell_size))};
+    return {(gouda::math::floor(bounds.left / cell_size)), (gouda::math::floor(bounds.right / cell_size)),
+            (gouda::math::floor(bounds.bottom / cell_size)), (gouda::math::floor(bounds.top / cell_size))};
 }
 
 bool IsInFrustum(const gouda::Vec3 &position, const gouda::Vec2 &size,
@@ -37,10 +36,14 @@ bool IsInFrustum(const gouda::Vec3 &position, const gouda::Vec2 &size,
     return object_bounds.Intersects(frustum_bounds);
 }
 // Scene ---------------------------------------------------------------------------------------
-Scene::Scene(gouda::OrthographicCamera *camera_ptr)
-    : p_camera{camera_ptr}, m_player{gouda::InstanceData{}, {0.0f}, 0.0f}, m_instances_dirty{true}, m_font_id{1}
+Scene::Scene(gouda::OrthographicCamera *camera, gouda::vk::TextureManager *texture_manager)
+    : p_camera{camera},
+      p_texture_manager{texture_manager},
+      m_player{gouda::InstanceData{}, {0.0f}, 0.0f},
+      m_instances_dirty{true},
+      m_font_id{1}
 {
-    const std::vector<gouda::InstanceData> instances = {
+    const gouda::Vector<gouda::InstanceData> instances = {
         {{2945.3f, 3048.8f, -0.3f}, {81.9f, 453.95f}, 0.0f, 4},
         {{200.3f, 200.8f, -0.3f}, {281.9f, 453.95f}, 0.0f, 4},
         {{1182.08f, 69.08f, -0.8f}, {188.0f, 101.51f}, 0.0f, 2},
@@ -127,7 +130,7 @@ void Scene::Update(const f32 delta_time)
 
     // Player collision bounds
     const Rect<f32> player_bounds{new_position.x, new_position.x + m_player.render_data.size.x, new_position.y,
-                            new_position.y + m_player.render_data.size.y};
+                                  new_position.y + m_player.render_data.size.y};
 
     // Spatial grid query for collision
     static constexpr f32 cell_size{500.0f};
@@ -150,9 +153,9 @@ void Scene::Update(const f32 delta_time)
             CheckCollision(new_position, m_player.render_data.size, entity.render_data.position, entity_size)) {
 
             const Rect<f32> entity_bounds{entity.render_data.position.x, entity.render_data.position.x + entity_size.x,
-                                    entity.render_data.position.y, entity.render_data.position.y + entity_size.y};
+                                          entity.render_data.position.y, entity.render_data.position.y + entity_size.y};
 
-            Rect<f32> penetration_bounds{
+            const Rect<f32> penetration_bounds{
                 player_bounds.right - entity_bounds.left, entity_bounds.right - player_bounds.left,
                 player_bounds.top - entity_bounds.bottom, entity_bounds.top - player_bounds.bottom};
 
@@ -214,7 +217,7 @@ void Scene::Update(const f32 delta_time)
     UpdateVisibleInstances();
 }
 
-void Scene::Render(f32 delta_time, gouda::vk::Renderer &renderer, gouda::UniformData &uniform_data)
+void Scene::Render(const f32 delta_time, gouda::vk::Renderer &renderer, gouda::UniformData &uniform_data)
 {
 
     uniform_data.WVP = p_camera->GetViewProjectionMatrix();
@@ -227,7 +230,7 @@ void Scene::DrawUI(gouda::vk::Renderer &renderer)
 {
     m_text_instances.clear();
 
-    renderer.DrawText("MEEFFFDFDSFDSFDSFDSFD", {100.0f}, 200.0f, m_font_id, m_text_instances);
+    renderer.DrawText("GOUDA RENDERER", {100.0f}, 200.0f, m_font_id, m_text_instances);
 }
 
 void Scene::LoadFromJSON(std::string_view filepath)
@@ -241,12 +244,7 @@ void Scene::SaveToJSON(std::string_view filepath) {}
 void Scene::SpawnParticle(const gouda::Vec3 &position, const gouda::Vec2 &size, const gouda::Vec3 &velocity,
                           const f32 lifetime, const u32 texture_index, const gouda::Vec4 &colour)
 {
-    m_particles_instances.push_back({.position = position,
-                                     .size = size,
-                                     .colour = colour,
-                                     .texture_index = texture_index,
-                                     .lifetime = lifetime,
-                                     .velocity = velocity});
+    m_particles_instances.push_back({position, size, colour, texture_index, lifetime, velocity});
 }
 
 // Private ---------------------------------------------------------------------------------
@@ -262,13 +260,13 @@ void Scene::SetupPlayer()
     m_player.speed = 200.0f;
     m_player.render_data.is_atlas = true;
 
-    const auto sprite_rect =
-        gouda::get_normalized_sprite_rect(64.0f, 0.0f, 32.0f, 32.0f,
-                                    128.0f, 128.0f);
+    // const auto sprite_rect = gouda::get_normalized_sprite_rect(64.0f, 0.0f, 32.0f, 32.0f, 128.0f, 128.0f);
 
-    m_player.render_data.sprite_rect = sprite_rect;
+    const auto sprite = p_texture_manager->GetSprite(5, "player.player_climb");
+    auto frame = sprite->frames.at(0);
 
-    // todo: load player animations from json
+    m_player.render_data.sprite_rect =
+        UVRect<f32>{frame.uv_rect.u_min, frame.uv_rect.v_min, frame.uv_rect.u_max, frame.uv_rect.v_max}; // sprite_rect;
 
     // Add animation component to player
     m_player.animation_component = AnimationComponent{};
@@ -277,11 +275,13 @@ void Scene::SetupPlayer()
     // Animations
     m_player.animation_component->animations["walk"] =
         Animation{"walk",
-                  {{0.0f, 0.0f, 0.25f, 1.0f}, {0.25f, 0.0f, 0.5f, 1.0f}, {0.5f, 0.0f, 0.75f, 1.0f}},
+                  {UVRect<f32>{0.0f, 0.0f, 0.25f, 1.0f}, UVRect<f32>{0.25f, 0.0f, 0.5f, 1.0f},
+                   UVRect<f32>{0.5f, 0.0f, 0.75f, 1.0f}},
                   {0.2f, 0.2f, 0.2f},
                   true};
 
-    m_player.animation_component->animations["idle"] = Animation{"idle", {{0.75f, 0.0f, 1.0f, 1.0f}}, {1.0f}, true};
+    m_player.animation_component->animations["idle"] =
+        Animation{"idle", {UVRect<f32>{0.75f, 0.0f, 1.0f, 1.0f}}, {1.0f}, true};
 }
 
 void Scene::BuildSpatialGrid()
@@ -292,7 +292,7 @@ void Scene::BuildSpatialGrid()
     for (size_t i = 0; i < m_entities.size(); ++i) {
         const auto &entity = m_entities[i];
         Rect bounds{entity.render_data.position.x, entity.render_data.position.x + entity.render_data.size.x,
-                         entity.render_data.position.y, entity.render_data.position.y + entity.render_data.size.y};
+                    entity.render_data.position.y, entity.render_data.position.y + entity.render_data.size.y};
 
         auto [min_x, max_x, min_y, max_y] = GetGridRange(bounds, cell_size);
         for (int x = min_x; x <= max_x; ++x) {

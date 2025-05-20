@@ -10,12 +10,11 @@
 #include "renderers/vulkan/vk_renderer.hpp"
 #include "renderers/vulkan/vk_shader.hpp"
 #include "renderers/vulkan/vk_utils.hpp"
-#include "containers/small_vector.hpp"
 
 namespace gouda::vk {
 
-ComputePipeline::ComputePipeline(Renderer &renderer, const Shader *compute_shader, const std::vector<Buffer> &storage_buffers,
-                                 const std::vector<Buffer> &uniform_buffers,
+ComputePipeline::ComputePipeline(Renderer &renderer, const Shader *compute_shader, const Vector<Buffer> &storage_buffers,
+                                 const Vector<Buffer> &uniform_buffers,
                                  const VkDeviceSize storage_buffer_size, const VkDeviceSize uniform_buffer_size)
     : m_renderer{renderer}, p_device{renderer.GetDevice()}
 {

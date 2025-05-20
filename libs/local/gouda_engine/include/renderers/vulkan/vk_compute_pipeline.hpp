@@ -17,6 +17,7 @@
 
 #include "core/types.hpp"
 #include "renderers/vulkan/vk_buffer.hpp"
+#include "containers/small_vector.hpp"
 
 namespace gouda::vk {
 
@@ -25,19 +26,19 @@ class Shader;
 
 class ComputePipeline {
 public:
-    ComputePipeline(Renderer &renderer, const Shader *compute_shader, const std::vector<Buffer> &storage_buffers,
-                    const std::vector<Buffer> &uniform_buffers, VkDeviceSize storage_buffer_size,
+    ComputePipeline(Renderer &renderer, const Shader *compute_shader, const Vector<Buffer> &storage_buffers,
+                    const Vector<Buffer> &uniform_buffers, VkDeviceSize storage_buffer_size,
                     VkDeviceSize uniform_buffer_size);
     ~ComputePipeline();
 
     void Bind(VkCommandBuffer command_buffer) const;
     void BindDescriptors(VkCommandBuffer command_buffer, u32 image_index) const;
-    u32 CalculateWorkGroupCount(u32 particle_count) const;
+    [[nodiscard]] u32 CalculateWorkGroupCount(u32 particle_count) const;
     void Dispatch(VkCommandBuffer command_buffer, u32 group_count_x, u32 group_count_y, u32 group_count_z) const;
     void Destroy();
 
-    VkPipeline GetPipeline() const { return p_pipeline; }
-    VkPipelineLayout GetPipelineLayout() const { return p_pipeline_layout; }
+    [[nodiscard]] VkPipeline GetPipeline() const { return p_pipeline; }
+    [[nodiscard]] VkPipelineLayout GetPipelineLayout() const { return p_pipeline_layout; }
 
 private:
     Renderer &m_renderer;

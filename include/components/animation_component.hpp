@@ -16,17 +16,16 @@
 
 #include "containers/small_vector.hpp"
 #include "core/types.hpp"
-#include "math/math.hpp"
 #include "renderers/render_data.hpp"
 
 struct Animation {
     String name;
-    gouda::Vector<gouda::math::Vec4> frames{}; // List of UV rects
+    gouda::Vector<UVRect<f32>> frames{}; // List of UV rects
     gouda::Vector<f32> frame_durations{};      // Seconds per frame
     bool looping = true;
 
     constexpr Animation() = default;
-    Animation(StringView name_, gouda::Vector<gouda::math::Vec4> frames_,
+    Animation(StringView name_, gouda::Vector<UVRect<f32>> frames_,
               const gouda::Vector<f32> &frame_durations_,
               bool looping);
 };

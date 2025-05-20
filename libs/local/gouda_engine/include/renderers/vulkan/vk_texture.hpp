@@ -28,7 +28,7 @@ class Device;
 struct SpriteFrame {
     SpriteFrame() : uv_rect{0.0f,0.0f, 0.0f, 0.0f} {}
 
-    UVRect<f32> uv_rect; // u_min, v_min, u_max, v_max
+    UVRect<f32> uv_rect;
 };
 
 struct Sprite {

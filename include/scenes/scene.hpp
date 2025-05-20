@@ -13,6 +13,7 @@
  */
 #include "cameras/orthographic_camera.hpp"
 #include "renderers/vulkan/vk_renderer.hpp"
+#include "renderers/vulkan/vk_texture_manager.hpp"
 
 #include "entities/player.hpp"
 
@@ -23,13 +24,13 @@ struct GridPos {
 
     bool operator==(const GridPos &other) const { return x == other.x && y == other.y; }
     struct Hash {
-        size_t operator()(const GridPos &pos) const { return std::hash<int>()(pos.x) ^ (std::hash<int>()(pos.y) << 1); }
+        size_t operator()(const GridPos &pos) const { return std::hash<int>()(pos.x) ^ std::hash<int>()(pos.y) << 1; }
     };
 };
 
 class Scene {
 public:
-    explicit Scene(gouda::OrthographicCamera *camera_ptr);
+    explicit Scene(gouda::OrthographicCamera *camera, gouda::vk::TextureManager *texture_manager);
     ~Scene() = default;
 
     void Update(f32 delta_time);
@@ -57,6 +58,7 @@ private:
 
 private:
     gouda::OrthographicCamera *p_camera;
+    gouda::vk::TextureManager *p_texture_manager;
 
     Player m_player;
     gouda::Vector<Entity> m_entities;

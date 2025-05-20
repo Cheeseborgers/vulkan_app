@@ -101,7 +101,7 @@ static constexpr std::string_view pipeline_type_to_string(const PipelineType typ
 // GraphicsPipeline implementation -----------------------------------------------------------------
 GraphicsPipeline::GraphicsPipeline(Renderer &renderer, VkRenderPass p_render_pass,
                                    Shader *vertex_shader, Shader *fragment_shader, int number_of_images,
-                                   std::vector<Buffer> &uniform_buffers, int uniform_data_size, PipelineType type)
+                                   Vector<Buffer> &uniform_buffers, int uniform_data_size, PipelineType type)
     : m_renderer{renderer},
       p_device{renderer.GetDevice()},
       p_pipeline{VK_NULL_HANDLE},
@@ -199,9 +199,11 @@ void GraphicsPipeline::Destroy()
         vkDestroyPipeline(p_device, p_pipeline, nullptr);
         p_pipeline = VK_NULL_HANDLE;
     }
+
     m_descriptor_sets.clear();
     m_binding_descriptions.clear();
     m_attribute_descriptions.clear();
+
     ENGINE_LOG_DEBUG("Graphics pipeline destroyed");
 }
 
@@ -402,7 +404,7 @@ void GraphicsPipeline::CreateDescriptorPool(const int number_of_images)
     ENGINE_LOG_DEBUG("Created descriptor pool with {} sets and {} pool sizes", total_sets, pool_sizes.size());
 }
 
-void GraphicsPipeline::CreateDescriptorSets(const int number_of_images, std::vector<Buffer> &uniform_buffers,
+void GraphicsPipeline::CreateDescriptorSets(const int number_of_images, const Vector<Buffer> &uniform_buffers,
                                             const int uniform_data_size)
 {
     CreateDescriptorPool(number_of_images);
@@ -460,7 +462,7 @@ void GraphicsPipeline::CreateDescriptorSetLayout()
     }
 }
 
-void GraphicsPipeline::AllocateDescriptorSets(int number_of_images)
+void GraphicsPipeline::AllocateDescriptorSets(const int number_of_images)
 {
     m_descriptor_sets.resize(m_descriptor_set_layouts.size());
     for (size_t set = 0; set < m_descriptor_set_layouts.size(); ++set) {
@@ -481,8 +483,8 @@ void GraphicsPipeline::AllocateDescriptorSets(int number_of_images)
     }
 }
 
-void GraphicsPipeline::UpdateDescriptorSets(int number_of_images, std::vector<Buffer> &uniform_buffers,
-                                            int uniform_data_size)
+void GraphicsPipeline::UpdateDescriptorSets(const int number_of_images, const Vector<Buffer> &uniform_buffers,
+                                            const int uniform_data_size)
 {
     ASSERT(uniform_buffers.size() >= static_cast<size_t>(number_of_images), "Not enough uniform buffers");
 

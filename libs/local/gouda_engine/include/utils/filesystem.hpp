@@ -122,17 +122,17 @@ constexpr std::string_view error_to_string(Error err) noexcept
 
 /**
  * @brief Checks if a file exists.
- * @param file_path Path to the file.
+ * @param filepath Path to the file.
  * @return True if the file exists, false otherwise.
  */
-[[nodiscard]] bool IsFileExists(std::string_view file_path);
+[[nodiscard]] bool IsFileExists(std::string_view filepath);
 
 /**
  * @brief Checks if a file is empty.
- * @param file_path Path to the file.
+ * @param filepath Path to the file.
  * @return True if the file is empty, false otherwise.
  */
-[[nodiscard]] bool IsFileEmpty(std::string_view file_path);
+[[nodiscard]] bool IsFileEmpty(std::string_view filepath);
 
 /**
  * @brief Gets the current working directory.
@@ -149,10 +149,10 @@ constexpr std::string_view error_to_string(Error err) noexcept
 
 /**
  * @brief Deletes a file.
- * @param file_path Path to the file.
+ * @param filepath Path to the file.
  * @return Success or an Error code.
  */
-[[nodiscard]] Expect<void, Error> DeleteFile(std::string_view file_path);
+[[nodiscard]] Expect<void, Error> DeleteFile(std::string_view filepath);
 
 /**
  * @brief Deletes a directory and all its contents.
@@ -163,11 +163,16 @@ constexpr std::string_view error_to_string(Error err) noexcept
 
 /**
  * @brief Gets the file extension from a file path.
- * @param file_path Path to the file.
+ * @param filepath Path to the file.
  * @return The file extension as a string.
  */
-[[nodiscard]] std::string GetFileExtension(std::string_view file_path);
+[[nodiscard]] std::string GetFileExtension(std::string_view filepath);
 
+/**
+ * @brief Gets the last time the file was writen.
+ * @param filepath Path to the file.
+ * @return The last write time as FileTimeType (std::chrono timepoint).
+ */
 [[nodiscard]] FileTimeType GetLastWriteTime(std::string_view filepath);
 
 

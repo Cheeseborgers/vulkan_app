@@ -56,7 +56,7 @@ Renderer::Renderer()
       p_imgui_pool{VK_NULL_HANDLE},
       m_framebuffer_size{0, 0},
       m_current_frame{0},
-      m_simulation_params{0.0f, {0.0f, -9.81f, 0.0f}},
+      m_simulation_params{{0.0f, constants::gravity, 0.0f}, 0.0f},
       m_clear_colour{},
       m_max_quad_instances{1000},
       m_max_text_instances{1000},
@@ -365,9 +365,9 @@ void Renderer::Render(const f32 delta_time, const UniformData &uniform_data,
     m_current_frame = (m_current_frame + 1) % p_swapchain->GetImageCount();
 }
 
-void Renderer::UpdateComputeUniformBuffer(u32 image_index, f32 delta_time)
+void Renderer::UpdateComputeUniformBuffer(const u32 image_index, const f32 delta_time)
 {
-    m_simulation_params.deltaTime = delta_time;
+    m_simulation_params.delta_time = delta_time;
     m_compute_uniform_buffers[image_index].Update(p_device->GetDevice(), &m_simulation_params,
                                                   sizeof(SimulationParams));
 }
@@ -626,6 +626,7 @@ u32 Renderer::LoadTexture(StringView filepath, const std::optional<StringView> &
     else {
         texture_id = p_texture_manager->LoadSingleTexture(filepath);
     }
+
     return texture_id;
 }
 
