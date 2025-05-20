@@ -135,13 +135,13 @@ Buffer BufferManager::CreateVertexBuffer(const void *data, const VkDeviceSize si
     return vertex_buffer;
 }
 
-Buffer BufferManager::CreateDynamicVertexBuffer(const VkDeviceSize size)
+Buffer BufferManager::CreateDynamicVertexBuffer(const VkDeviceSize size) const
 {
     return CreateBuffer(size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 }
 
-Buffer BufferManager::CreateUniformBuffer(size_t size)
+Buffer BufferManager::CreateUniformBuffer(const size_t size) const
 {
     return CreateBuffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -200,7 +200,7 @@ void BufferManager::CreateImage(Texture &texture, const VkImageCreateInfo &image
     vkBindImageMemory(p_device->GetDevice(), texture.p_image, texture.p_memory, 0);
 }
 
-void BufferManager::CreateDepthImage(Texture &texture, const ImageSize size, const VkFormat format)
+void BufferManager::CreateDepthImage(Texture &texture, const ImageSize size, const VkFormat format) const
 {
     VkImageCreateInfo image_info{};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -229,36 +229,59 @@ void BufferManager::CopyBufferToBuffer(VkBuffer destination, VkBuffer source, co
     SubmitCopyCommand(command_buffer);
 }
 
-void BufferManager::CreateTextureImageFromData(Texture &texture, const void *pixels_ptr,
-                                               const ImageSize image_size, const VkFormat texture_format,
-                                               const u32 layer_count, const VkImageCreateFlags create_flags)
+void BufferManager::CreateTextureImageFromData(Texture &texture, const void *pixels_ptr, const ImageSize image_size,
+                                               const VkFormat texture_format, const u32 layer_count,
+                                               const VkImageCreateFlags create_flags) const
 {
     CreateTextureImage(texture, image_size, texture_format, 1, layer_count, create_flags);
     UpdateTextureImage(texture, image_size, texture_format, layer_count, pixels_ptr, VK_IMAGE_LAYOUT_UNDEFINED);
 }
 
-std::unique_ptr<Texture> BufferManager::CreateTexture(std::string_view fileName)
+std::unique_ptr<Texture> BufferManager::CreateTexture(StringView file_name, const u32 mips, const u32 layers) const
 {
-    const auto image_result = Image::Load(fileName, 4);
+    const auto image_result = Image::Load(file_name, 4);
     if (!image_result) {
-        ENGINE_LOG_ERROR("Failed to load texture: {}. Using default texture instead.", fileName);
+        ENGINE_LOG_ERROR("Failed to load texture: {}. Using default texture instead.", file_name);
         return CreateDefaultTexture(); // Fallback to default texture
     }
 
-    const auto& image = image_result.value();
+    const auto &image = image_result.value();
     auto texture = std::make_unique<Texture>();
     const VkFormat format{image_channels_to_vk_format(image.GetChannels())};
 
-    CreateTextureImage(*texture, image.GetSize(), format, 1, 1, 0);
-    UpdateTextureImage(*texture, image.GetSize(), format, 1, image.data().data(), VK_IMAGE_LAYOUT_UNDEFINED);
-    texture->p_view = CreateImageView(texture->p_image, format, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, 1, 1);
+    CreateTextureImage(*texture, image.GetSize(), format, mips, layers, 0);
+    UpdateTextureImage(*texture, image.GetSize(), format, layers, image.data().data(), VK_IMAGE_LAYOUT_UNDEFINED);
+    texture->p_view =
+        CreateImageView(texture->p_image, format, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, layers, mips);
     texture->p_sampler =
         CreateTextureSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
     return texture;
 }
 
-std::unique_ptr<Texture> BufferManager::CreateDefaultTexture()
+std::unique_ptr<Texture> BufferManager::CreateTexture(StringView file_name, const u32 mips, const u32 layers,
+                                                      const VkImageCreateFlags create_flags, const VkFilter filter) const
+{
+    const auto image_result = Image::Load(file_name, 4);
+    if (!image_result) {
+        ENGINE_LOG_ERROR("Failed to load texture: {}. Using default texture instead.", file_name);
+        return CreateDefaultTexture(); // Fallback to default texture
+    }
+
+    const auto &image = image_result.value();
+    auto texture = std::make_unique<Texture>();
+    const VkFormat format{image_channels_to_vk_format(image.GetChannels())};
+
+    CreateTextureImage(*texture, image.GetSize(), format, mips, layers, create_flags);
+    UpdateTextureImage(*texture, image.GetSize(), format, layers, image.data().data(), VK_IMAGE_LAYOUT_UNDEFINED);
+    texture->p_view =
+        CreateImageView(texture->p_image, format, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, layers, mips);
+    texture->p_sampler = CreateTextureSampler(filter, filter, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+
+    return texture;
+}
+
+std::unique_ptr<Texture> BufferManager::CreateDefaultTexture() const
 {
     // Create a 1x1 white texture
     constexpr u32 white_pixel{0xFFFFFFFF}; // RGBA white
@@ -301,8 +324,8 @@ std::unique_ptr<Texture> BufferManager::CreateDefaultTexture()
     return texture;
 }
 
-void BufferManager::CreateTextureImage(Texture &texture, ImageSize size, const VkFormat format, const u32 mip_levels,
-                                       const u32 layer_count, const VkImageCreateFlags flags)
+void BufferManager::CreateTextureImage(Texture &texture, const ImageSize size, const VkFormat format, const u32 mip_levels,
+                                       const u32 layer_count, const VkImageCreateFlags flags) const
 {
     VkImageCreateInfo image_info{};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -322,8 +345,7 @@ void BufferManager::CreateTextureImage(Texture &texture, ImageSize size, const V
 }
 
 void BufferManager::UpdateTextureImage(const Texture &texture, const ImageSize size, const VkFormat format,
-                                       const u32 layer_count,
-                                       const void *data, const VkImageLayout initial_layout)
+                                       const u32 layer_count, const void *data, const VkImageLayout initial_layout) const
 {
     const u32 image_channel_count{vk_format_to_channel_count(format)};
     const VkDeviceSize image_size{size.area() * image_channel_count};
@@ -357,7 +379,8 @@ void BufferManager::CopyBufferToImage(VkBuffer source, VkImage destination, cons
 }
 
 void BufferManager::TransitionImageLayout(VkImage image, const VkFormat format, const VkImageLayout old_layout,
-                                          const VkImageLayout new_layout, const u32 layer_count, const u32 mip_levels) const
+                                          const VkImageLayout new_layout, const u32 layer_count,
+                                          const u32 mip_levels) const
 {
     BeginCommandBuffer(p_copy_command_buffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -495,7 +518,8 @@ void BufferManager::TransitionImageLayout(VkImage image, const VkFormat format, 
 }
 
 VkImageView BufferManager::CreateImageView(VkImage image, const VkFormat format, const VkImageAspectFlags aspect_flags,
-                                           const VkImageViewType view_type, const u32 layer_count, const u32 mip_levels) const
+                                           const VkImageViewType view_type, const u32 layer_count,
+                                           const u32 mip_levels) const
 {
     VkImageViewCreateInfo view_info{};
     view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -553,8 +577,8 @@ VkSampler BufferManager::CreateTextureSampler(const VkFilter minFilter, const Vk
 }
 
 // Private functions -----------------------------------------------------------------------------------
-Expect<u32, std::string> BufferManager::GetMemoryTypeIndex(u32 memory_type_bits,
-                                                           VkMemoryPropertyFlags required_properties) const
+Expect<u32, String> BufferManager::GetMemoryTypeIndex(const u32 memory_type_bits,
+                                                           const VkMemoryPropertyFlags required_properties) const
 {
     const VkPhysicalDeviceMemoryProperties &mem_properties{p_device->GetSelectedPhysicalDevice().m_memory_properties};
     for (u32 i = 0; i < mem_properties.memoryTypeCount; i++) {

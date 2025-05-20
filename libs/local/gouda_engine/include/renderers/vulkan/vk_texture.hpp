@@ -13,7 +13,6 @@
 #include <unordered_map>
 #include <vector>
 #include <optional>
-#include <filesystem>
 
 #include <vulkan/vulkan.h>
 
@@ -50,6 +49,7 @@ struct Texture {
     VkSampler p_sampler;
 };
 
+// TODO: Sort out the ordering and padding of this
 struct TextureMetadata {
     TextureMetadata();
     ~TextureMetadata();
@@ -57,14 +57,15 @@ struct TextureMetadata {
     bool is_atlas;
     Texture* texture;
     std::unordered_map<String, Sprite> sprites;
+    SemVer version;
     String image_filepath;
     std::optional<String> json_filepath;
-    std::filesystem::file_time_type image_last_modified;
-    std::optional<std::filesystem::file_time_type> json_last_modified;
+    FileTimeType image_last_modified;
+    std::optional<FileTimeType> json_last_modified;
 };
 
 [[nodiscard]] VkSampler create_texture_sampler(const Device *device, VkFilter min_filter, VkFilter max_filter,
-                                               VkSamplerAddressMode address_mode);
+                                               VkSamplerAddressMode address_mode, VkSamplerCreateFlags create_flags = 0);
 
 [[nodiscard]] constexpr int get_bytes_per_texture_format(VkFormat Format) noexcept;
 

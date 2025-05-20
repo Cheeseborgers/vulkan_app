@@ -6,6 +6,7 @@
  */
 #include "renderers/vulkan/vk_texture_manager.hpp"
 
+#include <filesystem>
 #include <fstream>
 
 #include <nlohmann/json.hpp>
@@ -18,6 +19,44 @@
 #include "utils/filesystem.hpp"
 
 namespace gouda::vk {
+
+namespace internal {
+static SemVer parse_sem_ver(const std::string &str)
+{
+    SemVer version;
+    std::stringstream ss(str);
+    std::string token;
+    int i{0};
+
+    while (std::getline(ss, token, '.') && i < 4) {
+        try {
+            const u32 value{static_cast<u32>(std::stoul(token))};
+            switch (i++) {
+                case 0:
+                    version.major = value;
+                    break;
+                case 1:
+                    version.minor = value;
+                    break;
+                case 2:
+                    version.patch = value;
+                    break;
+                case 3:
+                    version.variant = value;
+                    break;
+                default:
+                    ENGINE_LOG_ERROR("Error parsing semver. Contains more than 4 components");
+            }
+        }
+        catch (...) {
+            ENGINE_LOG_ERROR("Error parsing semver: %s", token);
+        }
+    }
+
+    // Any unspecified fields remain as default (0)
+    return version;
+}
+}
 
 TextureManager::TextureManager(BufferManager *buffer_manager, Device *device)
     : p_buffer_manager{buffer_manager}, p_device{device}, m_textures_dirty{true}
@@ -55,7 +94,8 @@ u32 TextureManager::LoadSingleTexture(StringView filepath)
 
     try {
         metadata.image_last_modified = fs::GetLastWriteTime(filepath);
-    } catch (const std::filesystem::filesystem_error& e) {
+    }
+    catch (const std::filesystem::filesystem_error &e) {
         ENGINE_LOG_WARNING("Failed to get last modified time for '{}': {}", filepath, e.what());
         metadata.image_last_modified = FileTimeType{};
     }
@@ -89,13 +129,15 @@ u32 TextureManager::LoadAtlasTexture(StringView image_filepath, StringView json_
     metadata.json_filepath = json_filepath;
     try {
         metadata.image_last_modified = fs::GetLastWriteTime(image_filepath);
-    } catch (const std::filesystem::filesystem_error& e) {
+    }
+    catch (const std::filesystem::filesystem_error &e) {
         ENGINE_LOG_WARNING("Failed to get last modified time for '{}': {}", image_filepath, e.what());
         metadata.image_last_modified = FileTimeType{};
     }
     try {
         metadata.json_last_modified = fs::GetLastWriteTime(json_filepath);
-    } catch (const std::filesystem::filesystem_error& e) {
+    }
+    catch (const std::filesystem::filesystem_error &e) {
         ENGINE_LOG_WARNING("Failed to get last modified time for '{}': {}", json_filepath, e.what());
         metadata.json_last_modified = FileTimeType{};
     }
@@ -114,7 +156,6 @@ bool TextureManager::ReloadTexture(u32 texture_id, const bool force)
         ENGINE_LOG_ERROR("Invalid texture_id for reload: {}.", texture_id);
         return false;
     }
-
 
     if (texture_id == 0) {
         if (!force) {
@@ -151,7 +192,8 @@ bool TextureManager::ReloadTexture(u32 texture_id, const bool force)
     // Update image timestamp
     try {
         metadata.image_last_modified = fs::GetLastWriteTime(metadata.image_filepath);
-    } catch (const std::filesystem::filesystem_error& e) {
+    }
+    catch (const std::filesystem::filesystem_error &e) {
         ENGINE_LOG_WARNING("Failed to update last modified time for '{}': {}", metadata.image_filepath, e.what());
         metadata.image_last_modified = FileTimeType{};
     }
@@ -162,7 +204,8 @@ bool TextureManager::ReloadTexture(u32 texture_id, const bool force)
         ParseAtlasJson(*metadata.json_filepath, metadata);
         try {
             metadata.json_last_modified = fs::GetLastWriteTime(*metadata.json_filepath);
-        } catch (const std::filesystem::filesystem_error& e) {
+        }
+        catch (const std::filesystem::filesystem_error &e) {
             ENGINE_LOG_WARNING("Failed to update last modified time for '{}': {}", *metadata.json_filepath, e.what());
             metadata.json_last_modified = FileTimeType{};
         }
@@ -186,20 +229,21 @@ bool TextureManager::CheckTextureForUpdate(u32 texture_id)
         return false;
     }
 
-    TextureMetadata& metadata = m_metadata[texture_id];
+    TextureMetadata &metadata{m_metadata[texture_id]};
     if (metadata.image_filepath.empty()) {
         ENGINE_LOG_DEBUG("No image filepath for texture_id {}, skipping update check", texture_id);
         return false;
     }
 
-    bool needs_reload = false;
+    bool needs_reload{false};
     try {
         if (const auto current_image_time = fs::GetLastWriteTime(metadata.image_filepath);
             current_image_time > metadata.image_last_modified) {
             ENGINE_LOG_DEBUG("Image file '{}' has changed for texture_id {}", metadata.image_filepath, texture_id);
             needs_reload = true;
         }
-    } catch (const std::filesystem::filesystem_error& e) {
+    }
+    catch (const std::filesystem::filesystem_error &e) {
         ENGINE_LOG_WARNING("Failed to check last modified time for '{}': {}", metadata.image_filepath, e.what());
     }
 
@@ -210,7 +254,8 @@ bool TextureManager::CheckTextureForUpdate(u32 texture_id)
                 ENGINE_LOG_DEBUG("JSON file '{}' has changed for texture_id {}", *metadata.json_filepath, texture_id);
                 needs_reload = true;
             }
-        } catch (const std::filesystem::filesystem_error& e) {
+        }
+        catch (const std::filesystem::filesystem_error &e) {
             ENGINE_LOG_WARNING("Failed to check last modified time for '{}': {}", *metadata.json_filepath, e.what());
         }
     }
@@ -230,7 +275,7 @@ const Sprite *TextureManager::GetSprite(u32 texture_id, StringView sprite_name) 
     }
 
     const auto &sprites = m_metadata[texture_id].sprites;
-    const auto it = sprites.find(std::string(sprite_name));
+    const auto it = sprites.find(String(sprite_name));
     if (it == sprites.end()) {
         ENGINE_LOG_ERROR("Sprite not found: {}", sprite_name);
         return nullptr;
@@ -268,6 +313,19 @@ void TextureManager::ParseAtlasJson(StringView json_filepath, TextureMetadata &m
     const AtlasSize atlas_size{json["meta"]["size"]["w"].get<f32>(), json["meta"]["size"]["h"].get<f32>()};
     ENGINE_LOG_DEBUG("Atlas size: {}:{}", atlas_size.width, atlas_size.height);
 
+    if (json["meta"].contains("version") && json["meta"]["version"].is_string()) {
+        metadata.version = internal::parse_sem_ver(json["meta"]["version"]);
+        ENGINE_LOG_DEBUG("Atlas Version: {}", metadata.version.ToString());
+    }
+
+    if (json["meta"].contains("image_file") && json["meta"]["image_file"].is_string()) {
+        if (String image_filename = FilePath(metadata.image_filepath).filename().string();
+            json["meta"]["image_file"].get<String>() != image_filename) {
+            ENGINE_LOG_ERROR("Atlas metadata does not match atlas image name: {}", image_filename);
+            return;
+        }
+    }
+
     if (!json.contains("sprites")) {
         ENGINE_LOG_ERROR("Invalid JSON: missing sprites");
         return;
@@ -298,8 +356,8 @@ void TextureManager::ParseAtlasJson(StringView json_filepath, TextureMetadata &m
             SpriteFrame frame;
             frame.uv_rect = NormalizeRect(sprite_rect, atlas_size);
             sprite.frames.push_back(frame);
-            ENGINE_LOG_DEBUG("Adding single sprite: {} pre-normal=({}), normal=({})", group_name, sprite_rect.ToString(),
-                             frame.uv_rect.ToString());
+            ENGINE_LOG_DEBUG("Adding single sprite: {} pre-normal=({}), normal=({})", group_name,
+                             sprite_rect.ToString(), frame.uv_rect.ToString());
             metadata.sprites.emplace(group_name, std::move(sprite));
         }
         else { // Animation group
@@ -356,6 +414,13 @@ void TextureManager::ParseAtlasJson(StringView json_filepath, TextureMetadata &m
                 for (const auto &timing : anim_data["timings"]) {
                     f32 duration{timing.get<f32>()};
                     sprite.frame_durations.push_back(duration > 0.0f ? duration : 0.1f);
+                }
+
+                ASSERT(sprite.frame_durations.size() == sprite.frames.size(),
+                       "Frame count does not match frame timing count.");
+
+                if (sprite.frame_durations.size() != sprite.frames.size()) {
+                    ENGINE_LOG_ERROR("Frame count does not match frame timing count.");
                 }
 
                 String key{std::format("{}.{}", group_name, anim_name)};

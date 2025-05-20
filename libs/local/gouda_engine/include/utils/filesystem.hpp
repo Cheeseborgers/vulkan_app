@@ -62,8 +62,8 @@ constexpr std::string_view error_to_string(Error err) noexcept
         "Invalid directory path",      "Failed to delete file",
         "Failed to delete directory"};
 
-    auto index = static_cast<std::size_t>(err);
-    return (index < error_strings.size()) ? error_strings[index] : "Unknown error";
+    const auto index = static_cast<std::size_t>(err);
+    return index < error_strings.size() ? error_strings[index] : "Unknown error";
 }
 
 /**

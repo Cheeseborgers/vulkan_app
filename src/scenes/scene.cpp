@@ -260,28 +260,16 @@ void Scene::SetupPlayer()
     m_player.speed = 200.0f;
     m_player.render_data.is_atlas = true;
 
-    // const auto sprite_rect = gouda::get_normalized_sprite_rect(64.0f, 0.0f, 32.0f, 32.0f, 128.0f, 128.0f);
+    const auto sprite = p_texture_manager->GetSprite(5, "player.walk");
+    const auto frame = sprite->frames.at(1);
 
-    const auto sprite = p_texture_manager->GetSprite(5, "player.player_climb");
-    auto frame = sprite->frames.at(0);
-
+    // Currently hardcoded
     m_player.render_data.sprite_rect =
-        UVRect<f32>{frame.uv_rect.u_min, frame.uv_rect.v_min, frame.uv_rect.u_max, frame.uv_rect.v_max}; // sprite_rect;
+        UVRect{frame.uv_rect.u_min, frame.uv_rect.v_min, frame.uv_rect.u_max, frame.uv_rect.v_max};
 
     // Add animation component to player
     m_player.animation_component = AnimationComponent{};
     m_player.animation_component->current_animation = "idle";
-
-    // Animations
-    m_player.animation_component->animations["walk"] =
-        Animation{"walk",
-                  {UVRect<f32>{0.0f, 0.0f, 0.25f, 1.0f}, UVRect<f32>{0.25f, 0.0f, 0.5f, 1.0f},
-                   UVRect<f32>{0.5f, 0.0f, 0.75f, 1.0f}},
-                  {0.2f, 0.2f, 0.2f},
-                  true};
-
-    m_player.animation_component->animations["idle"] =
-        Animation{"idle", {UVRect<f32>{0.75f, 0.0f, 1.0f, 1.0f}}, {1.0f}, true};
 }
 
 void Scene::BuildSpatialGrid()

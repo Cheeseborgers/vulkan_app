@@ -1,3 +1,9 @@
+/**
+* @file vk_texture.cpp
+ * @author GoudaCheeseburgers
+ * @date 2025-03-28
+ * @brief Engine Vulkan texture module implementation
+ */
 #include "renderers/vulkan/vk_texture.hpp"
 
 #include <vulkan/vulkan.h>
@@ -17,38 +23,39 @@ Texture::Texture()
 void Texture::Destroy(const Device *device)
 {
     if (device) {
-        if (p_sampler) {
+        if (p_sampler != VK_NULL_HANDLE) {
             vkDestroySampler(device->GetDevice(), p_sampler, nullptr);
             p_sampler = VK_NULL_HANDLE;
         }
 
-        if (p_view) {
+        if (p_view != VK_NULL_HANDLE) {
             vkDestroyImageView(device->GetDevice(), p_view, nullptr);
             p_view = VK_NULL_HANDLE;
         }
 
-        if (p_image) {
+        if (p_image != VK_NULL_HANDLE) {
             vkDestroyImage(device->GetDevice(), p_image, nullptr);
             p_image = VK_NULL_HANDLE;
         }
 
-        if (p_memory) {
+        if (p_memory != VK_NULL_HANDLE) {
             vkFreeMemory(device->GetDevice(), p_memory, nullptr);
             p_memory = VK_NULL_HANDLE;
         }
     }
 }
 
-TextureMetadata::TextureMetadata() : is_atlas{false}, texture{nullptr} {}
+TextureMetadata::TextureMetadata() : is_atlas{false}, texture{nullptr}, version{0,0,0,0} {}
 TextureMetadata::~TextureMetadata() { sprites.clear(); }
 
 // Function declarations --------------------------------------------------------------
-[[nodiscard]] VkSampler create_texture_sampler(const Device *device, const VkFilter min_filter, const VkFilter max_filter,
-                                               const VkSamplerAddressMode address_mode)
+[[nodiscard]] VkSampler create_texture_sampler(const Device *device, const VkFilter min_filter,
+                                               const VkFilter max_filter,
+                                               const VkSamplerAddressMode address_mode, const VkSamplerCreateFlags create_flags)
 {
     const VkSamplerCreateInfo sampler_create_info{.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
                                                   .pNext = nullptr,
-                                                  .flags = 0,
+                                                  .flags = create_flags,
                                                   .magFilter = min_filter,
                                                   .minFilter = max_filter,
                                                   .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,

@@ -11,7 +11,6 @@
  * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
  * See <https://www.gnu.org/licenses/> for more information.
  */
-#include <string>
 #include <unordered_map>
 
 #include "containers/small_vector.hpp"
@@ -20,8 +19,8 @@
 
 struct Animation {
     String name;
-    gouda::Vector<UVRect<f32>> frames{}; // List of UV rects
-    gouda::Vector<f32> frame_durations{};      // Seconds per frame
+    gouda::Vector<UVRect<f32>> frames{};  // List of UV rects
+    gouda::Vector<f32> frame_durations{}; // Seconds per frame
     bool looping = true;
 
     constexpr Animation() = default;
@@ -31,10 +30,10 @@ struct Animation {
 };
 
 struct AnimationComponent {
-    std::string current_animation{};
+    String current_animation{};
     f32 animation_time = 0.0f;
     int current_frame = 0;
-    std::unordered_map<std::string, Animation> animations{};
+    std::unordered_map<String, Animation> animations{};
 
     constexpr AnimationComponent() = default;
 

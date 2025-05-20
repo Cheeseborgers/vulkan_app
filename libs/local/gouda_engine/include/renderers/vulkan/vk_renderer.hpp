@@ -10,8 +10,6 @@
  * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
  * See <https://www.gnu.org/licenses/> for more information.
  */
-#include <string_view>
-
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 

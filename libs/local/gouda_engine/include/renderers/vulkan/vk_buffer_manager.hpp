@@ -36,12 +36,12 @@ public:
     // Create a vertex buffer with staging
     Buffer CreateVertexBuffer(const void *data, VkDeviceSize size) const;
 
-    Buffer CreateDynamicVertexBuffer(VkDeviceSize size);
+    Buffer CreateDynamicVertexBuffer(VkDeviceSize size) const;
 
     // Create a uniform buffer
-    Buffer CreateUniformBuffer(size_t size);
+    Buffer CreateUniformBuffer(size_t size) const;
 
-    // Create a index buffer
+    // Create an index buffer
     Buffer CreateIndexBuffer(const void *data, VkDeviceSize size) const;
 
     // Create a storage buffer
@@ -50,22 +50,24 @@ public:
     // Create and allocate memory for an image
     void CreateImage(Texture &texture, const VkImageCreateInfo &image_info, VkMemoryPropertyFlags memory_properties) const;
 
-    void CreateDepthImage(Texture &texture, ImageSize size, VkFormat format);
+    void CreateDepthImage(Texture &texture, ImageSize size, VkFormat format) const;
 
     // Utility to copy data between buffers
     void CopyBufferToBuffer(VkBuffer destination, VkBuffer source, VkDeviceSize size, VkCommandBuffer command_buffer) const;
 
     void CreateTextureImageFromData(Texture &texture, const void *pixels_ptr, ImageSize image_size,
-                                    VkFormat texture_format, u32 layer_count, VkImageCreateFlags create_flags);
+                                    VkFormat texture_format, u32 layer_count, VkImageCreateFlags create_flags) const;
 
     // Texture-related methods
-    std::unique_ptr<Texture> CreateTexture(std::string_view fileName); // TODO: add flags, mips and layers
-    std::unique_ptr<Texture> CreateDefaultTexture();
+    std::unique_ptr<Texture> CreateTexture(StringView file_name, u32 mips = 1, u32 layers = 1) const;
+    std::unique_ptr<Texture> CreateTexture(StringView file_name, u32 mips, u32 layers, VkImageCreateFlags create_flags,
+                                           VkFilter filter) const;
+    std::unique_ptr<Texture> CreateDefaultTexture() const;
 
     void CreateTextureImage(Texture &texture, ImageSize size, VkFormat format, u32 mipLevels, u32 layerCount,
-                            VkImageCreateFlags flags);
+                            VkImageCreateFlags flags) const;
     void UpdateTextureImage(const Texture &texture, ImageSize size, VkFormat format, u32 layerCount, const void *data,
-                            VkImageLayout initialLayout);
+                            VkImageLayout initialLayout) const;
     void CopyBufferToImage(VkBuffer source, VkImage destination, ImageSize imageSize, u32 layerCount) const;
     void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout,
                                u32 layerCount, u32 mipLevels) const;

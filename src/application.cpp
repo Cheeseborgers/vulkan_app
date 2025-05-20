@@ -5,9 +5,7 @@
 #include "backends/event_types.hpp"
 #include "backends/glfw/glfw_backend.hpp"
 #include "debug/logger.hpp"
-#include "math/collision.hpp"
 #include "math/vector.hpp"
-#include "renderers/vulkan/gouda_vk_wrapper.hpp"
 #include "utils/timer.hpp"
 
 #include "core/constants.hpp"
@@ -171,7 +169,7 @@ void Application::SetupCamera()
     p_ortho_camera = std::make_unique<gouda::OrthographicCamera>(
         0.0f, static_cast<f32>(framebuffer_size.width),  // left = 0, right = width
         static_cast<f32>(framebuffer_size.height), 0.0f, // bottom = height, top = 0
-        -1.0f, 1.0f, 1.0f, 100.0f, 1.0f                  // zoom, speed, sensitivity
+        -1.0f, 1.0f, 1.0f, 100.0f, 1.0f  //near, far, zoom, speed, sensitivity
     );
 }
 
@@ -182,11 +180,11 @@ void Application::LoadTextures() const
     u32 checkerboard_3_id = m_renderer.LoadSingleTexture("assets/textures/checkerboard3.png");
     u32 checkerboard_4_id = m_renderer.LoadSingleTexture("assets/textures/checkerboard4.png");
 
-    APP_LOG_DEBUG("Loaded textures: {},{},{},{}", checkerboard_id, checkerboard_2_id, checkerboard_3_id, checkerboard_4_id);
+    APP_LOG_DEBUG("Loaded textures: {},{},{},{}", checkerboard_id, checkerboard_2_id, checkerboard_3_id,
+                  checkerboard_4_id);
 
     u32 atlas_id = m_renderer.LoadAtlasTexture("assets/textures/sprite_sheet.png", "assets/textures/sprite_sheet.json");
     APP_LOG_DEBUG("Atlas ID: {}", atlas_id);
-
 }
 
 void Application::LoadFonts()
@@ -206,63 +204,63 @@ void Application::SetupInputSystem()
 
     const std::vector<gouda::InputHandler::ActionBinding> game_bindings = {
         {gouda::Key::Escape, gouda::ActionState::Pressed,
-         [this]() { glfwSetWindowShouldClose(p_window->GetWindow(), GLFW_TRUE); }},
+         [this] { glfwSetWindowShouldClose(p_window->GetWindow(), GLFW_TRUE); }},
         {gouda::Key::A, gouda::ActionState::Pressed,
-         [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_LEFT); }},
+         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_LEFT); }},
         {gouda::Key::A, gouda::ActionState::Released,
-         [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_LEFT); }},
+         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_LEFT); }},
         {gouda::Key::D, gouda::ActionState::Pressed,
-         [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_RIGHT); }},
+         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_RIGHT); }},
         {gouda::Key::D, gouda::ActionState::Released,
-         [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_RIGHT); }},
+         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_RIGHT); }},
         {gouda::Key::W, gouda::ActionState::Pressed,
-         [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_UP); }},
+         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_UP); }},
         {gouda::Key::W, gouda::ActionState::Released,
-         [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_UP); }},
+         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_UP); }},
         {gouda::Key::S, gouda::ActionState::Pressed,
-         [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_DOWN); }},
+         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_DOWN); }},
         {gouda::Key::S, gouda::ActionState::Released,
-         [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_DOWN); }},
+         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_DOWN); }},
         {gouda::Key::Q, gouda::ActionState::Pressed,
-         [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZOOM_IN); }},
+         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZOOM_IN); }},
         {gouda::Key::Q, gouda::ActionState::Released,
-         [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZOOM_IN); }},
+         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZOOM_IN); }},
         {gouda::Key::E, gouda::ActionState::Pressed,
-         [this]() { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZOOM_OUT); }},
+         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZOOM_OUT); }},
         {gouda::Key::E, gouda::ActionState::Released,
-         [this]() { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZOOM_OUT); }},
+         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZOOM_OUT); }},
         {gouda::Key::Left, gouda::ActionState::Pressed,
-         [this]() { p_current_scene->GetPlayer().velocity.x = -p_current_scene->GetPlayer().speed; }},
+         [this] { p_current_scene->GetPlayer().velocity.x = -p_current_scene->GetPlayer().speed; }},
         {gouda::Key::Left, gouda::ActionState::Released,
-         [this]() {
+         [this] {
              if (p_current_scene->GetPlayer().velocity.x < 0)
                  p_current_scene->GetPlayer().velocity.x = 0;
          }},
         {gouda::Key::Right, gouda::ActionState::Pressed,
-         [this]() { p_current_scene->GetPlayer().velocity.x = p_current_scene->GetPlayer().speed; }},
+         [this] { p_current_scene->GetPlayer().velocity.x = p_current_scene->GetPlayer().speed; }},
         {gouda::Key::Right, gouda::ActionState::Released,
-         [this]() {
+         [this] {
              if (p_current_scene->GetPlayer().velocity.x > 0)
                  p_current_scene->GetPlayer().velocity.x = 0;
          }},
         {gouda::Key::Up, gouda::ActionState::Pressed,
-         [this]() { p_current_scene->GetPlayer().velocity.y = p_current_scene->GetPlayer().speed; }},
+         [this] { p_current_scene->GetPlayer().velocity.y = p_current_scene->GetPlayer().speed; }},
         {gouda::Key::Up, gouda::ActionState::Released,
-         [this]() {
+         [this] {
              if (p_current_scene->GetPlayer().velocity.y > 0)
                  p_current_scene->GetPlayer().velocity.y = 0;
          }},
         {gouda::Key::Down, gouda::ActionState::Pressed,
-         [this]() { p_current_scene->GetPlayer().velocity.y = -p_current_scene->GetPlayer().speed; }},
+         [this] { p_current_scene->GetPlayer().velocity.y = -p_current_scene->GetPlayer().speed; }},
         {gouda::Key::Down, gouda::ActionState::Released,
-         [this]() {
+         [this] {
              if (p_current_scene->GetPlayer().velocity.y < 0)
                  p_current_scene->GetPlayer().velocity.y = 0;
          }},
-        {gouda::Key::Space, gouda::ActionState::Pressed, [this]() { p_ortho_camera->Shake(10.0f, 0.5f); }},
-        {gouda::Key::C, gouda::ActionState::Pressed, [this]() { m_renderer.ToggleComputeParticles(); }},
+        {gouda::Key::Space, gouda::ActionState::Pressed, [this] { p_ortho_camera->Shake(10.0f, 0.5f); }},
+        {gouda::Key::C, gouda::ActionState::Pressed, [this] { m_renderer.ToggleComputeParticles(); }},
         {gouda::MouseButton::Left, gouda::ActionState::Pressed,
-         [this]() {
+         [this] {
              // APP_LOG_DEBUG("Left Mouse Pressed");
              p_current_scene->SpawnParticle({0, 0, -0.1f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1});
              p_current_scene->SpawnParticle({0, 100, -0.1f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1});
@@ -276,20 +274,20 @@ void Application::SetupInputSystem()
     p_input_handler->SetActiveState("Game");
 
     // Scroll callback
-    p_input_handler->SetScrollCallback([this]([[maybe_unused]]double xOffset, const double yOffset) {
+    p_input_handler->SetScrollCallback([this]([[maybe_unused]] double xOffset, const double yOffset) {
         const f32 zoom_delta{static_cast<f32>(yOffset) * 0.1f};
         p_ortho_camera->AdjustZoom(zoom_delta);
     });
 
     // Character input callback
-    p_input_handler->SetCharCallback([]([[maybe_unused]]unsigned int codepoint) {
+    p_input_handler->SetCharCallback([]([[maybe_unused]] unsigned int codepoint) {
         // char c = static_cast<char>(codepoint); // Simple ASCII cast for demo
         // APP_LOG_DEBUG("Character typed: {} (codepoint={})", c, codepoint);
     });
 
     // Cursor enter/leave callback
     p_input_handler->SetCursorEnterCallback(
-        []([[maybe_unused]]bool entered) { // APP_LOG_DEBUG("Cursor {} window", entered ? "entered" : "left");
+        []([[maybe_unused]] bool entered) { // APP_LOG_DEBUG("Cursor {} window", entered ? "entered" : "left");
         });
 
     // Window focus callback
@@ -336,7 +334,7 @@ void Application::OnFramebufferResize([[maybe_unused]] GLFWwindow *window, Frame
     APP_LOG_DEBUG("Swapchain and framebuffers recreated successfully.");
 }
 
-void Application::OnWindowResize([[maybe_unused]]GLFWwindow *window, WindowSize new_size)
+void Application::OnWindowResize([[maybe_unused]] GLFWwindow *window, WindowSize new_size)
 {
     if (new_size.area() != 0) {
         m_settings_manager.SetWindowSize(new_size);
@@ -345,4 +343,7 @@ void Application::OnWindowResize([[maybe_unused]]GLFWwindow *window, WindowSize 
     APP_LOG_INFO("Window resized: {}x{}", new_size.width, new_size.height);
 }
 
-void Application::OnWindowIconify([[maybe_unused]]GLFWwindow *window, const bool iconified) { m_is_iconified = iconified; }
+void Application::OnWindowIconify([[maybe_unused]] GLFWwindow *window, const bool iconified)
+{
+    m_is_iconified = iconified;
+}

@@ -17,10 +17,9 @@
 
 #include "entities/player.hpp"
 
-// Simple 2D grid position
 struct GridPos {
-    int x;
-    int y;
+    s32 x;
+    s32 y;
 
     bool operator==(const GridPos &other) const { return x == other.x && y == other.y; }
     struct Hash {
