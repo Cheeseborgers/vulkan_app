@@ -8,6 +8,7 @@
 
 #include "debug/logger.hpp"
 #include "debug/throw.hpp"
+#include "renderers/vulkan/vk_command_buffer_manager.hpp"
 #include "renderers/vulkan/vk_device.hpp"
 #include "renderers/vulkan/vk_fence.hpp"
 #include "renderers/vulkan/vk_queue.hpp"
@@ -18,55 +19,33 @@
 
 namespace gouda::vk {
 
-BufferManager::BufferManager(Device *device, Queue *queue)
+BufferManager::BufferManager(Device* device, Queue* queue, CommandBufferManager* command_buffer_manager)
     : p_device(device),
       p_queue{queue},
+      p_command_buffer_manager{command_buffer_manager},
       p_copy_command_buffer{VK_NULL_HANDLE},
       p_command_pool{VK_NULL_HANDLE},
       p_copy_fence{nullptr}
 {
-    VkCommandPoolCreateInfo pool_info{};
-    pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    pool_info.queueFamilyIndex = p_device->GetQueueFamily();
-
-    VkResult result{vkCreateCommandPool(p_device->GetDevice(), &pool_info, nullptr, &p_command_pool)};
-    if (result != VK_SUCCESS) {
-        CHECK_VK_RESULT(result, "vkCreateCommandPool in BufferManager");
+    if (!p_device || !p_queue || !p_command_buffer_manager) {
+        ENGINE_THROW("Invalid device, queue, or command buffer manager in BufferManager");
     }
 
-    VkCommandBufferAllocateInfo alloc_info{};
-    alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    alloc_info.commandPool = p_command_pool;
-    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    alloc_info.commandBufferCount = 1;
-
-    result = vkAllocateCommandBuffers(p_device->GetDevice(), &alloc_info, &p_copy_command_buffer);
-    if (result != VK_SUCCESS) {
-        CHECK_VK_RESULT(result, "vkAllocateCommandBuffers in BufferManager");
+    p_command_buffer_manager->AllocateBuffers(1, &p_copy_command_buffer);
+    if (p_copy_command_buffer == VK_NULL_HANDLE) {
+        ENGINE_THROW("Failed to allocate copy command buffer in BufferManager");
     }
 
     p_copy_fence = std::make_unique<Fence>(p_device);
-    if (constexpr VkFenceCreateFlags fence_flags{VK_FENCE_CREATE_SIGNALED_BIT}; !p_copy_fence->Create(fence_flags)) {
+    if (!p_copy_fence->Create(VK_FENCE_CREATE_SIGNALED_BIT)) {
         ENGINE_THROW("Failed to create copy fence.");
     }
 }
 
 BufferManager::~BufferManager()
 {
-    // Check we have a valid device
     if (p_device != VK_NULL_HANDLE) {
-        // Free the command buffer if it exists
-        if (p_copy_command_buffer != VK_NULL_HANDLE) {
-            vkFreeCommandBuffers(p_device->GetDevice(), p_command_pool, 1, &p_copy_command_buffer);
-            ENGINE_LOG_DEBUG("BufferManager command buffer freed.");
-        }
-
-        // Destroy the command pool if it exists
-        if (p_command_pool != VK_NULL_HANDLE) {
-            vkDestroyCommandPool(p_device->GetDevice(), p_command_pool, nullptr);
-            ENGINE_LOG_DEBUG("BufferManager command pool destroyed.");
-        }
+        p_copy_fence.reset(); // Ensure fence is destroyed
     }
 }
 

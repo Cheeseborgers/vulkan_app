@@ -25,6 +25,7 @@
 #include "renderers/vulkan/vk_texture.hpp"
 #include "renderers/vulkan/vk_utils.hpp"
 
+// TODO: Remove this dependency
 #include "renderers/vulkan/gouda_vk_wrapper.hpp"
 
 namespace gouda::vk {
@@ -89,10 +90,15 @@ Renderer::~Renderer()
 
         DestroyFramebuffers();
         DestroyImGUI();
+
+        // Destroy in reverse order to ensure dependencies are cleaned up properly
+        p_buffer_manager.reset();
+        p_command_buffer_manager.reset();
     }
 }
 
-void Renderer::Initialize(GLFWwindow *window_ptr, StringView app_name, SemVer vulkan_api_version, VSyncMode vsync_mode)
+void Renderer::Initialize(GLFWwindow *window_ptr, StringView app_name, const SemVer vulkan_api_version,
+                          const VSyncMode vsync_mode)
 {
     ASSERT(window_ptr, "Window pointer cannot be null.");
     ASSERT(!app_name.empty(), "Application name cannot be empty or null.");
@@ -661,7 +667,10 @@ void Renderer::InitializeCore(GLFWwindow *window_ptr, StringView app_name, SemVe
     p_device = std::make_unique<Device>(*p_instance, VK_QUEUE_GRAPHICS_BIT);
     ENGINE_LOG_DEBUG("VulkanDevice initialized.");
 
-    p_buffer_manager = std::make_unique<BufferManager>(p_device.get(), &m_queue);
+    p_command_buffer_manager =
+        std::make_unique<CommandBufferManager>(p_device.get(), &m_queue, p_device->GetQueueFamily());
+
+    p_buffer_manager = std::make_unique<BufferManager>(p_device.get(), &m_queue, p_command_buffer_manager.get());
     ENGINE_LOG_DEBUG("Buffer manager initialized.");
 }
 
@@ -702,9 +711,6 @@ void Renderer::InitializeRenderResources()
 {
     CreateFences();
     CreateInstanceBuffers();
-
-    p_command_buffer_manager =
-        std::make_unique<CommandBufferManager>(p_device.get(), &m_queue, p_device->GetQueueFamily());
 
     p_command_buffer_manager->AllocateBuffers(1, &p_copy_command_buffer);
     CreateCommandBuffers();

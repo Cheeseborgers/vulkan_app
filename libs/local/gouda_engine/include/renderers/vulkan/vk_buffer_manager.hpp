@@ -20,6 +20,7 @@
 
 namespace gouda::vk {
 
+class CommandBufferManager;
 class Fence;
 class Texture;
 class Device;
@@ -27,7 +28,7 @@ class Queue;
 
 class BufferManager {
 public:
-    BufferManager(Device *device, Queue *queue);
+    BufferManager(Device* device, Queue* queue, CommandBufferManager* command_buffer_manager);
     ~BufferManager();
 
     // Create a generic buffer with specified usage and properties
@@ -88,6 +89,7 @@ private:
 private:
     Device *p_device;
     Queue *p_queue;
+    CommandBufferManager *p_command_buffer_manager;
 
     VkCommandBuffer p_copy_command_buffer;
     VkCommandPool p_command_pool;
