@@ -27,8 +27,7 @@
 #include "debug/assert.hpp"
 #include "math/simd.hpp"
 
-namespace gouda {
-namespace math {
+namespace gouda::math {
 
 /**
  * @brief Base class for vector operations with static polymorphism (CRTP).
@@ -44,17 +43,20 @@ protected:
     const T &getComponent(size_t index) const { return static_cast<const Derived *>(this)->components[index]; }
 
 public:
-    T operator[](size_t index) const {
+    T operator[](size_t index) const
+    {
         ASSERT(index < N, "Vector index out of bounds");
         return getComponent(index);
     }
 
-    T &operator[](size_t index) {
+    T &operator[](size_t index)
+    {
         ASSERT(index < N, "Vector index out of bounds");
         return getComponent(index);
     }
 
-    Derived operator+(const Derived &other) const {
+    Derived operator+(const Derived &other) const
+    {
         Derived result;
         if constexpr (N == 4) {
             if (simdLevel >= SIMDLevel::AVX) {
@@ -70,7 +72,8 @@ public:
         return result;
     }
 
-    Derived operator-(const Derived &other) const {
+    Derived operator-(const Derived &other) const
+    {
         Derived result;
         if constexpr (N == 4) {
             if (simdLevel >= SIMDLevel::AVX) {
@@ -86,7 +89,8 @@ public:
         return result;
     }
 
-    Derived operator*(T scalar) const {
+    Derived operator*(T scalar) const
+    {
         Derived result;
         if constexpr (N == 4) {
             if (simdLevel >= SIMDLevel::AVX) {
@@ -102,7 +106,8 @@ public:
         return result;
     }
 
-    Derived operator/(T scalar) const {
+    Derived operator/(T scalar) const
+    {
         ASSERT(scalar != T(0), "Division by zero in Vector");
         Derived result;
         if constexpr (N == 4) {
@@ -119,7 +124,8 @@ public:
         return result;
     }
 
-    Derived &operator+=(const Derived &other) {
+    Derived &operator+=(const Derived &other)
+    {
         if constexpr (N == 4) {
             if (simdLevel >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<Derived *>(this)->components.data());
@@ -134,7 +140,8 @@ public:
         return *static_cast<Derived *>(this);
     }
 
-    Derived &operator-=(const Derived &other) {
+    Derived &operator-=(const Derived &other)
+    {
         if constexpr (N == 4) {
             if (simdLevel >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<Derived *>(this)->components.data());
@@ -149,7 +156,8 @@ public:
         return *static_cast<Derived *>(this);
     }
 
-    Derived &operator*=(T scalar) {
+    Derived &operator*=(T scalar)
+    {
         if constexpr (N == 4) {
             if (simdLevel >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<Derived *>(this)->components.data());
@@ -164,12 +172,13 @@ public:
         return *static_cast<Derived *>(this);
     }
 
-    Derived &operator/=(T scalar) {
+    Derived &operator/=(T scalar)
+    {
         ASSERT(scalar != T(0), "Division by zero in Vector");
         if constexpr (N == 4) {
             if (simdLevel >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<Derived *>(this)->components.data());
-                __m128 s = _mm_set1_ps(scalar);
+                const __m128 s = _mm_set1_ps(scalar);
                 a = _mm_div_ps(a, s);
                 _mm_storeu_ps(static_cast<Derived *>(this)->components.data(), a);
                 return *static_cast<Derived *>(this);
@@ -180,12 +189,13 @@ public:
         return *static_cast<Derived *>(this);
     }
 
-    Derived operator-() const {
+    Derived operator-() const
+    {
         Derived result;
         if constexpr (N == 4) {
             if (simdLevel >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<const Derived *>(this)->components.data());
-                __m128 zero = _mm_setzero_ps();
+                const __m128 zero = _mm_setzero_ps();
                 a = _mm_sub_ps(zero, a);
                 _mm_storeu_ps(result.components.data(), a);
                 return result;
@@ -196,23 +206,23 @@ public:
         return result;
     }
 
-    bool operator!=(const Derived &other) const {
-        return !(*this == other);
-    }
+    bool operator!=(const Derived &other) const { return !(*this == other); }
 
-    bool operator==(const Derived &other) const {
+    bool operator==(const Derived &other) const
+    {
         for (size_t i = 0; i < N; ++i)
             if (getComponent(i) != other.getComponent(i))
                 return false;
         return true;
     }
 
-    T dot(const Derived &other) const {
+    T dot(const Derived &other) const
+    {
         T result = T(0);
         if constexpr (N == 4) {
             if (simdLevel >= SIMDLevel::SSE2) {
-                __m128 a = _mm_loadu_ps(static_cast<const Derived *>(this)->components.data());
-                __m128 b = _mm_loadu_ps(other.components.data());
+                const __m128 a = _mm_loadu_ps(static_cast<const Derived *>(this)->components.data());
+                const __m128 b = _mm_loadu_ps(other.components.data());
                 __m128 mul = _mm_mul_ps(a, b);
                 __m128 shuf = _mm_shuffle_ps(mul, mul, _MM_SHUFFLE(2, 3, 0, 1));
                 __m128 sums = _mm_add_ps(mul, shuf);
@@ -226,16 +236,19 @@ public:
         return result;
     }
 
-    f64 magnitude() const {
+    [[nodiscard]] f64 magnitude() const
+    {
         return std::sqrt(static_cast<f64>(dot(*static_cast<const Derived *>(this))));
     }
 
-    Derived normalized() const {
+    Derived normalized() const
+    {
         f64 mag = magnitude();
         return (mag > 0.0) ? (*this / static_cast<T>(mag)) : Derived();
     }
 
-    T squaredDistance(const Derived &other) const {
+    T squaredDistance(const Derived &other) const
+    {
         T sum = T(0);
         for (size_t i = 0; i < N; ++i) {
             T diff = (*this)[i] - other[i];
@@ -244,9 +257,7 @@ public:
         return sum;
     }
 
-    f64 distance(const Derived &other) const {
-        return std::sqrt(static_cast<f64>(squaredDistance(other)));
-    }
+    f64 distance(const Derived &other) const { return std::sqrt(static_cast<f64>(squaredDistance(other))); }
 };
 
 // Primary templated Vector class for N dimensions
@@ -259,7 +270,7 @@ public:
     Vector() { components.fill(T(0)); }
 
     template <typename... Args>
-    Vector(Args... args) : components{{static_cast<T>(args)...}}
+    explicit Vector(Args... args) : components{{static_cast<T>(args)...}}
     {
         ASSERT(sizeof...(args) == N, "Number of arguments must match vector dimension");
     }
@@ -347,5 +358,8 @@ using Vec2 = Vector<float, 2>;
 using Vec3 = Vector<float, 3>;
 using Vec4 = Vector<float, 4>;
 
-} // namespace math
-} // namespace gouda
+using UVec2 = Vector<u_int32_t, 2>;
+using UVec3 = Vector<u_int32_t, 3>;
+using UVec4 = Vector<u_int32_t, 4>;
+
+}

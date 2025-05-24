@@ -20,7 +20,7 @@ struct GridRange {
     int max_y;
 };
 
-GridRange GetGridRange(const Rect<f32> &bounds, f32 cell_size)
+GridRange GetGridRange(const Rect<f32> &bounds, const f32 cell_size)
 {
     return {(gouda::math::floor(bounds.left / cell_size)), (gouda::math::floor(bounds.right / cell_size)),
             (gouda::math::floor(bounds.bottom / cell_size)), (gouda::math::floor(bounds.top / cell_size))};
@@ -244,7 +244,7 @@ void Scene::SaveToJSON(std::string_view filepath) {}
 void Scene::SpawnParticle(const gouda::Vec3 &position, const gouda::Vec2 &size, const gouda::Vec3 &velocity,
                           const f32 lifetime, const u32 texture_index, const gouda::Vec4 &colour)
 {
-    m_particles_instances.push_back({position, size, colour, texture_index, lifetime, velocity});
+    m_particles_instances.emplace_back(position, size, colour, texture_index, lifetime, velocity);
 }
 
 // Private ---------------------------------------------------------------------------------

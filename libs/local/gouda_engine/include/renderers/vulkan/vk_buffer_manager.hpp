@@ -1,25 +1,24 @@
 #pragma once
-
 /**
  * @file vk_buffer_manager.hpp
  * @author GoudaCheeseburgers
  * @date 2025-03-15
- * @brief Engine module
+ * @brief Engine Vulkan buffer manager module
  * @copyright
  * Copyright (c) 2025 GoudaCheeseburgers <https://github.com/Cheeseborgers>
  *
  * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
  * See <https://www.gnu.org/licenses/> for more information.
  */
-#include <string>
+#include <memory>
 
 #include <vulkan/vulkan.h>
 
 #include "core/types.hpp"
-#include "renderers/vulkan/vk_buffer.hpp"
 
 namespace gouda::vk {
 
+class Buffer;
 class CommandBufferManager;
 class Fence;
 class Texture;
@@ -32,21 +31,21 @@ public:
     ~BufferManager();
 
     // Create a generic buffer with specified usage and properties
-    Buffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties) const;
+    [[nodiscard]] Buffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties) const;
 
     // Create a vertex buffer with staging
-    Buffer CreateVertexBuffer(const void *data, VkDeviceSize size) const;
+    [[nodiscard]] Buffer CreateVertexBuffer(const void *data, VkDeviceSize size) const;
 
-    Buffer CreateDynamicVertexBuffer(VkDeviceSize size) const;
+    [[nodiscard]] Buffer CreateDynamicVertexBuffer(VkDeviceSize size) const;
 
     // Create a uniform buffer
-    Buffer CreateUniformBuffer(size_t size) const;
+    [[nodiscard]] Buffer CreateUniformBuffer(size_t size) const;
 
     // Create an index buffer
-    Buffer CreateIndexBuffer(const void *data, VkDeviceSize size) const;
+    [[nodiscard]] Buffer CreateIndexBuffer(const void *data, VkDeviceSize size) const;
 
     // Create a storage buffer
-    Buffer CreateStorageBuffer(VkDeviceSize size) const;
+    [[nodiscard]] Buffer CreateStorageBuffer(VkDeviceSize size) const;
 
     // Create and allocate memory for an image
     void CreateImage(Texture &texture, const VkImageCreateInfo &image_info, VkMemoryPropertyFlags memory_properties) const;
@@ -60,10 +59,10 @@ public:
                                     VkFormat texture_format, u32 layer_count, VkImageCreateFlags create_flags) const;
 
     // Texture-related methods
-    std::unique_ptr<Texture> CreateTexture(StringView file_name, u32 mips = 1, u32 layers = 1) const;
-    std::unique_ptr<Texture> CreateTexture(StringView file_name, u32 mips, u32 layers, VkImageCreateFlags create_flags,
+    [[nodiscard]] std::unique_ptr<Texture> CreateTexture(StringView file_name, u32 mips = 1, u32 layers = 1) const;
+    [[nodiscard]] std::unique_ptr<Texture> CreateTexture(StringView file_name, u32 mips, u32 layers, VkImageCreateFlags create_flags,
                                            VkFilter filter) const;
-    std::unique_ptr<Texture> CreateDefaultTexture() const;
+    [[nodiscard]] std::unique_ptr<Texture> CreateDefaultTexture() const;
 
     void CreateTextureImage(Texture &texture, ImageSize size, VkFormat format, u32 mipLevels, u32 layerCount,
                             VkImageCreateFlags flags) const;
@@ -72,19 +71,19 @@ public:
     void CopyBufferToImage(VkBuffer source, VkImage destination, ImageSize imageSize, u32 layerCount) const;
     void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout,
                                u32 layerCount, u32 mipLevels) const;
-    VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags,
+    [[nodiscard]] VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags,
                                 VkImageViewType viewType, u32 layerCount, u32 mipLevels) const;
-    VkSampler CreateTextureSampler(VkFilter minFilter, VkFilter magFilter, VkSamplerAddressMode addressMode) const;
+    [[nodiscard]] VkSampler CreateTextureSampler(VkFilter minFilter, VkFilter magFilter, VkSamplerAddressMode addressMode) const;
 
 private:
     // Helper to find suitable memory type
-    Expect<u32, std::string> GetMemoryTypeIndex(u32 memory_type_bits, VkMemoryPropertyFlags required_properties) const;
+    [[nodiscard]] Expect<u32, String> GetMemoryTypeIndex(u32 memory_type_bits, VkMemoryPropertyFlags required_properties) const;
 
     // Command buffer management for staging
     void BeginCommandBuffer(VkCommandBuffer command_buffer, VkCommandBufferUsageFlags usage) const;
     void SubmitCopyCommand(VkCommandBuffer command_buffer) const;
 
-    Buffer CreateAndUploadStagingBuffer(const void *data, VkDeviceSize size) const;
+    [[nodiscard]] Buffer CreateAndUploadStagingBuffer(const void *data, VkDeviceSize size) const;
 
 private:
     Device *p_device;

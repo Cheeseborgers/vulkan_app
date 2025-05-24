@@ -31,8 +31,8 @@ struct UniformData {
 
 struct InstanceData {
     InstanceData();
-    InstanceData(Vec3 position_, Vec2 size_, f32 rotation_, u32 texture_index_, Vec4 colour_ = Vec4(1.0f),
-                 UVRect<f32> sprite_rect_ = UVRect{0.0f, 0.0f, 0.0f, 0.0f}, u32 is_atlas_ = 0);
+    InstanceData(const Vec3 &position_, const Vec2 &size_, f32 rotation_, u32 texture_index_, const Vec4 &colour_ = Vec4(1.0f),
+                 const UVRect<f32> &sprite_rect_ = UVRect{0.0f, 0.0f, 0.0f, 0.0f}, u32 is_atlas_ = 0);
 
     Vec3 position; // 12 bytes, VK_FORMAT_R32G32B32_SFLOAT
     f32 _pad0;     // 4 bytes padding for alignment
@@ -76,21 +76,25 @@ struct SimulationParams {
     // Total: 16 bytes
 };
 
+// TODO: Align the padding and shader etc
 struct ParticleData {
     ParticleData();
     ParticleData(const Vec3 &position_, const Vec2 &size_, const Vec4 &colour_, u32 texture_index_, f32 lifetime_,
-                 const Vec3 &velocity_);
+                 const Vec3 &velocity_, const UVRect<f32> &sprite_rect_ = UVRect{0.0f, 0.0f, 0.0f, 0.0f},
+                 u32 is_atlas_ = 0);
 
     Vec3 position; // 12 bytes, VK_FORMAT_R32G32B32_SFLOAT
     f32 _pad0;     // 4 bytes padding
 
-    Vec2 size;         // 8 bytes, VK_FORMAT_R32G32_SFLOAT
-    Vec4 colour;       // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
-    u32 texture_index; // 4 bytes, VK_FORMAT_R32_UINT
-    f32 lifetime;      // 4 bytes, VK_FORMAT_R32_SFLOAT
-    Vec3 velocity;     // 12 bytes, VK_FORMAT_R32G32B32_SFLOAT
-    f32 _pad1;         // 4 bytes padding to align to 16-byte boundary
-    // Total: 64 bytes
+    Vec2 size;               // 8 bytes, VK_FORMAT_R32G32_SFLOAT
+    Vec4 colour;             // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
+    u32 texture_index;       // 4 bytes, VK_FORMAT_R32_UINT
+    UVRect<f32> sprite_rect; // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
+    f32 lifetime;            // 4 bytes, VK_FORMAT_R32_SFLOAT
+    Vec3 velocity;           // 12 bytes, VK_FORMAT_R32G32B32_SFLOAT
+    u32 is_atlas;            // 4 bytes, VK_FORMAT_R32_UINT
+    f32 _pad1;               // 4 bytes padding to align to 16-byte boundary
+    // Total: 84 bytes
 };
 
 } // namespace gouda

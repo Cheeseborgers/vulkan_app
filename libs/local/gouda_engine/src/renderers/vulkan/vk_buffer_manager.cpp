@@ -8,6 +8,7 @@
 
 #include "debug/logger.hpp"
 #include "debug/throw.hpp"
+#include "renderers/vulkan/vk_buffer.hpp"
 #include "renderers/vulkan/vk_command_buffer_manager.hpp"
 #include "renderers/vulkan/vk_device.hpp"
 #include "renderers/vulkan/vk_fence.hpp"

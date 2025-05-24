@@ -123,13 +123,11 @@ struct SemVer {
     {
     }
 
-    // Equality comparison
     [[nodiscard]] constexpr bool operator==(const SemVer &other) const
     {
         return major == other.major && minor == other.minor && patch == other.patch && variant == other.variant;
     }
 
-    // Inequality comparison
     [[nodiscard]] constexpr bool operator!=(const SemVer &other) const { return !(*this == other); }
 
     [[nodiscard]] std::string ToString() const
@@ -145,10 +143,8 @@ struct Dimensions {
 
     explicit constexpr Dimensions(T w = T(), T h = T()) : width(w), height(h) {}
 
-    // Equality comparison
     [[nodiscard]] constexpr bool operator==(const Dimensions &other) const { return width == other.width && height == other.height; }
 
-    // Inequality comparison
     [[nodiscard]] constexpr bool operator!=(const Dimensions &other) const { return !(*this == other); }
 
     [[nodiscard]] constexpr T area() const { return width * height; }
@@ -169,11 +165,9 @@ struct SpriteRect {
 
     explicit constexpr SpriteRect(const float value = 0) : x{value}, y{value}, width{value}, height{value} {}
 
-    // Equality comparison
     [[nodiscard]] constexpr bool operator==(const SpriteRect &other) const
     { return width == other.width && height == other.height && x == other.x && y == other.y; }
 
-    // Inequality comparison
     [[nodiscard]] constexpr bool operator!=(const SpriteRect &other) const { return !(*this == other); }
 
     [[nodiscard]] constexpr float area() const { return width * height; }
@@ -198,11 +192,9 @@ struct UVRect {
 
     explicit constexpr UVRect(T value) : u_min{value}, v_min{value}, u_max{value}, v_max{value} {}
 
-    // Equality comparison
     [[nodiscard]] constexpr bool operator==(const UVRect &other) const
     { return u_min == other.u_min && v_min == other.v_min && u_max == other.u_max && v_max == other.v_max; }
 
-    // Inequality comparison
     [[nodiscard]] constexpr bool operator!=(const SpriteRect &other) const { return !(*this == other); }
 
     [[nodiscard]] std::string ToString() const
@@ -223,13 +215,11 @@ struct Rect {
     {
     }
 
-    // Equality comparison
     [[nodiscard]] bool operator==(const Rect &other) const
     {
         return left == other.left && right == other.right && bottom == other.bottom && top == other.top;
     }
 
-    // Inequality comparison
     [[nodiscard]] bool operator!=(const Rect &other) const { return !(*this == other); }
 
     [[nodiscard]] std::string ToString() const
@@ -238,23 +228,27 @@ struct Rect {
     }
 };
 
+
 template <NumericT T>
 struct Colour {
-    std::array<T, 4> value{};
+    union {
+        struct {
+            T r, g, b, a;
+        };
+        std::array<T, 4> data;
+    };
 
-    Colour(T r, T g, T b, T a) : value{r, g, b, a} {}
-    explicit constexpr Colour(T all = T{}) : value{all, all, all, all} {}
+    Colour(T r_, T g_, T b_, T a_) : r{r_}, g{g_}, b{b_}, a{a_} {}
+    explicit constexpr Colour(T all = T{}) : r{all}, g{all}, b{all}, a{all} {}
 
-    // Access as span
-    [[nodiscard]] std::span<T, 4> as_span() { return std::span<T, 4>(value); }
-    [[nodiscard]] std::span<const T, 4> as_span() const { return std::span<const T, 4>(value); }
+    [[nodiscard]] constexpr T& operator[](std::size_t i) { return data[i]; }
+    [[nodiscard]] constexpr const T& operator[](std::size_t i) const { return data[i]; }
 
-    // Index access
-    T& operator[](size_t i) { return value[i]; }
-    const T& operator[](size_t i) const { return value[i]; }
+    [[nodiscard]] constexpr std::span<T, 4> as_span() { return data; }
+    [[nodiscard]] constexpr std::span<const T, 4> as_span() const { return data; }
 
     [[nodiscard]] std::string ToString() const {
-        return std::format("r: {}, g: {}, b: {}, a: {}", value[0], value[1], value[2], value[3]);
+        return std::format("r: {}, g: {}, b: {}, a: {}", r, g, b, a);
     }
 };
 

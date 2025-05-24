@@ -7,16 +7,17 @@
 #include "renderers/vulkan/vk_compute_pipeline.hpp"
 
 #include "debug/logger.hpp"
+#include "renderers/vulkan/vk_buffer.hpp"
 #include "renderers/vulkan/vk_renderer.hpp"
 #include "renderers/vulkan/vk_shader.hpp"
 #include "renderers/vulkan/vk_utils.hpp"
 
 namespace gouda::vk {
 
-ComputePipeline::ComputePipeline(Renderer &renderer, const Shader *compute_shader, const Vector<Buffer> &storage_buffers,
-                                 const Vector<Buffer> &uniform_buffers,
+ComputePipeline::ComputePipeline(Renderer &renderer, Device *device, const Shader *compute_shader,
+                                 const Vector<Buffer> &storage_buffers, const Vector<Buffer> &uniform_buffers,
                                  const VkDeviceSize storage_buffer_size, const VkDeviceSize uniform_buffer_size)
-    : m_renderer{renderer}, p_device{renderer.GetDevice()}
+    : m_renderer{renderer}, p_device{device}
 {
     // Create descriptor pool
     Vector<VkDescriptorPoolSize> pool_sizes{
@@ -29,11 +30,10 @@ ComputePipeline::ComputePipeline(Renderer &renderer, const Shader *compute_shade
         .poolSizeCount = static_cast<u32>(pool_sizes.size()),
         .pPoolSizes = pool_sizes.data(),
     };
-    VkResult result{vkCreateDescriptorPool(p_device, &pool_info, nullptr, &p_descriptor_pool)};
+    VkResult result{vkCreateDescriptorPool(p_device->GetDevice(), &pool_info, nullptr, &p_descriptor_pool)};
     if (result != VK_SUCCESS) {
         CHECK_VK_RESULT(result, "vkCreateDescriptorPool");
     }
-
 
     // Create descriptor set layout
     Vector<VkDescriptorSetLayoutBinding> bindings{
@@ -55,7 +55,8 @@ ComputePipeline::ComputePipeline(Renderer &renderer, const Shader *compute_shade
         .bindingCount = static_cast<u32>(bindings.size()),
         .pBindings = bindings.data(),
     };
-    result = vkCreateDescriptorSetLayout(p_device, &layout_info, nullptr, &p_descriptor_set_layout);
+
+    result = vkCreateDescriptorSetLayout(p_device->GetDevice(), &layout_info, nullptr, &p_descriptor_set_layout);
     if (result != VK_SUCCESS) {
         CHECK_VK_RESULT(result, "vkCreateDescriptorSetLayout");
     }
@@ -66,7 +67,7 @@ ComputePipeline::ComputePipeline(Renderer &renderer, const Shader *compute_shade
         .setLayoutCount = 1,
         .pSetLayouts = &p_descriptor_set_layout,
     };
-    result = vkCreatePipelineLayout(p_device, &pipeline_layout_info, nullptr, &p_pipeline_layout);
+    result = vkCreatePipelineLayout(p_device->GetDevice(), &pipeline_layout_info, nullptr, &p_pipeline_layout);
     if (result != VK_SUCCESS) {
         CHECK_VK_RESULT(result, "vkCreatePipelineLayout");
     }
@@ -79,12 +80,12 @@ ComputePipeline::ComputePipeline(Renderer &renderer, const Shader *compute_shade
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
                 .stage = compute_shader->Stage(),
                 .module = compute_shader->Get(),
-                .pName = "main",
+                .pName = compute_shader->Reflection().entry_point.c_str(),
             },
         .layout = p_pipeline_layout,
     };
 
-    result = vkCreateComputePipelines(p_device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &p_pipeline);
+    result = vkCreateComputePipelines(p_device->GetDevice(), VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &p_pipeline);
     if (result != VK_SUCCESS) {
         CHECK_VK_RESULT(result, "vkCreateComputePipelines");
     }
@@ -100,11 +101,10 @@ ComputePipeline::ComputePipeline(Renderer &renderer, const Shader *compute_shade
         .descriptorSetCount = static_cast<u32>(storage_buffers.size()),
         .pSetLayouts = layouts.data(),
     };
-    result = vkAllocateDescriptorSets(p_device, &alloc_info, m_descriptor_sets.data());
+    result = vkAllocateDescriptorSets(p_device->GetDevice(), &alloc_info, m_descriptor_sets.data());
     if (result != VK_SUCCESS) {
         CHECK_VK_RESULT(result, "vkAllocateDescriptorSets");
     }
-
 
     // Update descriptor sets
     for (size_t i = 0; i < storage_buffers.size(); ++i) {
@@ -139,18 +139,18 @@ ComputePipeline::ComputePipeline(Renderer &renderer, const Shader *compute_shade
                 .pBufferInfo = &uniform_info,
             },
         };
-        vkUpdateDescriptorSets(p_device, static_cast<u32>(writes.size()), writes.data(), 0, nullptr);
+        vkUpdateDescriptorSets(p_device->GetDevice(), static_cast<u32>(writes.size()), writes.data(), 0, nullptr);
     }
 }
 
 ComputePipeline::~ComputePipeline() { Destroy(); }
 
-void ComputePipeline::Bind(const VkCommandBuffer command_buffer) const
+void ComputePipeline::Bind(VkCommandBuffer command_buffer) const
 {
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, p_pipeline);
 }
 
-void ComputePipeline::BindDescriptors(const VkCommandBuffer command_buffer, const u32 image_index) const
+void ComputePipeline::BindDescriptors(VkCommandBuffer command_buffer, const u32 image_index) const
 {
     vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, p_pipeline_layout,
                             0, // firstSet
@@ -163,32 +163,31 @@ void ComputePipeline::BindDescriptors(const VkCommandBuffer command_buffer, cons
 
 u32 ComputePipeline::CalculateWorkGroupCount(const u32 particle_count) const
 {
-    constexpr u32 local_size_x{256};                               // Matches shader's local_size_x
+    constexpr u32 local_size_x{256};                           // Matches shader's local_size_x
     return (particle_count + local_size_x - 1) / local_size_x; // Ceiling division
 }
 
-void ComputePipeline::Dispatch(VkCommandBuffer command_buffer, const u32 group_count_x, const u32 group_count_y,
-                               const u32 group_count_z) const
+void ComputePipeline::Dispatch(VkCommandBuffer command_buffer, const math::UVec3 &group_counts) const
 {
-    vkCmdDispatch(command_buffer, group_count_x, group_count_y, group_count_z); // Simplify for 1D dispatch
+    vkCmdDispatch(command_buffer, group_counts.x, group_counts.y, group_counts.z); // Simplify for 1D dispatch
 }
 
 void ComputePipeline::Destroy()
 {
     if (p_descriptor_pool != VK_NULL_HANDLE) {
-        vkDestroyDescriptorPool(p_device, p_descriptor_pool, nullptr);
+        vkDestroyDescriptorPool(p_device->GetDevice(), p_descriptor_pool, nullptr);
         p_descriptor_pool = VK_NULL_HANDLE;
     }
     if (p_descriptor_set_layout != VK_NULL_HANDLE) {
-        vkDestroyDescriptorSetLayout(p_device, p_descriptor_set_layout, nullptr);
+        vkDestroyDescriptorSetLayout(p_device->GetDevice(), p_descriptor_set_layout, nullptr);
         p_descriptor_set_layout = VK_NULL_HANDLE;
     }
     if (p_pipeline != VK_NULL_HANDLE) {
-        vkDestroyPipeline(p_device, p_pipeline, nullptr);
+        vkDestroyPipeline(p_device->GetDevice(), p_pipeline, nullptr);
         p_pipeline = VK_NULL_HANDLE;
     }
     if (p_pipeline_layout != VK_NULL_HANDLE) {
-        vkDestroyPipelineLayout(p_device, p_pipeline_layout, nullptr);
+        vkDestroyPipelineLayout(p_device->GetDevice(), p_pipeline_layout, nullptr);
         p_pipeline_layout = VK_NULL_HANDLE;
     }
 

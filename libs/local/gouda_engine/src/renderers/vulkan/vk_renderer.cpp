@@ -158,8 +158,10 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, const u32 ima
         p_particle_compute_pipeline->Bind(command_buffer);
         p_particle_compute_pipeline->BindDescriptors(command_buffer, image_index);
         const u32 particle_count{math::min(particle_instance_count, static_cast<u32>(m_max_particle_instances))};
-        const u32 workgroup_count{(particle_count + 255) / 256};
-        p_particle_compute_pipeline->Dispatch(command_buffer, workgroup_count, 1, 1);
+        //const u32 workgroup_count{(particle_count + 255) / 256};
+
+        const math::UVec3 workgroup_count{((particle_count + 255) / 256), 0, 1};
+        p_particle_compute_pipeline->Dispatch(command_buffer, workgroup_count);
 
         const VkBufferMemoryBarrier compute_to_copy_barrier{
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -530,7 +532,7 @@ void Renderer::SetupPipelines(StringView quad_vertex_shader_path, StringView qua
 
     p_particle_compute_shader = std::make_unique<Shader>(*p_device, particle_compute_shader_path);
     p_particle_compute_pipeline = std::make_unique<ComputePipeline>(
-        *this, p_particle_compute_shader.get(), m_particle_storage_buffers, m_compute_uniform_buffers,
+        *this, p_device.get(),  p_particle_compute_shader.get(), m_particle_storage_buffers, m_compute_uniform_buffers,
         sizeof(ParticleData) * m_max_particle_instances, sizeof(SimulationParams));
 }
 
@@ -653,7 +655,7 @@ u32 Renderer::LoadMSDFFont(StringView image_filepath, StringView json_filepath)
 
 void Renderer::SetClearColour(const Colour<f32> &colour)
 {
-    m_clear_colour = {{colour.value[0], colour.value[1], colour.value[2], colour.value[3]}};
+    m_clear_colour = {colour.r, colour.g, colour.b, colour.a};
 }
 
 void Renderer::InitializeCore(GLFWwindow *window_ptr, StringView app_name, SemVer vulkan_api_version)

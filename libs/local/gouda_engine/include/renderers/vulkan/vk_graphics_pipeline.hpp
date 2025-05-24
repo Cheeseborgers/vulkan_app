@@ -11,8 +11,6 @@
  * This file is part of the Gouda engine and licensed under the GNU Affero General Public License v3.0 or later.
  * See <https://www.gnu.org/licenses/> for more information.
  */
-#include <vector>
-
 #include <vulkan/vulkan.h>
 
 #include "containers/small_vector.hpp"
@@ -22,10 +20,10 @@ struct GLFWwindow;
 
 namespace gouda::vk {
 
-class Buffer;
+struct Buffer;
+struct Texture;
 class Renderer;
 class Shader;
-class Texture;
 
 enum class PipelineType : u8 { Quad, Text, Particle };
 
