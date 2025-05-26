@@ -221,13 +221,12 @@ ShaderReflection reflect_shader(const std::vector<u32> &spirv, VkShaderStageFlag
         spirv_cross::ShaderResources resources{compiler.get_shader_resources()};
 
         // Get the shaders entry
-        auto entry_points = compiler.get_entry_points_and_stages();
-        if (!entry_points.empty()) {
+        if (auto entry_points = compiler.get_entry_points_and_stages(); !entry_points.empty()) {
             reflection.entry_point = entry_points[0].name;
         }
 
         // Helper lambda to add a descriptor binding
-        auto add_binding = [&](const spirv_cross::Resource &resource, VkDescriptorType type) {
+        auto add_binding = [&](const spirv_cross::Resource &resource, const VkDescriptorType type) {
             ShaderDescriptorBinding binding{};
             binding.name = resource.name;
             binding.set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
@@ -431,8 +430,8 @@ size_t compile_shader(const VkDevice device, const glslang_stage_t stage, String
     shader_create_info.codeSize = shader_module.m_spirv.size() * sizeof(u32);
     shader_create_info.pCode = shader_module.m_spirv.data();
 
-    VkResult result{vkCreateShaderModule(device, &shader_create_info, nullptr, &shader_module.p_shader_module)};
-    if (result != VK_SUCCESS) {
+    if (const VkResult result{vkCreateShaderModule(device, &shader_create_info, nullptr, &shader_module.p_shader_module)};
+        result != VK_SUCCESS) {
         ENGINE_LOG_ERROR("vkCreateShaderModule failed: {}", vk_result_to_string(result));
         return 0;
     }
@@ -556,8 +555,8 @@ Expect<VkShaderModule, ShaderError> Shader::CreateShaderModuleFromBinary(std::st
     shader_create_info.pCode = reinterpret_cast<const u32 *>(shader_code.data());
 
     VkShaderModule shader_module{VK_NULL_HANDLE};
-    const VkResult result{vkCreateShaderModule(m_device.GetDevice(), &shader_create_info, nullptr, &shader_module)};
-    if (result != VK_SUCCESS) {
+    if (const VkResult result{vkCreateShaderModule(m_device.GetDevice(), &shader_create_info, nullptr, &shader_module)};
+        result != VK_SUCCESS) {
         ENGINE_LOG_ERROR("Failed to create shader module from '{}': {}", file_name, vk_result_to_string(result));
         return std::unexpected(ShaderError::VulkanError);
     }

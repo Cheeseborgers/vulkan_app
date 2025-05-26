@@ -31,7 +31,7 @@ struct AABB2D {
     AABB2D() = default;
     AABB2D(const Vec2 &min_, const Vec2 &max_) : min(min_), max(max_) {}
 
-    bool Intersects(const AABB2D &other) const
+    [[nodiscard]] bool Intersects(const AABB2D &other) const
     {
         return (min.x < other.max.x && max.x > other.min.x) && (min.y < other.max.y && max.y > other.min.y);
     }
@@ -44,17 +44,17 @@ struct AABB3D {
     AABB3D() = default;
     AABB3D(const Vec3 &min_, const Vec3 &max_) : min(min_), max(max_) {}
 
-    bool Intersects(const AABB3D &other) const
+    [[nodiscard]] bool Intersects(const AABB3D &other) const
     {
         return (min.x <= other.max.x && max.x >= other.min.x) && (min.y <= other.max.y && max.y >= other.min.y) &&
                (min.z <= other.max.z && max.z >= other.min.z);
     }
 };
 
-inline bool CheckCollision(const Vec3 &pos1, const Vec2 &size1, const Vec3 &pos2, const Vec2 &size2)
+inline bool check_collision(const Vec3 &pos1, const Vec2 &size1, const Vec3 &pos2, const Vec2 &size2)
 {
-    bool collision_x{(pos1.x + size1.x >= pos2.x) && (pos2.x + size2.x >= pos1.x)};
-    bool collision_y{(pos1.y + size1.y >= pos2.y) && (pos2.y + size2.y >= pos1.y)};
+    const bool collision_x{pos1.x + size1.x >= pos2.x && pos2.x + size2.x >= pos1.x};
+    const bool collision_y{pos1.y + size1.y >= pos2.y && pos2.y + size2.y >= pos1.y};
     return collision_x && collision_y;
 }
 

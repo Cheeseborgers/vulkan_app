@@ -132,7 +132,7 @@ struct SemVer {
 
     [[nodiscard]] std::string ToString() const
     {
-        return std::string(std::format("major: {}, minor: {}, patch: {}, variant: {}", major, minor, patch, variant));
+        return std::format("major: {}, minor: {}, patch: {}, variant: {}", major, minor, patch, variant);
     }
 };
 
@@ -149,7 +149,7 @@ struct Dimensions {
 
     [[nodiscard]] constexpr T area() const { return width * height; }
 
-    [[nodiscard]] std::string ToString() const { return std::string(std::format("{}x{}", width, height)); }
+    [[nodiscard]] std::string ToString() const { return std::format("{}x{}", width, height); }
 };
 
 struct SpriteRect {
@@ -174,7 +174,7 @@ struct SpriteRect {
 
     [[nodiscard]] std::string ToString() const
     {
-        return std::string(std::format("x: {}, y: {}, width: {}, height: {}", x, y, width, height));
+        return std::format("x: {}, y: {}, width: {}, height: {}", x, y, width, height);
     }
 };
 

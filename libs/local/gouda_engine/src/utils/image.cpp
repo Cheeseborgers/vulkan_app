@@ -11,13 +11,13 @@
 
 namespace gouda {
 
-Expect<Image, String> Image::Load(StringView filename, const int desired_channels)
+Expect<Image, String> Image::Load(StringView filename, const int desired_channels, const bool flip_horizontally)
 {
     int actual_channels{0};
     ImageSize size{0, 0};
 
     // Enable vertical flipping for loading
-    stbi_set_flip_vertically_on_load(1); // Flip image so bottom row is first
+    stbi_set_flip_vertically_on_load(flip_horizontally); // Flip image so bottom row is first
 
     // Load image with the desired number of channels
     stbi_uc *data{stbi_load(filename.data(), &size.width, &size.height, &actual_channels, desired_channels)};

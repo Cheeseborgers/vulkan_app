@@ -301,6 +301,8 @@ public:
     Vector() { components.fill(T(0)); }
     Vector(T value) { components.fill(T(value)); }
     Vector(T x_, T y_) : components{x_, y_} {}
+
+    [[nodiscard]] String ToString() const { return std::format("x:{}, y:{}", x, y); }
 };
 
 // Specialization for Vec3 (N=3)
@@ -327,6 +329,8 @@ public:
                       x * other.y - y * other.x  // z
         );
     }
+
+    [[nodiscard]] String ToString() const { return std::format("x:{}, y:{}, z:{}", x, y, z); }
 };
 
 // Specialization for Vec4 (N=4)
@@ -344,6 +348,8 @@ public:
     Vector() { components.fill(T(0)); }
     Vector(T value) { components.fill(T(value)); }
     Vector(T x_, T y_, T z_, T w_) : components{x_, y_, z_, w_} {}
+
+    [[nodiscard]] String ToString() const { return std::format("x:{}, y:{}, z:{}, w:{}", x, y, z, w); }
 };
 
 // Scalar multiplication (left-hand scalar)

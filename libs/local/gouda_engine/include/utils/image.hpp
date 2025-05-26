@@ -37,7 +37,7 @@ enum class ImageChannels { RGB, RGBA };
 class Image {
 public:
     /// Loads an image from file.
-    static Expect<Image, String> Load(StringView filename, int desired_channels = STBI_rgb_alpha);
+    static Expect<Image, String> Load(StringView filename, int desired_channels = STBI_rgb_alpha, bool flip_horizontally = true);
 
     /// Saves the image to a file.
     [[nodiscard]] bool Save(StringView filename) const;

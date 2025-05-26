@@ -11,7 +11,6 @@
 #include "debug/logger.hpp"
 #include "math/collision.hpp"
 #include "math/vector.hpp"
-#include "renderers/common.hpp"
 
 struct GridRange {
     int min_x;
@@ -43,6 +42,7 @@ Scene::Scene(gouda::OrthographicCamera *camera, gouda::vk::TextureManager *textu
       m_instances_dirty{true},
       m_font_id{1}
 {
+
     const gouda::Vector<gouda::InstanceData> instances = {
         {{2945.3f, 3048.8f, -0.3f}, {81.9f, 453.95f}, 0.0f, 4},
         {{200.3f, 200.8f, -0.3f}, {281.9f, 453.95f}, 0.0f, 4},
@@ -103,6 +103,8 @@ Scene::Scene(gouda::OrthographicCamera *camera, gouda::vk::TextureManager *textu
         m_entities.emplace_back(instance, EntityType::Quad);
     }
 
+    // const gouda::Vector<gouda::InstanceData> instances;
+
     SetupPlayer();
 
     m_visible_quad_instances.reserve(instances.size() + 1);
@@ -124,9 +126,10 @@ void Scene::Update(const f32 delta_time)
     }
 
     // Calculate new position
-    gouda::math::Vec3 new_position{m_player.render_data.position + gouda::math::Vec3{m_player.velocity.x * delta_time,
-                                                                                     m_player.velocity.y * delta_time,
-                                                                                     m_player.render_data.position.z}};
+    gouda::math::Vec3 new_position{};
+    new_position.x = m_player.render_data.position.x + m_player.velocity.x * delta_time;
+    new_position.y = m_player.render_data.position.y + m_player.velocity.y * delta_time,
+    new_position.z = m_player.render_data.position.z;
 
     // Player collision bounds
     const Rect<f32> player_bounds{new_position.x, new_position.x + m_player.render_data.size.x, new_position.y,
@@ -150,7 +153,7 @@ void Scene::Update(const f32 delta_time)
     for (const size_t entity_idx : nearby_entities) {
         auto &entity = m_entities[entity_idx];
         if (const gouda::math::Vec2 & entity_size{entity.render_data.size};
-            CheckCollision(new_position, m_player.render_data.size, entity.render_data.position, entity_size)) {
+            check_collision(new_position, m_player.render_data.size, entity.render_data.position, entity_size)) {
 
             const Rect<f32> entity_bounds{entity.render_data.position.x, entity.render_data.position.x + entity_size.x,
                                           entity.render_data.position.y, entity.render_data.position.y + entity_size.y};
@@ -230,7 +233,8 @@ void Scene::DrawUI(gouda::vk::Renderer &renderer)
 {
     m_text_instances.clear();
 
-    renderer.DrawText("GOUDA RENDERER", {100.0f}, 200.0f, m_font_id, m_text_instances);
+    renderer.DrawText("GOUDA RENDERER", {100.0f, 100.0f, -0.9}, {0.0f, 1.0f, 0.0f, 1.0f}, 20.0f, m_font_id,
+                      m_text_instances);
 }
 
 void Scene::LoadFromJSON(std::string_view filepath)
@@ -244,7 +248,12 @@ void Scene::SaveToJSON(std::string_view filepath) {}
 void Scene::SpawnParticle(const gouda::Vec3 &position, const gouda::Vec2 &size, const gouda::Vec3 &velocity,
                           const f32 lifetime, const u32 texture_index, const gouda::Vec4 &colour)
 {
-    m_particles_instances.emplace_back(position, size, colour, texture_index, lifetime, velocity);
+    if (size.x <= 0.0f || size.y <= 0.0f || lifetime <= 0.0f) {
+        APP_LOG_WARNING("Invalid particle parameters: size=[{}, {}], lifetime={}", size.x, size.y, lifetime);
+        return;
+    }
+
+    m_particles_instances.emplace_back(position, size, lifetime, velocity, colour, texture_index);
 }
 
 // Private ---------------------------------------------------------------------------------
@@ -252,7 +261,9 @@ void Scene::SetupEntities() {}
 
 void Scene::SetupPlayer()
 {
-    m_player.render_data.position = {500.0f, 500.0f, 0.0f};
+    // TODO: Fix the player position in regards to the camera viewport and check collision is not affected by the z axis
+    // yet?????
+    m_player.render_data.position = {500.0f, 500.0f, -0.9f};
     m_player.render_data.size = {32.0f, 32.0f};
     m_player.render_data.texture_index = 5;
     m_player.render_data.colour = {1.0f, 1.0f, 1.0f, 0.0f};
@@ -308,7 +319,7 @@ void Scene::UpdateVisibleInstances()
 void Scene::UpdateParticles(const f32 delta_time)
 {
     for (auto it = m_particles_instances.begin(); it != m_particles_instances.end();) {
-        it->velocity += gouda::math::Vec3{0.0f, constants::gravity, 0.0f} * delta_time; // Gravity
+        it->velocity += gouda::math::Vec3{0.0f, constants::gravity, 0.0f} * delta_time;
         it->position += it->velocity * delta_time;
         it->lifetime -= delta_time;
         if (it->lifetime <= 0.0f) {

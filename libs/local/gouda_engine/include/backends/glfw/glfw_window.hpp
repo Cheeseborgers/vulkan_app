@@ -6,8 +6,8 @@
 #include "backends/window.hpp"
 #include "core/types.hpp"
 
-namespace gouda {
-namespace glfw {
+
+namespace gouda::glfw {
 
 /**
  * @class Window
@@ -19,14 +19,14 @@ namespace glfw {
  *
  * @tparam WindowHandle The type of the window handle (GLFWwindow* in this case).
  */
-class Window : public IWindow {
+class Window final : public IWindow {
 public:
     /**
      * @brief Constructor that initializes the window based on the given configuration.
      *
      * @param config The configuration used to create the window (e.g., size, fullscreen, renderer type).
      */
-    Window(const WindowConfig &config);
+    explicit Window(const WindowConfig &config);
 
     /**
      * @brief Destructor that cleans up resources and destroys the GLFW window. (calls 'Destroy' internally)
@@ -64,7 +64,7 @@ public:
      *
      * @param filepath The file path for the window decoration icon
      */
-    void SetIcon(std::string_view filepath) override;
+    void SetIcon(StringView filepath) override;
 
     /**
      * @brief Loads the mouse cursor for the window.
@@ -72,14 +72,14 @@ public:
      * @param filepath The file path for the mouse cursor image
      * @param identifier The identifier for the mouse cursor
      */
-    void LoadCursor(std::string_view filepath, std::string_view identifier) override;
+    void LoadCursor(StringView filepath, StringView identifier) override;
 
     /**
      * @brief Sets the mouse cursor for the window.
      *
      * @param filepath The identifier for the loaded cursor
      */
-    void SetCursor(std::string_view filepath) override;
+    void SetCursor(StringView filepath) override;
 
     /**
      * @brief Destroys any stored and loaded mouse cursors.
@@ -92,7 +92,7 @@ public:
      *
      * @return A pointer to the GLFW window object.
      */
-    GLFWwindow *GetWindow() { return p_window; }
+    GLFWwindow *GetWindow() const { return p_window; }
 
     /**
      * @brief Retrieves the size of the window.
@@ -114,10 +114,9 @@ public:
 
 private:
     GLFWwindow *p_window; ///< The GLFW window handle.
-    Renderer m_renderer;  ///< The Renderer type.
+    Renderer m_renderer;  ///< The Renderer type. // TODO: Do we need the render? why not use the type from config?
 
     std::unordered_map<std::string, GLFWcursor *> m_cursors; ///< Current loaded cursors
 };
 
-} // namespace glfw
-} // namespace gouda
+} // namespace gouda::glfw

@@ -3,8 +3,9 @@
 #include "debug/debug.hpp"
 #include "utils/image.hpp"
 
-namespace gouda {
-namespace glfw {
+#include <ranges>
+
+namespace gouda::glfw {
 
 // GLFW Error callback
 static void error_callback(int error, const char *description)
@@ -13,19 +14,19 @@ static void error_callback(int error, const char *description)
 }
 
 // Detect GLFW Platform
-static std::optional<std::string_view> detect_glfw_platform()
+static std::optional<StringView> detect_glfw_platform()
 {
-    int platform{glfwGetPlatform()};
+    const int platform{glfwGetPlatform()};
 
     // Using an unordered_map to map platform codes to platform strings
-    static const std::unordered_map<int, std::string_view> platform_map{
+    static const std::unordered_map<int, StringView> platform_map{
         {GLFW_PLATFORM_WAYLAND, internal::constants::Wayland},
         {GLFW_PLATFORM_X11, internal::constants::X11},
         {GLFW_PLATFORM_WIN32, internal::constants::Windows},
         {GLFW_PLATFORM_COCOA, internal::constants::MacOS},
         {GLFW_PLATFORM_NULL, internal::constants::Headless}};
 
-    if (platform_map.find(platform) != platform_map.end()) {
+    if (platform_map.contains(platform)) {
         return platform_map.at(platform); // Return the mapped platform string
     }
 
@@ -35,9 +36,8 @@ static std::optional<std::string_view> detect_glfw_platform()
 // Log GLFW platform info
 static void log_glfw_platform_info()
 {
-    auto platform = detect_glfw_platform();
 
-    if (!platform) {
+    if (auto platform = detect_glfw_platform(); !platform) {
         ENGINE_LOG_FATAL("Unknown GLFW platform! Terminating application");
         glfwTerminate();
     }
@@ -47,7 +47,7 @@ static void log_glfw_platform_info()
 }
 
 // Set GLFW platform hints
-static void set_platform_hints(Platform platform)
+static void set_platform_hints(const Platform platform)
 {
     static const std::unordered_map<Platform, int> platform_hints{{Platform::X11, GLFW_PLATFORM_X11},
                                                                   {Platform::Wayland, GLFW_PLATFORM_WAYLAND},
@@ -81,7 +81,7 @@ Window::Window(const WindowConfig &config) : p_window{nullptr}
         case Renderer::Vulkan:
             if (!glfwVulkanSupported()) {
                 ENGINE_LOG_FATAL("Failed to find a Vulkan loader and an ICD. Terminating application");
-                Destroy();
+                Window::Destroy();
             }
             glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
             ENGINE_LOG_INFO("GLFW set to use Vulkan renderer (GLFW_NO_API)");
@@ -94,7 +94,7 @@ Window::Window(const WindowConfig &config) : p_window{nullptr}
 
         default:
             ENGINE_LOG_FATAL("Unknown renderer type specified. Terminating application");
-            Destroy();
+            Window::Destroy();
             break;
     }
 
@@ -102,19 +102,19 @@ Window::Window(const WindowConfig &config) : p_window{nullptr}
     glfwWindowHint(GLFW_RESIZABLE, config.resizable);
 
     // Determine monitor for fullscreen mode
-    GLFWmonitor *monitor{nullptr};
 
     if (config.fullscreen) {
+        GLFWmonitor *monitor{nullptr};
         monitor = glfwGetPrimaryMonitor(); // Get the primary monitor for fullscreen
         if (!monitor) {
             ENGINE_LOG_FATAL("Failed to retrieve primary monitor for fullscreen mode.");
-            Destroy();
+            Window::Destroy();
         }
 
         const GLFWvidmode *mode{glfwGetVideoMode(monitor)}; // Get the monitor's current resolution & refresh rate
         if (!mode) {
             ENGINE_LOG_FATAL("Failed to retrieve video mode for primary monitor.");
-            Destroy();
+            Window::Destroy();
         }
 
         // Only set refresh rate if not using Vulkan, and user hasn't explicitly disabled vsync.
@@ -145,11 +145,11 @@ Window::Window(const WindowConfig &config) : p_window{nullptr}
             ENGINE_LOG_FATAL("Error description: {}", error_description);
         }
 
-        Destroy();
+        Window::Destroy();
     }
 }
 
-Window::~Window() { Destroy(); }
+Window::~Window() { Window::Destroy(); }
 
 void Window::Destroy()
 {
@@ -164,7 +164,7 @@ void Window::Destroy()
     glfwTerminate();
 }
 
-void Window::SetVsync(bool enabled)
+void Window::SetVsync(const bool enabled)
 {
     if (m_renderer == Renderer::OpenGL) {
         if (enabled) {
@@ -174,6 +174,7 @@ void Window::SetVsync(bool enabled)
             glfwSwapInterval(0); // Disable vsync for OpenGL
         }
     }
+    // FIXME: Calling this will cause BIG ISSUES!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     else if (m_renderer == Renderer::Vulkan) {
         // For Vulkan, you'd typically need to adjust the swapchain's present mode.
         // You would need to recreate the swapchain if you're changing vsync settings in Vulkan.
@@ -196,15 +197,15 @@ void Window::SetVsync(bool enabled)
     }
 }
 
-void Window::SetIcon(std::string_view filepath)
+void Window::SetIcon(StringView filepath)
 {
-    auto image_result = Image::Load(filepath);
+    auto image_result = Image::Load(filepath, 4, false);
     if (!image_result) {
         ENGINE_LOG_ERROR("Could not load window icon image: {}", image_result.error());
         return;
     }
 
-    Image original = std::move(image_result.value());
+    const Image original{std::move(image_result.value())};
 
     // Resize to 32x32
     auto small_icon_result = original.Resize(32, 32);
@@ -213,7 +214,7 @@ void Window::SetIcon(std::string_view filepath)
         return;
     }
 
-    Image small_icon = std::move(small_icon_result.value());
+    const Image small_icon = std::move(small_icon_result.value());
     GLFWimage icons[2];
 
     // 64x64 original image
@@ -232,7 +233,7 @@ void Window::SetIcon(std::string_view filepath)
     ENGINE_LOG_INFO("Window icon set successfully.");
 }
 
-void Window::LoadCursor(std::string_view filepath, std::string_view identifier)
+void Window::LoadCursor(StringView filepath, StringView identifier)
 {
     auto image_result = Image::Load(filepath);
     if (!image_result) {
@@ -240,7 +241,7 @@ void Window::LoadCursor(std::string_view filepath, std::string_view identifier)
         return;
     }
 
-    Image image{std::move(image_result.value())};
+    const Image image{std::move(image_result.value())};
     GLFWimage cursor_image{};
     cursor_image.width = image.GetWidth();
     cursor_image.height = image.GetHeight();
@@ -253,10 +254,10 @@ void Window::LoadCursor(std::string_view filepath, std::string_view identifier)
         return;
     }
 
-    m_cursors.emplace(std::string(identifier), cursor);
+    m_cursors.emplace(String(identifier), cursor);
 }
 
-void Window::SetCursor(std::string_view identifier)
+void Window::SetCursor(StringView identifier)
 {
     ASSERT(p_window, "Window is not initialized or invalid!");
 
@@ -266,8 +267,7 @@ void Window::SetCursor(std::string_view identifier)
     }
 
     // Find the cursor by its identifier in the map
-    auto it = m_cursors.find(std::string(identifier));
-    if (it != m_cursors.end() && it->second) {
+    if (const auto it = m_cursors.find(std::string(identifier)); it != m_cursors.end() && it->second) {
         // Set the cursor if it exists
         glfwSetCursor(p_window, it->second);
     }
@@ -279,8 +279,8 @@ void Window::SetCursor(std::string_view identifier)
 void Window::ClearCursors()
 {
     if (p_window) {
-        for (auto &[key, cursor] : m_cursors) {
-            glfwDestroyCursor(static_cast<GLFWcursor *>(cursor));
+        for (const auto &cursor : m_cursors | std::views::values) {
+            glfwDestroyCursor(cursor);
         }
         m_cursors.clear();
 
@@ -304,5 +304,4 @@ FrameBufferSize Window::GetFramebufferSize() const
     return size;
 }
 
-} // namespace glfw
-} // namespace gouda
+}
