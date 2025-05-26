@@ -1,6 +1,6 @@
 #pragma once
 /**
- * @file debug/Logger.hpp
+ * @file debug/logger.hpp
  * @author GoudaCheeseburgers
  * @date 2025-03-27
  * @brief Engine logger module
@@ -27,6 +27,10 @@
 #include "debug/assert.hpp"
 #include "debug/stacktrace.hpp"
 
+// TODO: REMOVE THIS!!
+#define APP_LOG_LEVEL_TRACE 1
+#define ENGINE_LOG_LEVEL_TRACE 1
+
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -35,18 +39,16 @@
 
 namespace gouda {
 
-enum class LogLevel : u8 { Debug, Info, Warning, Error, Fatal };
+enum class LogLevel : u8 { Trace, Debug, Info, Warning, Error, Fatal };
 
 class Logger {
 private:
-    using Sink = std::function<void(std::string_view)>;
+    using Sink = std::function<void(StringView)>;
 
 protected:
-    Logger(std::string_view file_path = "")
+    explicit Logger(StringView file_path = "")
         : m_file_path(file_path),
-          m_buffer{},
-          m_sinks{},
-          m_min_level{LogLevel::Debug},
+          m_min_level{LogLevel::Trace},
           m_log_to_file(!file_path.empty()),
           m_buffered{false}
     {
@@ -58,10 +60,10 @@ protected:
             }
             else {
                 m_sinks.push_back(
-                    [this](std::string_view msg) { std::osyncstream(m_file_stream) << msg << std::endl; });
+                    [this](StringView msg) { std::osyncstream(m_file_stream) << msg << std::endl; });
             }
         }
-        m_sinks.push_back([](std::string_view msg) { std::osyncstream(std::cout) << msg << std::endl; });
+        m_sinks.push_back([](StringView msg) { std::osyncstream(std::cout) << msg << std::endl; });
     }
 
     ~Logger()
@@ -71,16 +73,16 @@ protected:
         }
     }
 
-    std::string GetTimestamp()
+    static std::string GetTimestamp()
     {
-        auto now = SystemClock::now();
+        const auto now = SystemClock::now();
         auto local_time = std::chrono::floor<Milliseconds>(now);
         return std::format("{:%Y-%m-%d %H:%M:%S}", local_time);
     }
 
     // Variadic template for formatted Logging
     template <typename... Args>
-    void Log(LogLevel level, std::string_view prefix, std::string_view format_str, std::string_view tag = "",
+    void Log(LogLevel level, StringView prefix, StringView format_str, StringView tag = "",
              const std::source_location &loc = std::source_location::current(), Args &&...args)
     {
         // Create a tuple to store the arguments by value or move
@@ -90,40 +92,47 @@ protected:
 
     // Helper function to unpack tuple into std::make_format_args
     template <typename... TupleArgs, std::size_t... I>
-    void Log_impl(LogLevel level, std::string_view prefix, std::string_view format_str, std::string_view tag,
+    void Log_impl(LogLevel level, StringView prefix, StringView format_str, StringView tag,
                   const std::source_location &loc, std::tuple<TupleArgs...> &args_tuple, std::index_sequence<I...>)
     {
         if (static_cast<u8>(level) < static_cast<u8>(m_min_level)) {
             return;
         }
 
-        std::string timestamp{GetTimestamp()};
-        static constexpr std::array<std::string_view, 5> level_strings{"[DEBUG] ", "[INFO] ", "[WARNING] ", "[ERROR] ",
+        String timestamp{GetTimestamp()};
+        static constexpr std::array<StringView, 6> level_strings{"[TRACE] ", "[DEBUG] ", "[INFO] ", "[WARNING] ", "[ERROR] ",
                                                                        "[FATAL] "};
         // Set and Ensure level is within bounds
-        u8 level_index{static_cast<u8>(level)};
-        ASSERT(level_index >= 0 && level_index < static_cast<u8>(level_strings.size()), "Log level is out of bounds.");
+        const u8 level_index{static_cast<u8>(level)};
+        ASSERT(level_index < static_cast<u8>(level_strings.size()), "Log level is out of bounds.");
 
-        std::string full_prefix{tag.empty() ? std::string(prefix) : std::format("{} [{}] ", prefix, tag)};
-        std::string message{std::vformat(format_str, std::make_format_args(std::get<I>(args_tuple)...))};
+        String full_prefix{tag.empty() ? String(prefix) : std::format("{} [{}] ", prefix, tag)};
+        String message{std::vformat(format_str, std::make_format_args(std::get<I>(args_tuple)...))};
 
         // Common Log format, optionally including source location
-        std::string Log_message{
-            (level == LogLevel::Info || level == LogLevel::Debug)
+        String Log_message{
+            level == LogLevel::Info || level == LogLevel::Debug
                 ? std::format("{} {}{}{}", timestamp, full_prefix, level_strings[level_index], message)
                 : std::format("{} {}{}{} ({}:{}:{})", timestamp, full_prefix, level_strings[level_index], message,
                               loc.file_name(), loc.line(), loc.column())};
 
         if (m_buffered) {
-            std::lock_guard<std::mutex> lock(m_buffer_mutex);
+            std::lock_guard lock(m_buffer_mutex);
             m_buffer.push_back({level, Log_message});
         }
         else {
+            //if (level == LogLevel::Trace) { // Trace does not need to set or reset console colour
+            //    for (const auto &sink : m_sinks) {
+             //       sink(Log_message);
+             //   }
+
+             //   return; // Return early, we got no further business here.
+            //}
+
             SetConsoleColor(level);
             for (const auto &sink : m_sinks) {
                 sink(Log_message);
             }
-
             ResetConsoleColor();
         }
 
@@ -134,6 +143,7 @@ protected:
 
     void SetConsoleColor(LogLevel level)
     {
+
 #ifdef _WIN32
         HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
         if (hConsole == INVALID_HANDLE_VALUE)
@@ -154,6 +164,10 @@ protected:
             case LogLevel::Fatal:
                 SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
                 break;
+            case LogLevel::Trace:
+            default:
+                SetConsoleTextAttribute(hConsole, FOREGROUND_WHITE);
+                break;
         }
 #else
         if (isatty(STDOUT_FILENO)) {
@@ -172,6 +186,10 @@ protected:
                     break;
                 case LogLevel::Fatal:
                     std::cout << "\033[91m";
+                    break;
+                case LogLevel::Trace:
+                default:
+                    std::cout << "\033[0m";
                     break;
             }
         }
@@ -193,8 +211,8 @@ protected:
     }
 
     std::ofstream m_file_stream;
-    std::string m_file_path;
-    SmallVector<std::pair<LogLevel, std::string>, 1> m_buffer;
+    String m_file_path;
+    SmallVector<std::pair<LogLevel, String>, 1> m_buffer;
     SmallVector<Sink, 2, GrowthPolicyAddOne> m_sinks;
     std::mutex m_buffer_mutex;
     LogLevel m_min_level;
@@ -202,10 +220,10 @@ protected:
     bool m_buffered;
 
 public:
-    void SetLogLevel(LogLevel level) { m_min_level = level; }
-    void SetBuffered(bool enabled)
+    void SetLogLevel(const LogLevel level) { m_min_level = level; }
+    void SetBuffered(const bool enabled)
     {
-        std::lock_guard<std::mutex> lock(m_buffer_mutex);
+        std::lock_guard lock(m_buffer_mutex);
         m_buffered = enabled;
         if (!enabled) {
             Flush();
@@ -214,7 +232,7 @@ public:
 
     void Flush()
     {
-        std::lock_guard<std::mutex> lock(m_buffer_mutex);
+        std::lock_guard lock(m_buffer_mutex);
         for (const auto &[level, msg] : m_buffer) {
             SetConsoleColor(level);
             for (const auto &sink : m_sinks) {
@@ -227,9 +245,9 @@ public:
         m_buffer.clear();
     }
 
-    void AddSink(Sink sink)
+    void AddSink(const Sink& sink)
     {
-        std::lock_guard<std::mutex> lock(m_buffer_mutex);
+        std::lock_guard lock(m_buffer_mutex);
         m_sinks.push_back(sink);
     }
 };
@@ -237,7 +255,7 @@ public:
 // TODO: FIX THIS TO WORK IN EVERY BUILD
 class EngineLogger : public Logger {
 public:
-    static EngineLogger &GetInstance(const std::string &Log_file_path = "")
+    static EngineLogger &GetInstance(const String &Log_file_path = "")
     {
         static std::once_flag init_flag;
         std::call_once(init_flag, [&]() {
@@ -255,30 +273,30 @@ public:
 
     // Variadic template for formatted Logging
     template <typename... Args>
-    void Log(LogLevel level, std::string_view format_str, std::string_view tag = "",
+    void Log(LogLevel level, StringView format_str, StringView tag = "",
              const std::source_location &loc = std::source_location::current(), Args &&...args)
     {
         Logger::Log(level, "[ENGINE]", format_str, tag, loc, std::forward<Args>(args)...);
     }
 
     // Plain string overload
-    void Log(LogLevel level, std::string_view message, std::string_view tag = "",
+    void Log(const LogLevel level, StringView message, StringView tag = "",
              const std::source_location &loc = std::source_location::current())
     {
         Logger::Log(level, "[ENGINE]", message, tag, loc);
     }
 
 private:
-    EngineLogger(const std::string &file_path) : Logger(file_path) {}
+    explicit EngineLogger(const String &file_path) : Logger(file_path) {}
     inline static EngineLogger *instance{nullptr};
 };
 
 class AppLogger : public Logger {
 public:
-    static AppLogger &GetInstance(const std::string &file_path = "")
+    static AppLogger &GetInstance(const String &file_path = "")
     {
         static std::once_flag init_flag;
-        std::call_once(init_flag, [&]() {
+        std::call_once(init_flag, [&] {
             instance = new AppLogger(file_path);
 #ifdef APP_LOG_LEVEL_DEBUG
             // instance->SetLogLevel(LogLevel::Debug);
@@ -293,21 +311,21 @@ public:
 
     // Variadic template for formatted Logging
     template <typename... Args>
-    void Log(LogLevel level, std::string_view format_str, std::string_view tag = "",
+    void Log(LogLevel level, StringView format_str, StringView tag = "",
              const std::source_location &loc = std::source_location::current(), Args &&...args)
     {
-        Logger::Log(level, "[GAME]", format_str, tag, loc, std::forward<Args>(args)...);
+        Logger::Log(level, "[APP]", format_str, tag, loc, std::forward<Args>(args)...);
     }
 
     // Plain string overload
-    void Log(LogLevel level, std::string_view message, std::string_view tag = "",
+    void Log(const LogLevel level, StringView message, StringView tag = "",
              const std::source_location &loc = std::source_location::current())
     {
-        Logger::Log(level, "[GAME]", message, tag, loc);
+        Logger::Log(level, "[APP]", message, tag, loc);
     }
 
 private:
-    AppLogger(const std::string &file_path) : Logger(file_path) {}
+    explicit AppLogger(const String &file_path) : Logger(file_path) {}
     inline static AppLogger *instance{nullptr};
 };
 
@@ -321,6 +339,19 @@ private:
     gouda::EngineLogger::GetInstance().Log(level, fmt, "", std::source_location::current(), ##__VA_ARGS__)
 #define ENGINE_LOG_TAG(level, tag, fmt, ...)                                                                           \
     gouda::EngineLogger::GetInstance().Log(level, fmt, tag, std::source_location::current(), ##__VA_ARGS__)
+
+#if defined(ENGINE_LOG_LEVEL_TRACE)
+#define ENGINE_LOG_TRACE(fmt, ...) ENGINE_LOG(gouda::LogLevel::Trace, fmt, ##__VA_ARGS__)
+#define ENGINE_LOG_TRACE_TAG(tag, fmt, ...) ENGINE_LOG_TAG(gouda::LogLevel::Trace, tag, fmt, ##__VA_ARGS__)
+#else
+#define ENGINE_LOG_TRACE(fmt, ...)                                                                                     \
+do {                                                                                                               \
+} while (0)
+#define ENGINE_LOG_TRACE_TAG(tag, fmt, ...)                                                                            \
+do {                                                                                                               \
+} while (0)
+#endif
+
 
 #if defined(ENGINE_LOG_LEVEL_DEBUG)
 #define ENGINE_LOG_DEBUG(fmt, ...) ENGINE_LOG(gouda::LogLevel::Debug, fmt, ##__VA_ARGS__)
@@ -391,6 +422,13 @@ private:
 #define ENGINE_LOG_TAG(level, tag, fmt, ...)                                                                           \
     do {                                                                                                               \
     } while (0)
+
+#define ENGINE_LOG_TRACE(fmt, ...)                                                                                     \
+do {                                                                                                               \
+} while (0)
+#define ENGINE_LOG_TRACE_TAG(tag, fmt, ...)                                                                            \
+do {                                                                                                               \
+} while (0)
 #define ENGINE_LOG_DEBUG(fmt, ...)                                                                                     \
     do {                                                                                                               \
     } while (0)
@@ -431,6 +469,17 @@ private:
 #define APP_LOG_TAG(level, tag, fmt, ...)                                                                              \
     gouda::AppLogger::GetInstance().Log(level, fmt, tag, std::source_location::current(), ##__VA_ARGS__)
 
+#if defined(APP_LOG_LEVEL_TRACE)
+#define APP_LOG_TRACE(fmt, ...) APP_LOG(gouda::LogLevel::Trace, fmt, ##__VA_ARGS__)
+#define APP_LOG_TRACE_TAG(tag, fmt, ...) APP_LOG_TAG(gouda::LogLevel::Trace, tag, fmt, ##__VA_ARGS__)
+#else
+#define APP_LOG_TRACE(fmt, ...)                                                                                        \
+do {                                                                                                               \
+} while (0)
+#define APP_LOG_TRACE_TAG(tag, fmt, ...)                                                                               \
+do {                                                                                                               \
+} while (0)
+#endif
 #if defined(APP_LOG_LEVEL_DEBUG)
 #define APP_LOG_DEBUG(fmt, ...) APP_LOG(gouda::LogLevel::Debug, fmt, ##__VA_ARGS__)
 #define APP_LOG_DEBUG_TAG(tag, fmt, ...) APP_LOG_TAG(gouda::LogLevel::Debug, tag, fmt, ##__VA_ARGS__)
@@ -499,6 +548,13 @@ private:
 #define APP_LOG_TAG(level, tag, fmt, ...)                                                                              \
     do {                                                                                                               \
     } while (0)
+
+#define APP_LOG_TRACE(fmt, ...)                                                                                        \
+do {                                                                                                               \
+} while (0)
+#define APP_LOG_TRACE_TAG(tag, fmt, ...)                                                                               \
+do {                                                                                                               \
+} while (0)
 #define APP_LOG_DEBUG(fmt, ...)                                                                                        \
     do {                                                                                                               \
     } while (0)
