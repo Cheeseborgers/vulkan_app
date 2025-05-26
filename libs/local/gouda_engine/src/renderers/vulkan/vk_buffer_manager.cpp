@@ -117,8 +117,8 @@ Buffer BufferManager::CreateVertexBuffer(const void *data, const VkDeviceSize si
 
 Buffer BufferManager::CreateDynamicVertexBuffer(const VkDeviceSize size) const
 {
-    return CreateBuffer(size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    constexpr VkBufferUsageFlags usage{VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT};
+    return CreateBuffer(size, usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 }
 
 Buffer BufferManager::CreateUniformBuffer(const size_t size) const
@@ -144,12 +144,9 @@ Buffer BufferManager::CreateIndexBuffer(const void *data, const VkDeviceSize siz
     return index_buffer;
 }
 
-Buffer BufferManager::CreateStorageBuffer(const VkDeviceSize size) const
-{
-    constexpr VkBufferUsageFlags usage{VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT};
-    constexpr VkMemoryPropertyFlags properties{VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
-    return CreateBuffer(size, usage, properties);
+Buffer BufferManager::CreateStorageBuffer(VkDeviceSize size, VkBufferUsageFlags additional_usage) const {
+    const VkBufferUsageFlags usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | additional_usage;
+    return CreateBuffer(size, usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 }
 
 void BufferManager::CreateImage(Texture &texture, const VkImageCreateInfo &image_info,

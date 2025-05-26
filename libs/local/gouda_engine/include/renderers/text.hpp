@@ -26,6 +26,7 @@
 
 namespace gouda {
 
+// TODO: Change atlas bounds to use UVRect<f32>
 struct Glyph {
     Glyph();
 

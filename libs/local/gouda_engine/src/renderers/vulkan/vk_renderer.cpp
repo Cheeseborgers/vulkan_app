@@ -61,7 +61,7 @@ Renderer::Renderer()
       m_clear_colour{},
       m_max_quad_instances{1000},
       m_max_text_instances{1000},
-      m_max_particle_instances{1000},
+      m_max_particle_instances{1024}, // Multiple of 256 for compute
       m_vsync_mode{VSyncMode::Disabled},
       m_vertex_count{0},
       m_index_count{0},
@@ -127,6 +127,32 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, const u32 ima
 
     BeginCommandBuffer(command_buffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
+    // Update Particles ---------------------------------------------
+    if (m_use_compute_particles && particle_instance_count > 0) {
+        // ENGINE_LOG_DEBUG("Compute dispatch: particle_count = {}, workgroup_count = [{}, {}, {}]",
+        //          particle_instance_count, (particle_instance_count + 255) / 256, 1, 1);
+        p_particle_compute_pipeline->Bind(command_buffer);
+        p_particle_compute_pipeline->BindDescriptors(command_buffer, image_index);
+        const u32 particle_count{math::min(particle_instance_count, m_max_particle_instances)};
+        const math::UVec3 workgroup_count{(particle_count + 255) / 256, 1, 1};
+        p_particle_compute_pipeline->Dispatch(command_buffer, workgroup_count);
+
+        // Barrier: Compute shader write to vertex attribute read
+        const VkBufferMemoryBarrier barrier{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_particle_storage_buffers[image_index].p_buffer,
+            .offset = 0,
+            .size = sizeof(ParticleData) * particle_count,
+        };
+        vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+                             0, 0, nullptr, 1, &barrier, 0, nullptr);
+    }
+
+    // Begin Render pass
     std::array<VkClearValue, 2> clear_values{};
     clear_values[0].color = m_clear_colour;
     clear_values[1].depthStencil = {1.0f, 0};
@@ -152,81 +178,6 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, const u32 ima
     vkCmdSetViewport(command_buffer, 0, 1, &viewport);
     vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-    // Compute pipeline
-    if (m_use_compute_particles && particle_instance_count > 0) {
-        ENGINE_LOG_DEBUG("Compute dispatch: particle_count = {}", particle_instance_count);
-        p_particle_compute_pipeline->Bind(command_buffer);
-        p_particle_compute_pipeline->BindDescriptors(command_buffer, image_index);
-        const u32 particle_count{math::min(particle_instance_count, static_cast<u32>(m_max_particle_instances))};
-        //const u32 workgroup_count{(particle_count + 255) / 256};
-
-        const math::UVec3 workgroup_count{((particle_count + 255) / 256), 0, 1};
-        p_particle_compute_pipeline->Dispatch(command_buffer, workgroup_count);
-
-        const VkBufferMemoryBarrier compute_to_copy_barrier{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .buffer = m_particle_storage_buffers[image_index].p_buffer,
-            .offset = 0,
-            .size = sizeof(ParticleData) * particle_count,
-        };
-        vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
-                             nullptr, 1, &compute_to_copy_barrier, 0, nullptr);
-
-        const VkBufferCopy copy_region{
-            .srcOffset = 0,
-            .dstOffset = 0,
-            .size = sizeof(ParticleData) * particle_count,
-        };
-        vkCmdCopyBuffer(command_buffer, m_particle_storage_buffers[image_index].p_buffer,
-                        m_particle_instance_buffers[image_index].p_buffer, 1, &copy_region);
-
-        const VkBufferMemoryBarrier copy_to_vertex_barrier{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .buffer = m_particle_instance_buffers[image_index].p_buffer,
-            .offset = 0,
-            .size = sizeof(ParticleData) * particle_count,
-        };
-        vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0,
-                             nullptr, 1, &copy_to_vertex_barrier, 0, nullptr);
-
-        /*
-    *auto *instance_particles = static_cast<ParticleData *>(m_mapped_particle_instance_data[image_index]);
-    if (particle_count > 0) {
-
-        ENGINE_LOG_DEBUG(
-            "After copy[{}]: Particle[0]: pos = [{}, {}, {}], size = [{}, {}], lifetime = {}, vel = [{}, {}, {}], "
-            "colour = [{}, {}, {}, {}]",
-            image_index, instance_particles[0].position[0], instance_particles[0].position[1],
-            instance_particles[0].position[2], instance_particles[0].size[0], instance_particles[0].size[1],
-            instance_particles[0].lifetime, instance_particles[0].velocity[0], instance_particles[0].velocity[1],
-            instance_particles[0].velocity[2], instance_particles[0].colour[0], instance_particles[0].colour[1],
-            instance_particles[0].colour[2], instance_particles[0].colour[3]);
-
-
-        }
-        if (particle_count > 2) {
-
-            ENGINE_LOG_DEBUG(
-                "After copy[{}]: Particle[2]: pos = [{}, {}, {}], size = [{}, {}], lifetime = {}, vel = [{}, {}, {}], "
-                "colour = [{}, {}, {}, {}]",
-                image_index, instance_particles[2].position[0], instance_particles[2].position[1],
-                instance_particles[2].position[2], instance_particles[2].size[0], instance_particles[2].size[1],
-                instance_particles[2].lifetime, instance_particles[2].velocity[0], instance_particles[2].velocity[1],
-                instance_particles[2].velocity[2], instance_particles[2].colour[0], instance_particles[2].colour[1],
-                instance_particles[2].colour[2], instance_particles[2].colour[3]);
-
-        }
-                */
-    }
-
     // Quad/Sprite rendering
     if (quad_instance_count > 0) {
         p_quad_pipeline->Bind(command_buffer, image_index);
@@ -249,9 +200,9 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, const u32 ima
 
     // Particle rendering
     if (p_particle_pipeline && particle_instance_count > 0) {
-        ENGINE_LOG_DEBUG("Particle draw: instance_count = {}", particle_instance_count);
+        // ENGINE_LOG_DEBUG("Particle draw: instance_count = {}", particle_instance_count);
         p_particle_pipeline->Bind(command_buffer, image_index);
-        const VkBuffer buffers[]{p_quad_vertex_buffer->p_buffer, m_particle_instance_buffers[image_index].p_buffer};
+        const VkBuffer buffers[]{p_quad_vertex_buffer->p_buffer, m_particle_storage_buffers[image_index].p_buffer};
         constexpr VkDeviceSize offsets[]{0, 0};
         vkCmdBindVertexBuffers(command_buffer, 0, 2, buffers, offsets);
         vkCmdBindIndexBuffer(command_buffer, p_quad_index_buffer->p_buffer, 0, VK_INDEX_TYPE_UINT32);
@@ -271,27 +222,12 @@ void Renderer::Render(const f32 delta_time, const UniformData &uniform_data,
                       const std::vector<InstanceData> &quad_instances, const std::vector<TextData> &text_instances,
                       const std::vector<ParticleData> &particle_instances)
 {
-
-    /*
-    // ENGINE_LOG_DEBUG("Render: particle_instances.size() = {}", particle_instances.size());
-    for (size_t i = 0; i < math:min(particle_instances.size(), size_t(3)); ++i) {
-
-        ENGINE_LOG_DEBUG("Particle[{}]: pos = [{}, {}, {}], size = [{}, {}], lifetime = {}, colour = [{}, {}, {}, {}]",
-                         i, particle_instances[i].position[0], particle_instances[i].position[1],
-                         particle_instances[i].position[2], particle_instances[i].size[0],
-                         particle_instances[i].size[1], particle_instances[i].lifetime, particle_instances[i].colour[0],
-                         particle_instances[i].colour[1], particle_instances[i].colour[2],
-                         particle_instances[i].colour[3]);
-
-    }
-                         */
-
     while (!p_swapchain->IsValid()) {
         std::this_thread::yield();
         ENGINE_LOG_INFO("Rendering paused, waiting for valid swapchain");
     }
 
-    UpdateTextureDescriptors(); // Returns early if m_textures_dirty = false.
+    UpdateTextureDescriptors();
 
     m_frame_fences[m_current_frame].WaitFor(constants::u64_max);
     m_frame_fences[m_current_frame].Reset();
@@ -301,7 +237,28 @@ void Renderer::Render(const f32 delta_time, const UniformData &uniform_data,
         return;
     }
 
-    m_particles_instances = particle_instances;
+    // Update compute uniform buffer
+    UpdateComputeUniformBuffer(image_index, delta_time);
+    UpdateParticleStorageBuffer(image_index, particle_instances);
+
+    // Update particle instances
+    if (m_use_compute_particles && !particle_instances.empty()) {
+        // ENGINE_LOG_DEBUG("Compute particles enabled");
+        const ParticleData *storage_particles =
+            static_cast<ParticleData *>(m_mapped_particle_storage_data[image_index]);
+        m_particles_instances.clear();
+        m_particles_instances.reserve(particle_instances.size());
+        for (size_t i = 0; i < particle_instances.size(); ++i) {
+            if (storage_particles[i].lifetime > 0.0f && storage_particles[i].size.x > 0.0f &&
+                storage_particles[i].size.y > 0.0f) {
+                m_particles_instances.push_back(storage_particles[i]);
+            }
+        }
+    }
+    else {
+        // CPU path: Use m_particles_instances directly
+        m_particles_instances = particle_instances; // Already updated in Scene::UpdateParticles
+    }
 
     // Update uniform buffer
     m_uniform_buffers[image_index].Update(p_device->GetDevice(), &uniform_data, sizeof(uniform_data));
@@ -320,30 +277,6 @@ void Renderer::Render(const f32 delta_time, const UniformData &uniform_data,
            "Text instance count exceeds maximum buffer size.");
     if (text_instance_size > 0) {
         memcpy(m_mapped_text_instance_data[image_index], text_instances.data(), text_instance_size);
-    }
-
-    // Update particle buffers
-    UpdateComputeUniformBuffer(image_index, delta_time);
-    UpdateParticleStorageBuffer(image_index, particle_instances);
-    if (!m_use_compute_particles && !particle_instances.empty()) {
-        const VkDeviceSize particle_instance_size{sizeof(ParticleData) * particle_instances.size()};
-        ASSERT(particle_instance_size <= sizeof(ParticleData) * m_max_particle_instances,
-               "Particle instance count exceeds maximum buffer size.");
-        memcpy(m_mapped_particle_instance_data[image_index], particle_instances.data(), particle_instance_size);
-    }
-    else if (m_use_compute_particles && !particle_instances.empty()) {
-        // Update m_particles_instances with compute results
-        const ParticleData *storage_particles{static_cast<ParticleData *>(m_mapped_particle_storage_data[image_index])};
-        std::vector<ParticleData> updated_particles;
-        updated_particles.reserve(particle_instances.size());
-        for (size_t i = 0; i < particle_instances.size(); ++i) {
-            if (storage_particles[i].lifetime > 0.0f && storage_particles[i].size.x > 0.0f &&
-                storage_particles[i].size.y > 0.0f) {
-                updated_particles.push_back(storage_particles[i]);
-            }
-        }
-        m_particles_instances = updated_particles;
-        ENGINE_LOG_DEBUG("After compute: m_particles_instances.size() = {}", m_particles_instances.size());
     }
 
     // Render ImGui
@@ -383,56 +316,36 @@ void Renderer::UpdateComputeUniformBuffer(const u32 image_index, const f32 delta
 void Renderer::UpdateParticleStorageBuffer(const u32 image_index,
                                            const std::vector<ParticleData> &particle_instances) const
 {
-    const VkDeviceSize max_particle_instance_size{sizeof(ParticleData) * m_max_particle_instances};
+    const VkDeviceSize particle_instance_size =
+        sizeof(ParticleData) * std::min(particle_instances.size(), static_cast<size_t>(m_max_particle_instances));
 
-    memset(m_mapped_particle_storage_data[image_index], 0, max_particle_instance_size);
-
-    if (particle_instances.empty()) {
-        ClearParticleBuffers(image_index);
-        return;
+    // Only update if there are particles
+    if (!particle_instances.empty()) {
+        memcpy(m_mapped_particle_storage_data[image_index], particle_instances.data(), particle_instance_size);
     }
 
-    const VkDeviceSize particle_instance_size{sizeof(ParticleData) *
-                                              math::min(particle_instances.size(), m_max_particle_instances)};
-    memcpy(m_mapped_particle_storage_data[image_index], particle_instances.data(), particle_instance_size);
-
-    /*
-    ParticleData *gpu_particles{static_cast<ParticleData *>(m_mapped_particle_storage_data[image_index])};
-    if (particle_instances.size() > 0) {
-        ENGINE_LOG_DEBUG("Storage buffer[{}] Particle[0]: pos = [{}, {}, {}], size = [{}, {}], lifetime = {}, vel = "
-                         "[{}, {}, {}], colour = [{}, {}, {}, {}]",
-                         image_index, gpu_particles[0].position[0], gpu_particles[0].position[1],
-                         gpu_particles[0].position[2], gpu_particles[0].size[0], gpu_particles[0].size[1],
-                         gpu_particles[0].lifetime, gpu_particles[0].velocity[0], gpu_particles[0].velocity[1],
-                         gpu_particles[0].velocity[2], gpu_particles[0].colour[0], gpu_particles[0].colour[1],
-                         gpu_particles[0].colour[2], gpu_particles[0].colour[3]);
-    }
-    if (particle_instances.size() > 2) {
-        ENGINE_LOG_DEBUG("Storage buffer[{}] Particle[2]: pos = [{}, {}, {}], size = [{}, {}], lifetime = {}, vel = "
-                         "[{}, {}, {}], colour = [{}, {}, {}, {}]",
-                         image_index, gpu_particles[2].position[0], gpu_particles[2].position[1],
-                         gpu_particles[2].position[2], gpu_particles[2].size[0], gpu_particles[2].size[1],
-                         gpu_particles[2].lifetime, gpu_particles[2].velocity[0], gpu_particles[2].velocity[1],
-                         gpu_particles[2].velocity[2], gpu_particles[2].colour[0], gpu_particles[2].colour[1],
-                         gpu_particles[2].colour[2], gpu_particles[2].colour[3]);
-    }
-                         */
+    // ENGINE_LOG_DEBUG("Updating particle storage buffer[{}]: {} particles, size = {} bytes",
+    //           image_index, particle_instances.size(), particle_instance_size);
 }
 
 void Renderer::ClearParticleBuffers(const u32 image_index) const
 {
     const VkDeviceSize max_particle_instance_size{sizeof(ParticleData) * m_max_particle_instances};
     memset(m_mapped_particle_storage_data[image_index], 0, max_particle_instance_size);
-    memset(m_mapped_particle_instance_data[image_index], 0, max_particle_instance_size);
 }
 
 void Renderer::ToggleComputeParticles()
 {
     m_use_compute_particles = !m_use_compute_particles;
     ENGINE_LOG_DEBUG("Compute particles {}", m_use_compute_particles ? "enabled" : "disabled");
+
+    // Sync storage buffers with current particle instances
+    for (size_t i = 0; i < p_swapchain->GetImageCount(); ++i) {
+        UpdateParticleStorageBuffer(i, m_particles_instances);
+    }
 }
 
-void Renderer::DrawText(StringView text, const Vec2 position, const f32 scale, u32 font_id,
+void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32> &colour, const f32 scale, u32 font_id,
                         std::vector<TextData> &text_instances)
 {
     if (!m_fonts.contains(font_id)) {
@@ -441,72 +354,54 @@ void Renderer::DrawText(StringView text, const Vec2 position, const f32 scale, u
     }
 
     const auto &glyphs = m_fonts[font_id];
-    f32 x{position.x};
-    const f32 y{position.y};
-
-    /*
-    ENGINE_LOG_DEBUG("Drawing text '{}' at position=({}, {}), scale={}, font_id={}", text, x, y, scale, font_id);
-    ENGINE_LOG_DEBUG("Available glyphs: {}", glyphs.size());
-    for (const auto &c : glyphs | std::views::keys) {
-        ENGINE_LOG_DEBUG("Glyph '{}'(unicode={})", c, static_cast<int>(c));
-    }
-    */
-
-    // const size_t instance_count = text_instances.size();
+    f32 x = position.x;
+    const f32 y = position.y;
+    const f32 atlas_size = 312.0f; // From JSON atlas.width, atlas.height
+    const f32 distance_range = 4.0f; // From JSON atlas.distanceRange
+    const f32 distance_range_middle = 0.0f; // From JSON atlas.distanceRangeMiddle
 
     for (char c : text) {
-        auto it = glyphs.find(c);
+        auto it = glyphs.find(static_cast<u32>(static_cast<unsigned char>(c)));
         if (it == glyphs.end()) {
             ENGINE_LOG_WARNING("Glyph '{}' (unicode={}) not found in font {}", c, static_cast<int>(c), font_id);
             continue;
         }
 
         const Glyph &glyph = it->second;
+        if (!glyph.plane_bounds.left && !glyph.plane_bounds.right &&
+            !glyph.plane_bounds.bottom && !glyph.plane_bounds.top) {
+            // Skip empty glyphs (e.g., space)
+            x += glyph.advance * scale;
+            continue;
+        }
 
-        // Log glyph data
-        /*
-        ENGINE_LOG_DEBUG("Glyph {} '{}': advance={}, plane_bounds=({}, {}, {}, {}), atlas_bounds=({}, {}, {}, {})", i,
-                         c, glyph.advance, glyph.plane_bounds.left, glyph.plane_bounds.bottom, glyph.plane_bounds.right,
-                         glyph.plane_bounds.top, glyph.atlas_bounds.left, glyph.atlas_bounds.bottom,
-                         glyph.atlas_bounds.right, glyph.atlas_bounds.top);
-                         */
+        const Rect<f32> &bounds = glyph.plane_bounds;
 
-        // Compute bound
-        const Rect bounds{std::min(glyph.plane_bounds.left, glyph.plane_bounds.right),
-                          std::max(glyph.plane_bounds.left, glyph.plane_bounds.right),
-                          std::min(glyph.plane_bounds.bottom, glyph.plane_bounds.top),
-                          std::max(glyph.plane_bounds.bottom, glyph.plane_bounds.top)};
+        const Vec3 glyph_position = {
+            x + bounds.left * scale,
+            y + bounds.bottom * scale,
+            position.z
+        };
 
-        const Vec3 glyph_position{x + bounds.left * scale, y + bounds.bottom * scale, -0.1f};
-        const f32 width{(bounds.right - bounds.left) * scale};
-        const f32 height{(bounds.top - bounds.bottom) * scale};
+        const f32 width = (bounds.right - bounds.left) * scale;
+        const f32 height = (bounds.top - bounds.bottom) * scale;
 
-        TextData instance;
+        TextData instance{};
         instance.position = glyph_position;
         instance.size = Vec2{width, height};
-        instance.colour = Vec4{1.0f, 0.0f, 0.0f, 1.0f}; // Red for visibility
-        instance.glyph_index = static_cast<u32>(c);
-        instance.sdf_params =
-            Vec4{glyph.atlas_bounds.left, glyph.atlas_bounds.bottom, glyph.atlas_bounds.right, glyph.atlas_bounds.top};
+        instance.colour = Vec4{colour.r, colour.g, colour.b, colour.a}; // Fixed colour.g to colour.b
+        instance.glyph_index = static_cast<u32>(static_cast<unsigned char>(c));
+        instance.sdf_params = Vec4{
+            distance_range / atlas_size, // pxRange for MSDF
+            distance_range_middle,       // Middle of distance range
+            glyph.atlas_bounds.left / atlas_size,  // atlas_min_x (normalized UV)
+            glyph.atlas_bounds.bottom / atlas_size // atlas_min_y (normalized UV)
+        };
         instance.texture_index = font_id;
-
-        // Log instance data
-        /*
-        ENGINE_LOG_DEBUG("Instance {} '{}': position=({}, {}, {}), size=({}, {}), glyph_index={}, sdf_params=({}, {}, "
-                         "{}, {}), texture_index={}",
-                         i, c, instance.position.x, instance.position.y, instance.position.z, instance.size.x,
-                         instance.size.y, instance.glyph_index, instance.sdf_params.x, instance.sdf_params.y,
-                         instance.sdf_params.z, instance.sdf_params.w, instance.texture_index);
-                         */
-
         text_instances.push_back(instance);
         x += glyph.advance * scale;
     }
-
-    // ENGINE_LOG_DEBUG("Added {} instances, total instances: {}", text_instances.size() - instance_count,
-    //      text_instances.size());
 }
-
 void Renderer::SetupPipelines(StringView quad_vertex_shader_path, StringView quad_fragment_shader_path,
                               StringView text_vertex_shader_path, StringView text_fragment_shader_path,
                               StringView particle_vertex_shader_path, StringView particle_fragment_shader_path,
@@ -532,7 +427,7 @@ void Renderer::SetupPipelines(StringView quad_vertex_shader_path, StringView qua
 
     p_particle_compute_shader = std::make_unique<Shader>(*p_device, particle_compute_shader_path);
     p_particle_compute_pipeline = std::make_unique<ComputePipeline>(
-        *this, p_device.get(),  p_particle_compute_shader.get(), m_particle_storage_buffers, m_compute_uniform_buffers,
+        *this, p_device.get(), p_particle_compute_shader.get(), m_particle_storage_buffers, m_compute_uniform_buffers,
         sizeof(ParticleData) * m_max_particle_instances, sizeof(SimulationParams));
 }
 
@@ -653,10 +548,7 @@ u32 Renderer::LoadMSDFFont(StringView image_filepath, StringView json_filepath)
     return font_id;
 }
 
-void Renderer::SetClearColour(const Colour<f32> &colour)
-{
-    m_clear_colour = {colour.r, colour.g, colour.b, colour.a};
-}
+void Renderer::SetClearColour(const Colour<f32> &colour) { m_clear_colour = {colour.r, colour.g, colour.b, colour.a}; }
 
 void Renderer::InitializeCore(GLFWwindow *window_ptr, StringView app_name, SemVer vulkan_api_version)
 {
@@ -848,13 +740,11 @@ void Renderer::CreateInstanceBuffers()
 
     m_quad_instance_buffers.resize(p_swapchain->GetImageCount());
     m_text_instance_buffers.resize(p_swapchain->GetImageCount());
-    m_particle_instance_buffers.resize(p_swapchain->GetImageCount());
     m_particle_storage_buffers.resize(p_swapchain->GetImageCount());
     m_compute_uniform_buffers.resize(p_swapchain->GetImageCount());
 
     m_mapped_quad_instance_data.resize(p_swapchain->GetImageCount());
     m_mapped_text_instance_data.resize(p_swapchain->GetImageCount());
-    m_mapped_particle_instance_data.resize(p_swapchain->GetImageCount());
     m_mapped_particle_storage_data.resize(p_swapchain->GetImageCount());
 
     for (size_t i = 0; i < p_swapchain->GetImageCount(); ++i) {
@@ -864,10 +754,9 @@ void Renderer::CreateInstanceBuffers()
         m_text_instance_buffers[i] = p_buffer_manager->CreateDynamicVertexBuffer(max_text_instance_size);
         m_mapped_text_instance_data[i] = m_text_instance_buffers[i].MapPersistent(p_device->GetDevice());
 
-        m_particle_instance_buffers[i] = p_buffer_manager->CreateDynamicVertexBuffer(max_particle_instance_size);
-        m_mapped_particle_instance_data[i] = m_particle_instance_buffers[i].MapPersistent(p_device->GetDevice());
-
-        m_particle_storage_buffers[i] = p_buffer_manager->CreateStorageBuffer(max_particle_instance_size);
+        // Create storage buffer with vertex buffer usage
+        m_particle_storage_buffers[i] =
+            p_buffer_manager->CreateStorageBuffer(max_particle_instance_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         m_mapped_particle_storage_data[i] = m_particle_storage_buffers[i].MapPersistent(p_device->GetDevice());
 
         m_compute_uniform_buffers[i] = p_buffer_manager->CreateUniformBuffer(sizeof(SimulationParams));
@@ -1070,12 +959,6 @@ void Renderer::DestroyBuffers()
         buffer.Destroy(p_device->GetDevice());
     }
     ENGINE_LOG_DEBUG("Text instance buffers destroyed.");
-
-    for (auto &buffer : m_particle_instance_buffers) {
-        buffer.Destroy(p_device->GetDevice());
-    }
-    ENGINE_LOG_DEBUG("Particle instance buffers destroyed.");
-
     for (auto &buffer : m_particle_storage_buffers) {
         buffer.Destroy(p_device->GetDevice());
     }

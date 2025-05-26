@@ -157,10 +157,17 @@ void Application::SetupAudio(const ApplicationSettings &settings)
     m_music2.Load("assets/audio/music_tracks/moonlight.wav");
     m_music.Load("assets/audio/music_tracks/track.mp3");
     m_music3.Load("assets/audio/music_tracks/blondie.mp3");
+    m_music4.Load("assets/audio/music_tracks/half.mp3");
+    m_music5.Load("assets/audio/music_tracks/the.mp3");
+    m_music6.Load("assets/audio/music_tracks/robin.mp3");
 
     m_audio_manager.QueueMusic(m_music3);
     m_audio_manager.QueueMusic(m_music2);
     m_audio_manager.QueueMusic(m_music);
+
+    m_audio_manager.QueueMusic(m_music4);
+    m_audio_manager.QueueMusic(m_music5);
+    m_audio_manager.QueueMusic(m_music6);
 }
 
 void Application::SetupCamera()
@@ -262,12 +269,13 @@ void Application::SetupInputSystem()
         {gouda::MouseButton::Left, gouda::ActionState::Pressed,
          [this] {
              // APP_LOG_DEBUG("Left Mouse Pressed");
-             p_current_scene->SpawnParticle({0, 0, -0.1f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1});
-             p_current_scene->SpawnParticle({0, 100, -0.1f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1});
-             p_current_scene->SpawnParticle({0, 200, -0.1f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1});
-             p_current_scene->SpawnParticle({0, 350, -0.1f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1});
-             p_current_scene->SpawnParticle({0, 500, -0.1f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1});
-         }},
+             p_current_scene->SpawnParticle({0, 0, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({0, 100, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({0, 200, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({0, 350, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({0, 500, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             m_audio_manager.PlaySoundEffect(m_laser_1);
+        }},
     };
 
     p_input_handler->LoadStateBindings("Game", game_bindings);

@@ -67,7 +67,7 @@ u32 get_struct_offset(StringView name, const VkFormat format, bool &success)
         if (name == "instance_velocity" && format == VK_FORMAT_R32G32B32_SFLOAT)
             return offsetof(ParticleData, velocity);
         if (name == "instance_is_atlas" && format == VK_FORMAT_R32_UINT)
-            return offsetof(InstanceData, is_atlas);
+            return offsetof(ParticleData, is_atlas);
     }
     else if constexpr (std::is_same_v<T, TextData>) {
         if (name == "instance_position" && format == VK_FORMAT_R32G32B32_SFLOAT)

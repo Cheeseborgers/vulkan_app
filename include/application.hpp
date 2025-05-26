@@ -76,6 +76,9 @@ private:
     gouda::audio::MusicTrack m_music;
     gouda::audio::MusicTrack m_music2;
     gouda::audio::MusicTrack m_music3;
+    gouda::audio::MusicTrack m_music4;
+    gouda::audio::MusicTrack m_music5;
+    gouda::audio::MusicTrack m_music6;
 
     u8 m_main_font_id;
 

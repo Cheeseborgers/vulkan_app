@@ -1,0 +1,11 @@
+Z Range's ----------------------------------------
+  Z = -1.0  ───────  UI Overlay / HUD            [On top]
+  Z = -0.8  ───────  Foreground Particles
+  Z = -0.6  ───────  Player / Enemies
+  Z = -0.5  ───────  Platforms
+  Z = -0.3  ───────  Background Particles
+  Z = -0.2  ───────  Background Props
+  Z = -0.05 ───────  Parallax Background Layers
+  Z =  0.0  ───────  Skybox / Deepest Background  [Furthest away]
+
+---------------------------------------------------

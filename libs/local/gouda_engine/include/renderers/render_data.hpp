@@ -31,8 +31,9 @@ struct UniformData {
 
 struct InstanceData {
     InstanceData();
-    InstanceData(const Vec3 &position_, const Vec2 &size_, f32 rotation_, u32 texture_index_, const Vec4 &colour_ = Vec4(1.0f),
-                 const UVRect<f32> &sprite_rect_ = UVRect{0.0f, 0.0f, 0.0f, 0.0f}, u32 is_atlas_ = 0);
+    InstanceData(const Vec3 &position_, const Vec2 &size_, f32 rotation_, u32 texture_index_,
+                 const Vec4 &colour_ = Vec4(1.0f), const UVRect<f32> &sprite_rect_ = UVRect{0.0f, 0.0f, 0.0f, 0.0f},
+                 u32 is_atlas_ = 0);
 
     Vec3 position; // 12 bytes, VK_FORMAT_R32G32B32_SFLOAT
     f32 _pad0;     // 4 bytes padding for alignment
@@ -49,7 +50,7 @@ struct InstanceData {
     // Total: 96 bytes
 };
 
-struct TextData {
+struct alignas(16) TextData {
     TextData();
 
     Vec3 position; // 12 bytes, VK_FORMAT_R32G32B32_SFLOAT
@@ -76,25 +77,39 @@ struct SimulationParams {
     // Total: 16 bytes
 };
 
-// TODO: Align the padding and shader etc
-struct ParticleData {
-    ParticleData();
-    ParticleData(const Vec3 &position_, const Vec2 &size_, const Vec4 &colour_, u32 texture_index_, f32 lifetime_,
-                 const Vec3 &velocity_, const UVRect<f32> &sprite_rect_ = UVRect{0.0f, 0.0f, 0.0f, 0.0f},
-                 u32 is_atlas_ = 0);
+struct alignas(16) ParticleData {
+    ParticleData(Vec3 position_, Vec2 size_, f32 lifetime_, Vec3 velocity_, Vec4 colour_, u32 texture_index_,
+                 UVRect<f32> sprite_rect_ = UVRect<f32>{0.0f, 0.0f, 0.0f, 0.0f}, u32 is_atlas_ = 0)
+        : position{position_},
+          size{size_},
+          lifetime{lifetime_},
+          velocity{velocity_},
+          colour{colour_},
+          texture_index{texture_index_},
+          sprite_rect{sprite_rect_},
+            is_atlas{is_atlas_}
+    {
+    }
 
-    Vec3 position; // 12 bytes, VK_FORMAT_R32G32B32_SFLOAT
-    f32 _pad0;     // 4 bytes padding
+    Vec3 position; // offset 0
+    f32 _pad0{};   // offset 12 → pad vec3 to vec4
 
-    Vec2 size;               // 8 bytes, VK_FORMAT_R32G32_SFLOAT
-    Vec4 colour;             // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
-    u32 texture_index;       // 4 bytes, VK_FORMAT_R32_UINT
-    UVRect<f32> sprite_rect; // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
-    f32 lifetime;            // 4 bytes, VK_FORMAT_R32_SFLOAT
-    Vec3 velocity;           // 12 bytes, VK_FORMAT_R32G32B32_SFLOAT
-    u32 is_atlas;            // 4 bytes, VK_FORMAT_R32_UINT
-    f32 _pad1;               // 4 bytes padding to align to 16-byte boundary
-    // Total: 84 bytes
+    Vec2 size;      // offset 16
+    f32 lifetime{}; // offset 24
+    f32 _pad1{};    // offset 28 → pad to 32
+
+    Vec3 velocity; // offset 32
+    f32 _pad2{};   // offset 44 → pad to 48
+
+    Vec4 colour; // offset 48
+
+    u32 texture_index{}; // offset 64
+    f32 _pad3[3]{};      // offset 68 → pad to 80
+
+    UVRect<f32> sprite_rect; // offset 80
+
+    u32 is_atlas{}; // offset 96
+    f32 _pad4[3]{}; // offset 100 → pad to 112
 };
 
 } // namespace gouda

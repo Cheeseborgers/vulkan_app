@@ -45,7 +45,7 @@ public:
     [[nodiscard]] Buffer CreateIndexBuffer(const void *data, VkDeviceSize size) const;
 
     // Create a storage buffer
-    [[nodiscard]] Buffer CreateStorageBuffer(VkDeviceSize size) const;
+    [[nodiscard]] Buffer CreateStorageBuffer(VkDeviceSize size, VkBufferUsageFlags additional_usage = 0) const;
 
     // Create and allocate memory for an image
     void CreateImage(Texture &texture, const VkImageCreateInfo &image_info, VkMemoryPropertyFlags memory_properties) const;
