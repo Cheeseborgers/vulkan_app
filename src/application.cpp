@@ -151,6 +151,7 @@ void Application::SetupAudio(const ApplicationSettings &settings)
 {
     m_audio_manager.Initialize(settings.audio_settings.sound_volume, settings.audio_settings.music_volume);
 
+    // TODO: Consider storing these filepaths as constant strings for easier change and locating
     m_laser_1.Load("assets/audio/sound_effects/laser1.wav");
     m_laser_2.Load("assets/audio/sound_effects/laser2.wav");
 
@@ -182,6 +183,7 @@ void Application::SetupCamera()
 
 void Application::LoadTextures() const
 {
+    // TODO: Consider storing these filepaths as constant strings for easier change and locating
     u32 checkerboard_id = m_renderer.LoadSingleTexture("assets/textures/checkerboard.png");
     u32 checkerboard_2_id = m_renderer.LoadSingleTexture("assets/textures/checkerboard2.png");
     u32 checkerboard_3_id = m_renderer.LoadSingleTexture("assets/textures/checkerboard3.png");
@@ -196,7 +198,8 @@ void Application::LoadTextures() const
 
 void Application::LoadFonts()
 {
-    m_main_font_id = m_renderer.LoadMSDFFont("assets/fonts/atlas.png", "assets/fonts/atlas.json");
+    // TODO: Consider storing these filepaths as constant strings for easier change and locating
+    m_main_font_id = m_renderer.LoadMSDFFont("assets/fonts/firacode_atlas.png", "assets/fonts/firacode_atlas.json");
 
     APP_LOG_DEBUG("font texture id: {}", m_main_font_id);
 }
@@ -283,7 +286,7 @@ void Application::SetupInputSystem()
              p_current_scene->SpawnParticle({static_cast<float>(this->m_framebuffer_size.width), 200, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
              p_current_scene->SpawnParticle({static_cast<float>(this->m_framebuffer_size.width), 350, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
              p_current_scene->SpawnParticle({static_cast<float>(this->m_framebuffer_size.width), 500, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
-             m_audio_manager.PlaySoundEffect(m_laser_1);
+             m_audio_manager.PlaySoundEffect(m_laser_2);
          }},
     };
 

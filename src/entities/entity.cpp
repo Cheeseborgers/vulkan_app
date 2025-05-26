@@ -1,5 +1,5 @@
 /**
- * @file entities/entity.cpp
+ * @file entity.cpp
  * @author GoudaCheeseburgers
  * @date 2025-04-06
  * @brief Application module implementation

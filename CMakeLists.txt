@@ -61,13 +61,15 @@ set(JSON_Install OFF CACHE INTERNAL "")
 
 set(CMAKE_BINARY_DIR "${CMAKE_SOURCE_DIR}/build")
 
-add_executable(${PROJECT_NAME})
+add_executable(${PROJECT_NAME}
+        include/components/health_component.hpp)
 
 target_sources(${PROJECT_NAME}
     PRIVATE
     src/application.cpp
     src/main.cpp
     src/components/animation_component.cpp
+        src/components/health_component.cpp
     src/core/settings_manager.cpp
     src/entities/entity.cpp
     src/entities/player.cpp

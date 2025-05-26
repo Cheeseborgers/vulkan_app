@@ -13,11 +13,10 @@
  */
 #include "entities/entity.hpp"
 
-struct Player : public Entity {
-public:
+struct Player : Entity {
     Player(const gouda::InstanceData &instance_data, gouda::Vec2 velocity_, f32 speed_);
     ~Player();
 
     gouda::Vec2 velocity; ///< Movement velocity
-    f32 speed;                  ///< Movement speed
+    f32 speed;            ///< Movement speed
 };

@@ -21,18 +21,18 @@ struct Animation {
     String name;
     gouda::Vector<UVRect<f32>> frames{};  // List of UV rects
     gouda::Vector<f32> frame_durations{}; // Seconds per frame
-    bool looping = true;
+    bool looping{true};
 
     constexpr Animation() = default;
-    Animation(StringView name_, gouda::Vector<UVRect<f32>> frames_,
-              const gouda::Vector<f32> &frame_durations_,
+    Animation(StringView name, gouda::Vector<UVRect<f32>> frames,
+              const gouda::Vector<f32> &frame_durations,
               bool looping);
 };
 
 struct AnimationComponent {
     String current_animation{};
-    f32 animation_time = 0.0f;
-    int current_frame = 0;
+    f32 animation_time{0.0f};
+    int current_frame{0};
     std::unordered_map<String, Animation> animations{};
 
     constexpr AnimationComponent() = default;

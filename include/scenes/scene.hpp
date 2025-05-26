@@ -51,6 +51,7 @@ public:
 private:
     void SetupEntities();
     void SetupPlayer();
+    void SetupUI();
     void BuildSpatialGrid();
     void UpdateVisibleInstances();
     void UpdateParticles(f32 delta_time);

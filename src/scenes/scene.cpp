@@ -282,6 +282,10 @@ void Scene::SetupPlayer()
     m_player.animation_component = AnimationComponent{};
     m_player.animation_component->current_animation = "idle";
 }
+void Scene::SetupUI()
+{
+
+}
 
 void Scene::BuildSpatialGrid()
 {
