@@ -226,6 +226,11 @@ struct Rect {
     {
         return std::string(std::format("left: {}, right: {}, bottom: {}, top: {}", left, right, bottom, top));
     }
+
+    [[nodiscard]] bool IsZero() const
+    {
+        return left == T() && right == T() && top == T() && bottom == T();
+    }
 };
 
 

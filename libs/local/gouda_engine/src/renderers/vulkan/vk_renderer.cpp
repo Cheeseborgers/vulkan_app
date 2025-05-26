@@ -368,24 +368,18 @@ void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32>
         if (it == glyphs.end()) {
             // Handle missing glyph (e.g., use space or skip)
             ENGINE_LOG_WARNING("MSDFGlyph '{}' (unicode={}) not found in font {}", c, unicode_char, font_id);
-
             continue;
         }
 
         const MSDFGlyph &glyph = it->second;
-        if (glyph.plane_bounds.left == 0.0f && glyph.plane_bounds.right == 0.0f && glyph.plane_bounds.bottom  == 0.0f &&
-            glyph.plane_bounds.top  == 0.0f) {
-            // Skip glyphs with empty plane bounds (e.g., space)
+
+        // Skip glyphs with empty plane bounds or current character is a space (32)
+        if (glyph.plane_bounds.IsZero() || unicode_char == 32) {
             current_position.x += glyph.advance * scale;
             continue;
-            }
+        }
 
-        // Compute bound
-        const Rect bounds{std::min(glyph.plane_bounds.left, glyph.plane_bounds.right),
-                          std::max(glyph.plane_bounds.left, glyph.plane_bounds.right),
-                          std::min(glyph.plane_bounds.bottom, glyph.plane_bounds.top),
-                          std::max(glyph.plane_bounds.bottom, glyph.plane_bounds.top)};
-
+        const Rect bounds = glyph.plane_bounds;
         const Vec3 glyph_position{current_position.x + bounds.left * scale, current_position.y + bounds.bottom * scale,
                                   -0.1f};
         const f32 width{(bounds.right - bounds.left) * scale};

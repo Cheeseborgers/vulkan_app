@@ -85,6 +85,7 @@ std::unordered_map<char, MSDFGlyph> load_msdf_glyphs(std::string_view json_path)
             ENGINE_LOG_WARNING("Invalid unicode key '{}': {}", key, e.what());
             continue;
         }
+
         glyphs[c] = glyph;
         ENGINE_LOG_DEBUG(
             "Loaded glyph '{}'(unicode={}): advance={}, plane_bounds=({}, {}, {}, {}), atlas_bounds=({}, {}, {}, {})",
