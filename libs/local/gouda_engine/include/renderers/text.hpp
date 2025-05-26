@@ -20,21 +20,63 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+#include "containers/small_vector.hpp"
+
 #include <unordered_map>
 
 #include "core/types.hpp"
+#include "math/math.hpp"
 
 namespace gouda {
 
 // TODO: Change atlas bounds to use UVRect<f32>
-struct Glyph {
-    Glyph();
+struct MSDFGlyph {
+    MSDFGlyph();
 
     f32 advance;
     Rect<f32> plane_bounds;
     Rect<f32> atlas_bounds;
 };
 
-std::unordered_map<char, Glyph> load_msdf_glyphs(StringView json_path);
+using GlyphMap = std::unordered_map<char, MSDFGlyph>;
+
+struct alignas(16) MSDFKerningPair {
+    MSDFKerningPair();
+
+    u32 unicode1;
+    u32 unicode2;
+    f32 advance;
+    f32 _padding1;
+};
+
+struct alignas(16) MSDFAtlasParams {
+    MSDFAtlasParams();
+
+    [[nodiscard]] std::string ToString() const;
+
+    f32 distance_range;
+    f32 distance_range_middle;
+    f32 font_size;
+    f32 _padding0; // pad to next 16-byte boundary
+
+    Vec2 atlas_size; // 8 bytes
+    f32 em_size;
+    f32 line_height;
+
+    f32 ascender;
+    f32 descender;
+    f32 underline_y;
+    f32 underline_thickness;
+
+    alignas(16) Vector<MSDFKerningPair> kerning;
+
+    alignas(4) bool y_origin_is_bottom;
+    u8 _padding1[3]; // pad bool to 4 bytes
+    u32 _padding2;   // pad to next 16-byte boundary
+};
+
+std::unordered_map<char, MSDFGlyph> load_msdf_glyphs(StringView json_path);
+
+MSDFAtlasParams load_msdf_atlas_params(StringView json_path);
 
 } // namespace gouda

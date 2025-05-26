@@ -233,7 +233,7 @@ void Scene::DrawUI(gouda::vk::Renderer &renderer)
 {
     m_text_instances.clear();
 
-    renderer.DrawText("GOUDA RENDERER", {100.0f, 100.0f, -0.9}, {0.0f, 1.0f, 0.0f, 1.0f}, 20.0f, m_font_id,
+    renderer.DrawText("GOUDA RENDERER", {100.0f, 100.0f, -0.6}, {0.0f, 1.0f, 0.0f, 1.0f}, 20.0f, m_font_id,
                       m_text_instances);
 }
 

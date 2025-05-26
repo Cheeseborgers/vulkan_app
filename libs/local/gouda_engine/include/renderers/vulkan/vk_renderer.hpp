@@ -60,72 +60,6 @@ public:
     void DrawText(StringView text, const Vec3 &position, const Colour<f32> &colour, f32 scale, u32 font_id,
                   std::vector<TextData> &text_instances);
 
-    void GenerateTextInstances(const std::string &text, u32 font_id, const Vec3 &start_position, f32 scale,
-                               const Colour<f32> &colour,// From JSON metrics.lineHeight
-                               std::vector<TextData> &text_instances)
-    {
-        Vec3 current_pos = start_position;
-        f32 em_size = 1.0f;               // From JSON metrics.emSize
-        f32 atlas_size = 312.0f;          // From JSON atlas.width and atlas.height
-        f32 line_height = 1.312f;
-        f32 distance_range = 4.0f;        // From JSON atlas.distanceRange
-        f32 distance_range_middle = 0.0f; // From JSON atlas.distanceRangeMiddle
-
-        const auto &glyphs = m_fonts[font_id];
-
-        for (char c : text) {
-            u32 unicode = static_cast<u32>(static_cast<unsigned char>(c));
-            auto it = glyphs.find(unicode);
-            if (it == glyphs.end()) {
-                // Handle missing glyph (e.g., use space or skip)
-                auto space_it = glyphs.find(32); // Unicode for space
-                if (space_it != glyphs.end()) {
-                    current_pos.x += space_it->second.advance * scale;
-                }
-                continue;
-            }
-
-            const Glyph &glyph = it->second;
-            if (!glyph.plane_bounds.left && !glyph.plane_bounds.right && !glyph.plane_bounds.bottom &&
-                !glyph.plane_bounds.top) {
-                // Skip glyphs with empty plane bounds (e.g., space)
-                current_pos.x += glyph.advance * scale;
-                continue;
-            }
-
-            TextData instance{};
-            instance.position = current_pos;
-
-            // Calculate size based on plane bounds and scale
-            f32 width = (glyph.plane_bounds.right - glyph.plane_bounds.left) * scale;
-            f32 height = (glyph.plane_bounds.top - glyph.plane_bounds.bottom) * scale;
-            instance.size = Vec2(width, height);
-
-            // Adjust position based on plane bounds (align to baseline)
-            instance.position.x += glyph.plane_bounds.left * scale;
-            instance.position.y += glyph.plane_bounds.bottom * scale;
-
-            // Set glyph index (could be used in shader if needed, set to unicode for simplicity)
-            instance.glyph_index = unicode;
-
-            // Set color
-            instance.colour = {colour.r, colour.g, colour.b, colour.a};
-
-            // Set SDF parameters (for MSDF rendering)
-            // sdf_params: (distanceRange / atlasSize, distanceRangeMiddle, 0, 0)
-            instance.sdf_params = Vec4(distance_range / atlas_size, distance_range_middle, 0.0f, 0.0f);
-
-            // Set texture index
-            instance.texture_index = font_id;
-
-            // Add to instances
-            text_instances.push_back(instance);
-
-            // Advance position
-            current_pos.x += glyph.advance * scale;
-        }
-    }
-
     void SetupPipelines(StringView quad_vertex_shader_path, StringView quad_fragment_shader_path,
                         StringView text_vertex_shader_path, StringView text_fragment_shader_path,
                         StringView particle_vertex_shader_path, StringView particle_fragment_shader_path,
@@ -235,7 +169,8 @@ private:
     std::vector<void *> m_mapped_text_instance_data;
 
     Vector<std::unique_ptr<Texture>> m_font_textures;
-    std::unordered_map<u32, std::unordered_map<char, Glyph>> m_fonts;
+    std::unordered_map<u32, MSDFAtlasParams> m_font_atlas_params;
+    std::unordered_map<u32, GlyphMap> m_fonts;
 
     FrameBufferSize m_framebuffer_size;
     u32 m_current_frame;

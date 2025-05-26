@@ -22,7 +22,7 @@ class Texture;
 
 enum class FontType : u8 { MSDF, BITMAP };
 
-using Glyphs = std::unordered_map<char, Glyph>;
+using Glyphs = std::unordered_map<char, MSDFGlyph>;
 
 class FontManager {
 public:
