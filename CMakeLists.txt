@@ -26,11 +26,13 @@ option(COPY_FONTS "Copy msdf fonts on build" ON)
 # Logging options
 option(ENABLE_ENGINE_LOGGING "Enable engine logging" ON)
 option(ENABLE_APP_LOGGING "Enable app logging" ON)
+option(ENGINE_LOG_LEVEL_TRACE "Enable engine trace logs" ON)
 option(ENGINE_LOG_LEVEL_DEBUG "Enable engine debug logs" ON)
 option(ENGINE_LOG_LEVEL_INFO "Enable engine info logs" ON)
 option(ENGINE_LOG_LEVEL_WARNING "Enable engine warning logs" ON)
 option(ENGINE_LOG_LEVEL_ERROR "Enable engine error logs" ON)
 option(ENGINE_LOG_LEVEL_FATAL "Enable engine fatal logs" ON)
+option(APP_LOG_LEVEL_TRACE "Enable app trace logs" ON)
 option(APP_LOG_LEVEL_DEBUG "Enable app debug logs" ON)
 option(APP_LOG_LEVEL_INFO "Enable app info logs" ON)
 option(APP_LOG_LEVEL_WARNING "Enable app warning logs" ON)
@@ -175,6 +177,11 @@ if(ENABLE_APP_LOGGING)
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_APP_LOGGING)
 endif()
 
+if(ENGINE_LOG_LEVEL_TRACE)
+    target_compile_definitions(gouda_engine PRIVATE ENGINE_LOG_LEVEL_TRACE)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_LOG_LEVEL_TRACE)
+endif()
+
 if(ENGINE_LOG_LEVEL_DEBUG)
     target_compile_definitions(gouda_engine PRIVATE ENGINE_LOG_LEVEL_DEBUG)
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_LOG_LEVEL_DEBUG)
@@ -198,6 +205,10 @@ endif()
 if(ENGINE_LOG_LEVEL_FATAL)
     target_compile_definitions(gouda_engine PRIVATE ENGINE_LOG_LEVEL_FATAL)
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_LOG_LEVEL_FATAL)
+endif()
+
+if(APP_LOG_LEVEL_TRACE)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE APP_LOG_LEVEL_TRACE)
 endif()
 
 if(APP_LOG_LEVEL_DEBUG)
@@ -241,7 +252,7 @@ if(COMPILE_SHADERS)
         get_filename_component(FILENAME ${SHADER} NAME)
         add_custom_command(
             OUTPUT ${SHADER_OUTPUT_DIR}/${FILENAME}.spv
-            COMMAND ${GLSLANG_VALIDATOR} -V ${SHADER} -o ${SHADER_OUTPUT_DIR}/${FILENAME}.spv
+            COMMAND ${GLSLANG_VALIDATOR} -V ${SHADER} -o ${SHADER_OUTPUT_DIR}/${FILENAME}.spv --target-env vulkan1.2
             DEPENDS ${SHADER}
             COMMENT " Compiling shader ${FILENAME} "
         )
