@@ -64,6 +64,9 @@ inline constexpr float epsilon = 1e-6f;
 inline constexpr float infinity = std::numeric_limits<float>::infinity();
 inline constexpr float pi = 3.14159265359f;
 
+inline  constexpr float z_max = 0.0f;
+inline  constexpr float z_min = -0.9f;
+
 } // namespace constants
 
 // Chrono types

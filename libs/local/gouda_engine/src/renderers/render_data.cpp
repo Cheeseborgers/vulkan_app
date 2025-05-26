@@ -33,8 +33,8 @@ InstanceData::InstanceData(const Vec3 &position_, const Vec2 &size_, const f32 r
       is_atlas{is_atlas_},
       _pad1{}
 {
-    // Ensure with ortho
-    position.z = math::clamp(position.z, -0.9f, 0.0f);
+    // Ensure within orthographic view
+    position.z = math::clamp(position.z, constants::z_min, constants::z_max);
 }
 
 TextData::TextData()
@@ -51,7 +51,7 @@ TextData::TextData()
 }
 
 SimulationParams::SimulationParams() : gravity{0.0f}, delta_time{0.0f} {}
-SimulationParams::SimulationParams(const Vec3 &gravity_, f32 delta_time_)  : gravity{gravity_}, delta_time{delta_time_}
+SimulationParams::SimulationParams(const Vec3 &gravity_, const f32 delta_time_)  : gravity{gravity_}, delta_time{delta_time_}
 {}
 
 

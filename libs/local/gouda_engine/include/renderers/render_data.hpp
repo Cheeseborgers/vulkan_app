@@ -31,9 +31,9 @@ struct UniformData {
 
 struct InstanceData {
     InstanceData();
-    InstanceData(const Vec3 &position_, const Vec2 &size_, f32 rotation_, u32 texture_index_,
-                 const Colour<f32> &colour_ = Colour(1.0f), const UVRect<f32> &sprite_rect_ = UVRect{0.0f, 0.0f, 0.0f, 0.0f},
-                 u32 is_atlas_ = 0);
+    InstanceData(const Vec3 &position, const Vec2 &size, f32 rotation, u32 texture_index,
+                 const Colour<f32> &colour = Colour(1.0f), const UVRect<f32> &sprite_rect = UVRect{0.0f, 0.0f, 0.0f, 0.0f},
+                 u32 is_atlas = 0);
 
     Vec3 position; // 12 bytes, VK_FORMAT_R32G32B32_SFLOAT
     f32 _pad0;     // 4 bytes padding for alignment
