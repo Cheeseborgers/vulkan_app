@@ -14,7 +14,7 @@
 
 #include "core/types.hpp"
 #include "containers/small_vector.hpp"
-#include "math/vector.hpp"
+#include "math/math.hpp"
 
 namespace gouda::vk {
 
@@ -32,7 +32,7 @@ public:
 
     void Bind(VkCommandBuffer command_buffer) const;
     void BindDescriptors(VkCommandBuffer command_buffer, u32 image_index) const;
-    void Dispatch(VkCommandBuffer command_buffer, const math::UVec3 &group_counts) const;
+    void Dispatch(VkCommandBuffer command_buffer, const UVec3 &group_counts) const;
     void Destroy();
 
     [[nodiscard]] VkPipeline GetPipeline() const { return p_pipeline; }

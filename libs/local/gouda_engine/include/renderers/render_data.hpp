@@ -32,7 +32,7 @@ struct UniformData {
 struct InstanceData {
     InstanceData();
     InstanceData(const Vec3 &position_, const Vec2 &size_, f32 rotation_, u32 texture_index_,
-                 const Vec4 &colour_ = Vec4(1.0f), const UVRect<f32> &sprite_rect_ = UVRect{0.0f, 0.0f, 0.0f, 0.0f},
+                 const Colour<f32> &colour_ = Colour(1.0f), const UVRect<f32> &sprite_rect_ = UVRect{0.0f, 0.0f, 0.0f, 0.0f},
                  u32 is_atlas_ = 0);
 
     Vec3 position; // 12 bytes, VK_FORMAT_R32G32B32_SFLOAT
@@ -42,7 +42,7 @@ struct InstanceData {
     f32 rotation;      // 4 bytes, VK_FORMAT_R32_SFLOAT
     u32 texture_index; // 4 bytes, VK_FORMAT_R32_UINT
 
-    Vec4 colour;             // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
+    Colour<f32> colour;      // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
     UVRect<f32> sprite_rect; // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
 
     u32 is_atlas; // 4 bytes, VK_FORMAT_R32_UINT
@@ -60,12 +60,11 @@ struct alignas(16) TextData {
     f32 _pad1;       // 4 bytes padding
     u32 glyph_index; // 4 bytes, VK_FORMAT_R32_UINT
 
-    Vec4 colour;     // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
-    Vec4 sdf_params; // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
+    Colour<f32> colour;     // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
+    UVRect<f32> sdf_params; // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
 
     u32 texture_index; // 4 bytes, VK_FORMAT_R32_UINT
     u32 _pad2[3];      // 12 bytes padding to align to 16-byte boundary
-    // Total: 96 bytes
 };
 
 struct SimulationParams {
@@ -87,7 +86,7 @@ struct alignas(16) ParticleData {
           colour{colour_},
           texture_index{texture_index_},
           sprite_rect{sprite_rect_},
-            is_atlas{is_atlas_}
+          is_atlas{is_atlas_}
     {
     }
 

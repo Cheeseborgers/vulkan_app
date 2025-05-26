@@ -14,7 +14,7 @@ InstanceData::InstanceData()
       size{1.0f, 1.0f},
       rotation{0.0f},
       texture_index{0},
-      colour{1.0f},
+      colour{1.0f, 0.0f, 0.0f, 1.0f}, // Default to red
       sprite_rect{0.0f, 0.0f, 0.0f, 0.0f},
       is_atlas{0},
       _pad1{}
@@ -22,7 +22,7 @@ InstanceData::InstanceData()
 }
 
 InstanceData::InstanceData(const Vec3 &position_, const Vec2 &size_, const f32 rotation_, const u32 texture_index_,
-                           const Vec4 &colour_, const UVRect<f32> &sprite_rect_, const u32 is_atlas_)
+                           const Colour<f32> &colour_, const UVRect<f32> &sprite_rect_, const u32 is_atlas_)
     : position{position_},
       _pad0{0.0f},
       size{size_},
@@ -33,6 +33,7 @@ InstanceData::InstanceData(const Vec3 &position_, const Vec2 &size_, const f32 r
       is_atlas{is_atlas_},
       _pad1{}
 {
+    // Ensure with ortho
     position.z = math::clamp(position.z, -0.9f, 0.0f);
 }
 
@@ -42,8 +43,8 @@ TextData::TextData()
       size{1.0f, 1.0f},
       _pad1{0.0f},
       glyph_index{0},
-      colour{0.0f},
-      sdf_params{0.0f},
+      colour{1.0f, 0.0f, 0.0f, 1.0f}, // Default to red
+      sdf_params{0.0f, 0.0f, 0.0f, 0.0f},
       texture_index{0},
       _pad2{}
 {

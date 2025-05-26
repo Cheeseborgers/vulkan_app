@@ -176,7 +176,7 @@ void Application::SetupCamera()
     p_ortho_camera = std::make_unique<gouda::OrthographicCamera>(
         0.0f, static_cast<f32>(framebuffer_size.width),  // left = 0, right = width
         static_cast<f32>(framebuffer_size.height), 0.0f, // bottom = height, top = 0
-        -1.0f, 1.0f, 1.0f, 100.0f, 1.0f  //near, far, zoom, speed, sensitivity
+        -1.0f, 1.0f, 1.0f, 100.0f, 1.0f                  // near, far, zoom, speed, sensitivity
     );
 }
 
@@ -268,14 +268,23 @@ void Application::SetupInputSystem()
         {gouda::Key::C, gouda::ActionState::Pressed, [this] { m_renderer.ToggleComputeParticles(); }},
         {gouda::MouseButton::Left, gouda::ActionState::Pressed,
          [this] {
-             // APP_LOG_DEBUG("Left Mouse Pressed");
              p_current_scene->SpawnParticle({0, 0, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
              p_current_scene->SpawnParticle({0, 100, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
              p_current_scene->SpawnParticle({0, 200, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
              p_current_scene->SpawnParticle({0, 350, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
              p_current_scene->SpawnParticle({0, 500, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
              m_audio_manager.PlaySoundEffect(m_laser_1);
-        }},
+         }},
+
+        {gouda::MouseButton::Right, gouda::ActionState::Pressed,
+         [this] {
+             p_current_scene->SpawnParticle({static_cast<float>(this->m_framebuffer_size.width), 0, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({static_cast<float>(this->m_framebuffer_size.width), 100, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({static_cast<float>(this->m_framebuffer_size.width), 200, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({static_cast<float>(this->m_framebuffer_size.width), 350, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({static_cast<float>(this->m_framebuffer_size.width), 500, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             m_audio_manager.PlaySoundEffect(m_laser_1);
+         }},
     };
 
     p_input_handler->LoadStateBindings("Game", game_bindings);

@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 
 #include "debug/logger.hpp"
+#include "debug/throw.hpp"
 
 namespace gouda {
 
@@ -61,7 +62,7 @@ std::unordered_map<char, MSDFGlyph> load_msdf_glyphs(std::string_view json_path)
         throw std::runtime_error("JSON file missing 'glyphs' or 'atlas' field");
     }
 
-    GlyphMap glyphs;
+    MSDFGlyphMap glyph_map;
     for (auto &[key, val] : data["glyphs"].items()) {
         MSDFGlyph glyph;
         if (!val.contains("advance") || !val.contains("planeBounds") || !val.contains("atlasBounds")) {
@@ -73,9 +74,9 @@ std::unordered_map<char, MSDFGlyph> load_msdf_glyphs(std::string_view json_path)
         auto pb = val["planeBounds"];
         auto ab = val["atlasBounds"];
         glyph.plane_bounds =
-            Rect{pb["left"].get<f32>(), pb["right"].get<f32>(), pb["bottom"].get<f32>(), pb["top"].get<f32>()};
+            Rect<f32>{pb["left"].get<f32>(), pb["right"].get<f32>(), pb["bottom"].get<f32>(), pb["top"].get<f32>()};
         glyph.atlas_bounds =
-            Rect{ab["left"].get<f32>(), ab["right"].get<f32>(), ab["bottom"].get<f32>(), ab["top"].get<f32>()};
+            Rect<f32>{ab["left"].get<f32>(), ab["right"].get<f32>(), ab["bottom"].get<f32>(), ab["top"].get<f32>()};
 
         char c{0};
         try {
@@ -86,16 +87,19 @@ std::unordered_map<char, MSDFGlyph> load_msdf_glyphs(std::string_view json_path)
             continue;
         }
 
-        glyphs[c] = glyph;
+        glyph_map[c] = glyph; // Add the glyph for the map
+
+        /*
         ENGINE_LOG_DEBUG(
             "Loaded glyph '{}'(unicode={}): advance={}, plane_bounds=({}, {}, {}, {}), atlas_bounds=({}, {}, {}, {})",
             c, static_cast<int>(c), glyph.advance, glyph.plane_bounds.left, glyph.plane_bounds.bottom,
             glyph.plane_bounds.right, glyph.plane_bounds.top, glyph.atlas_bounds.left, glyph.atlas_bounds.bottom,
             glyph.atlas_bounds.right, glyph.atlas_bounds.top);
+            */
     }
 
-    ENGINE_LOG_DEBUG("Loaded {} characters from {}", glyphs.size(), json_path);
-    return glyphs;
+    ENGINE_LOG_DEBUG("Loaded {} characters from {}", glyph_map.size(), json_path);
+    return glyph_map;
 }
 
 MSDFAtlasParams load_msdf_atlas_params(StringView json_path)

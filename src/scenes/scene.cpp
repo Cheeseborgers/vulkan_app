@@ -126,7 +126,7 @@ void Scene::Update(const f32 delta_time)
     }
 
     // Calculate new position
-    gouda::math::Vec3 new_position{};
+    gouda::Vec3 new_position{};
     new_position.x = m_player.render_data.position.x + m_player.velocity.x * delta_time;
     new_position.y = m_player.render_data.position.y + m_player.velocity.y * delta_time,
     new_position.z = m_player.render_data.position.z;
@@ -152,7 +152,7 @@ void Scene::Update(const f32 delta_time)
     // Collision detection and resolution
     for (const size_t entity_idx : nearby_entities) {
         auto &entity = m_entities[entity_idx];
-        if (const gouda::math::Vec2 & entity_size{entity.render_data.size};
+        if (const gouda::Vec2 & entity_size{entity.render_data.size};
             check_collision(new_position, m_player.render_data.size, entity.render_data.position, entity_size)) {
 
             const Rect<f32> entity_bounds{entity.render_data.position.x, entity.render_data.position.x + entity_size.x,
@@ -234,7 +234,7 @@ void Scene::DrawUI(gouda::vk::Renderer &renderer)
     m_text_instances.clear();
 
     renderer.DrawText("GOUDA RENDERER", {100.0f, 100.0f, -0.6}, {0.0f, 1.0f, 0.0f, 1.0f}, 20.0f, m_font_id,
-                      m_text_instances);
+                      m_text_instances, gouda::TextAlign::Center);
 }
 
 void Scene::LoadFromJSON(std::string_view filepath)
@@ -319,7 +319,7 @@ void Scene::UpdateVisibleInstances()
 void Scene::UpdateParticles(const f32 delta_time)
 {
     for (auto it = m_particles_instances.begin(); it != m_particles_instances.end();) {
-        it->velocity += gouda::math::Vec3{0.0f, constants::gravity, 0.0f} * delta_time;
+        it->velocity += gouda::Vec3{0.0f, constants::gravity, 0.0f} * delta_time;
         it->position += it->velocity * delta_time;
         it->lifetime -= delta_time;
         if (it->lifetime <= 0.0f) {

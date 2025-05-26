@@ -120,7 +120,7 @@ void Renderer::Initialize(GLFWwindow *window_ptr, StringView app_name, const Sem
 }
 
 void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, const u32 image_index, const u32 quad_instance_count,
-                                   const u32 text_instance_count, u32 particle_instance_count,
+                                   const u32 text_instance_count, const u32 particle_instance_count,
                                    ImDrawData *draw_data) const
 {
     ENGINE_PROFILE_SCOPE("Record command buffer");
@@ -134,7 +134,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, const u32 ima
         p_particle_compute_pipeline->Bind(command_buffer);
         p_particle_compute_pipeline->BindDescriptors(command_buffer, image_index);
         const u32 particle_count{math::min(particle_instance_count, m_max_particle_instances)};
-        const math::UVec3 workgroup_count{(particle_count + 255) / 256, 1, 1};
+        const UVec3 workgroup_count{(particle_count + 255) / 256, 1, 1};
         p_particle_compute_pipeline->Dispatch(command_buffer, workgroup_count);
 
         // Barrier: Compute shader write to vertex attribute read
@@ -345,8 +345,8 @@ void Renderer::ToggleComputeParticles()
     }
 }
 
-void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32> &colour, const f32 scale, u32 font_id,
-                        std::vector<TextData> &text_instances)
+void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32> &colour, const f32 scale,
+                        const u32 font_id, std::vector<TextData> &text_instances, const TextAlign alignment)
 {
     if (m_font_textures.empty()) {
         ENGINE_LOG_ERROR("No Fonts loaded when trying to render: {}, with font_id: {}.", text, font_id);
@@ -360,8 +360,35 @@ void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32>
 
     const auto &glyphs = m_fonts[font_id];
     const auto &atlas_params = m_font_atlas_params[font_id];
+    f32 overall_width{0.0f};
 
+    // First pass: Calculate overall width
+    for (char c : text) {
+        u32 unicode_char = static_cast<unsigned char>(c);
+        auto it = glyphs.find(unicode_char);
+        if (it == glyphs.end()) {
+            ENGINE_LOG_WARNING("MSDFGlyph '{}' (unicode={}) not found in font {}", c, unicode_char, font_id);
+            // Fallback to space glyph's advance
+            if (auto space_it = glyphs.find(32); space_it != glyphs.end()) {
+                overall_width += space_it->second.advance * scale;
+            }
+            continue;
+        }
+
+        const MSDFGlyph &glyph = it->second;
+        overall_width += glyph.advance * scale;
+    }
+
+    // Adjust starting position based on alignment
     Vec3 current_position = position;
+    if (alignment == TextAlign::Center) {
+        current_position.x -= overall_width * 0.5f;
+    } else if (alignment == TextAlign::Right) {
+        current_position.x -= overall_width;
+    }
+    // Left alignment: no adjustment needed
+
+    // Second pass: Generate TextData instances
     for (char c : text) {
         auto unicode_char = static_cast<unsigned char>(c);
         auto it = glyphs.find(c);
@@ -379,19 +406,19 @@ void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32>
             continue;
         }
 
-        const Rect bounds = glyph.plane_bounds;
-        const Vec3 glyph_position{current_position.x + bounds.left * scale, current_position.y + bounds.bottom * scale,
-                                  -0.1f};
-        const f32 width{(bounds.right - bounds.left) * scale};
-        const f32 height{(bounds.top - bounds.bottom) * scale};
+        const Rect plane_bounds = glyph.plane_bounds;
+        const Rect atlas_bounds = glyph.atlas_bounds;
+        const Vec3 glyph_position{current_position.x + plane_bounds.left * scale,
+                                  current_position.y + plane_bounds.bottom * scale, position.z};
+        const Vec2 size{(plane_bounds.right - plane_bounds.left) * scale,
+                        (plane_bounds.top - plane_bounds.bottom) * scale};
 
         TextData instance{};
         instance.position = glyph_position;
-        instance.size = {width, height};
-        instance.colour = {colour.r, colour.g, colour.b, colour.a};
+        instance.size = size;
+        instance.colour = colour;
         instance.glyph_index = static_cast<u32>(unicode_char);
-        instance.sdf_params =
-            Vec4{glyph.atlas_bounds.left, glyph.atlas_bounds.bottom, glyph.atlas_bounds.right, glyph.atlas_bounds.top};
+        instance.sdf_params = UVRect{atlas_bounds.left, atlas_bounds.bottom, atlas_bounds.right, atlas_bounds.top};
         instance.texture_index = font_id;
 
         text_instances.push_back(instance);
@@ -541,7 +568,9 @@ u32 Renderer::LoadMSDFFont(StringView image_filepath, StringView json_filepath)
     m_font_textures.push_back(p_buffer_manager->CreateTexture(image_filepath));
     m_fonts[font_id] = load_msdf_glyphs(json_filepath);
     m_font_atlas_params[font_id] = load_msdf_atlas_params(json_filepath);
-    ENGINE_LOG_TRACE("{}",m_font_atlas_params[font_id] .ToString());
+
+    //ENGINE_LOG_DEBUG("Atlas params: {}", m_font_atlas_params[font_id].ToString());
+
     m_font_textures_dirty = true;
 
     return font_id;

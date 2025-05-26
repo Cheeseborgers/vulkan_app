@@ -167,7 +167,7 @@ u32 ComputePipeline::CalculateWorkGroupCount(const u32 particle_count) const
     return (particle_count + local_size_x - 1) / local_size_x; // Ceiling division
 }
 
-void ComputePipeline::Dispatch(VkCommandBuffer command_buffer, const math::UVec3 &group_counts) const
+void ComputePipeline::Dispatch(VkCommandBuffer command_buffer, const UVec3 &group_counts) const
 {
     vkCmdDispatch(command_buffer, group_counts.x, group_counts.y, group_counts.z); // Simplify for 1D dispatch
 }

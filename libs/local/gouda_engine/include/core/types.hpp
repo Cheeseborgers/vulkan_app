@@ -158,6 +158,8 @@ struct SpriteRect {
     float width;
     float height;
 
+    constexpr SpriteRect() : x(0), y(0), width(0), height(0) {}
+
     explicit constexpr SpriteRect(const float x_ = 0, const float y_ = 0, const float width_ = 0, const float height_ = 0)
         : x{x_}, y{y_}, width{width_}, height{height_}
     {
@@ -185,7 +187,9 @@ struct UVRect {
     T u_max;
     T v_max;
 
-    explicit constexpr UVRect(T u_min_ = T(), T v_min_ = T(), T u_max_ = T(), T v_max_ = T())
+    constexpr UVRect() : u_min{0}, v_min{0}, u_max{0}, v_max{0} {}
+
+    explicit constexpr UVRect(T u_min_, T v_min_, T u_max_, T v_max_)
         : u_min{u_min_}, v_min{v_min_}, u_max{u_max_}, v_max{v_max_}
     {
     }
@@ -209,6 +213,8 @@ struct Rect {
     T right;
     T bottom;
     T top;
+
+    constexpr Rect() : left{0}, right{0}, bottom{0}, top{0} {}
 
     explicit constexpr Rect(T left_ = T(), T right_ = T(), T bottom_ = T(), T top_ = T())
         : left{left_}, right{right_}, bottom{bottom_}, top{top_}

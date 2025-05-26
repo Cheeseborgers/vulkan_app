@@ -58,7 +58,7 @@ public:
     bool UseComputeParticles() const { return m_use_compute_particles; }
 
     void DrawText(StringView text, const Vec3 &position, const Colour<f32> &colour, f32 scale, u32 font_id,
-                  std::vector<TextData> &text_instances);
+                  std::vector<TextData> &text_instances, TextAlign alignment = TextAlign::Left);
 
     void SetupPipelines(StringView quad_vertex_shader_path, StringView quad_fragment_shader_path,
                         StringView text_vertex_shader_path, StringView text_fragment_shader_path,
@@ -170,7 +170,7 @@ private:
 
     Vector<std::unique_ptr<Texture>> m_font_textures;
     std::unordered_map<u32, MSDFAtlasParams> m_font_atlas_params;
-    std::unordered_map<u32, GlyphMap> m_fonts;
+    std::unordered_map<u32, MSDFGlyphMap> m_fonts;
 
     FrameBufferSize m_framebuffer_size;
     u32 m_current_frame;

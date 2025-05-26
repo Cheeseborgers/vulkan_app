@@ -29,7 +29,8 @@
 
 namespace gouda {
 
-// TODO: Change atlas bounds to use UVRect<f32>
+enum class TextAlign : u8 { Left, Center, Right };
+
 struct MSDFGlyph {
     MSDFGlyph();
 
@@ -38,7 +39,7 @@ struct MSDFGlyph {
     Rect<f32> atlas_bounds;
 };
 
-using GlyphMap = std::unordered_map<char, MSDFGlyph>;
+using MSDFGlyphMap = std::unordered_map<char, MSDFGlyph>;
 
 struct alignas(16) MSDFKerningPair {
     MSDFKerningPair();
