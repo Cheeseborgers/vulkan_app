@@ -359,13 +359,4 @@ Vector<T, N> operator*(T scalar, const Vector<T, N> &vec)
     return vec * scalar;
 }
 
-// Type aliases
-using Vec2 = Vector<float, 2>;
-using Vec3 = Vector<float, 3>;
-using Vec4 = Vector<float, 4>;
-
-using UVec2 = Vector<u_int32_t, 2>;
-using UVec3 = Vector<u_int32_t, 3>;
-using UVec4 = Vector<u_int32_t, 4>;
-
 }

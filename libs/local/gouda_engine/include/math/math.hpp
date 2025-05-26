@@ -34,6 +34,11 @@ namespace gouda {
 using Vec2 = math::Vector<float, 2>;
 using Vec3 = math::Vector<float, 3>;
 using Vec4 = math::Vector<float, 4>;
+
+using UVec2 = math::Vector<u_int32_t, 2>;
+using UVec3 = math::Vector<u_int32_t, 3>;
+using UVec4 = math::Vector<u_int32_t, 4>;
+
 using Mat4 = math::Matrix4x4<float>;
 
 namespace math {
