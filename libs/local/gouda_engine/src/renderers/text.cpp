@@ -127,6 +127,8 @@ MSDFAtlasParams load_msdf_atlas_params(StringView json_path)
     atlas_params.atlas_size = {atlas["width"].get<f32>(), atlas["height"].get<f32>()};
     atlas_params.y_origin_is_bottom = atlas["yOrigin"].get<String>() == "bottom";
 
+    ENGINE_LOG_DEBUG("px_range: {}, atlas_size: {}", atlas_params.distance_range, atlas_params.atlas_size.ToString());
+
     // Metrics data
     atlas_params.em_size = metrics["emSize"].get<f32>();
     atlas_params.line_height = metrics["lineHeight"].get<f32>();

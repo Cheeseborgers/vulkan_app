@@ -1,5 +1,5 @@
 /**
- * @file cameras/orthographic_camera.cpp
+ * @file orthographic_camera.cpp
  * @author GoudaCheeseburgers
  * @date 2025-03-12
  * @brief A 2D orthographic camera that supports zoom and effects.
@@ -28,27 +28,27 @@ OrthographicCamera::OrthographicCamera(f32 left, f32 right, f32 bottom, f32 top,
     UpdateMatrix();
 }
 
-void OrthographicCamera::Update(f32 delta_time)
+void OrthographicCamera::Update(const f32 delta_time)
 {
     // Apply smooth follow if active
     ApplyFollow(delta_time);
 
     // Handle movement flags
-    if (m_movement_flags != CameraMovement::NONE) {
-        Vec2 movement;
+    if (m_movement_flags != CameraMovement::None) {
+        Vec2 movement{0.0f};
         f32 zoom_delta{0.0f};
 
-        if (m_movement_flags & CameraMovement::MOVE_LEFT)
+        if (m_movement_flags & CameraMovement::MoveLeft)
             movement.x -= m_speed * delta_time;
-        if (m_movement_flags & CameraMovement::MOVE_RIGHT)
+        if (m_movement_flags & CameraMovement::MoveRight)
             movement.x += m_speed * delta_time;
-        if (m_movement_flags & CameraMovement::MOVE_UP)
+        if (m_movement_flags & CameraMovement::MoveUp)
             movement.y += m_speed * delta_time;
-        if (m_movement_flags & CameraMovement::MOVE_DOWN)
+        if (m_movement_flags & CameraMovement::MoveDown)
             movement.y -= m_speed * delta_time;
-        if (m_movement_flags & CameraMovement::ZOOM_IN)
+        if (m_movement_flags & CameraMovement::ZoomIn)
             zoom_delta += m_sensitivity * delta_time;
-        if (m_movement_flags & CameraMovement::ZOOM_OUT)
+        if (m_movement_flags & CameraMovement::ZoomOut)
             zoom_delta -= m_sensitivity * delta_time;
 
         m_position.x += movement.x;
@@ -86,13 +86,13 @@ Mat4 OrthographicCamera::GetViewProjectionMatrix() const
 void OrthographicCamera::UpdateMatrix() const
 {
     // Calculate the total camera position from the offset
-    Vec3 camera_position = m_position + m_offset;
+    const Vec3 camera_position{m_position + m_offset};
 
     // Create the view matrix by translating the world opposite to the camera's position
-    Mat4 view_matrix = math::translate(-(camera_position));
+    const Mat4 view_matrix{math::translate(-camera_position)};
 
     // Create the projection matrix with zoom scaling
-    Mat4 projection = m_base_projection * math::scale(Vec3(m_zoom, m_zoom, 1.0f));
+    const Mat4 projection{m_base_projection * math::scale(Vec3(m_zoom, m_zoom, 1.0f))};
 
     // Combine projection and view matrices
     m_view_projection_matrix = projection * view_matrix;

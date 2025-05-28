@@ -20,21 +20,21 @@ void PerspectiveCamera::Update(f32 delta_time)
     ApplyFollow(delta_time);
 
     // Handle movement flags
-    if (m_movement_flags != CameraMovement::NONE) {
+    if (m_movement_flags != CameraMovement::None) {
         Vec3 movement{0.0f, 0.0f, 0.0f};
         Vec2 rotation_delta{0.0f, 0.0f};
 
-        if (m_movement_flags & CameraMovement::MOVE_LEFT)
+        if (m_movement_flags & CameraMovement::MoveLeft)
             movement.x -= m_speed * delta_time;
-        if (m_movement_flags & CameraMovement::MOVE_RIGHT)
+        if (m_movement_flags & CameraMovement::MoveRight)
             movement.x += m_speed * delta_time;
-        if (m_movement_flags & CameraMovement::MOVE_UP)
+        if (m_movement_flags & CameraMovement::MoveUp)
             movement.y += m_speed * delta_time;
-        if (m_movement_flags & CameraMovement::MOVE_DOWN)
+        if (m_movement_flags & CameraMovement::MoveDown)
             movement.y -= m_speed * delta_time;
-        if (m_movement_flags & CameraMovement::ROTATE_X)
+        if (m_movement_flags & CameraMovement::RotateX)
             rotation_delta.x += m_sensitivity * delta_time;
-        if (m_movement_flags & CameraMovement::ROTATE_Y)
+        if (m_movement_flags & CameraMovement::RotateY)
             rotation_delta.y += m_sensitivity * delta_time;
 
         m_position += movement;

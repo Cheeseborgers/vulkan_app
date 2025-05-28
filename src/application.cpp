@@ -18,6 +18,7 @@ Application::Application()
       m_framebuffer_size{0, 0},
       p_ortho_camera{nullptr},
       m_main_font_id{0},
+      m_secondary_font_id{0},
       p_current_scene{nullptr}
 {
 }
@@ -25,7 +26,6 @@ Application::Application()
 Application::~Application()
 {
     APP_LOG_INFO("Cleaning up application");
-
     m_renderer.DeviceWait(); // Ensure GPU is idle before cleanup
 }
 
@@ -122,7 +122,7 @@ void Application::SetupWindow(const ApplicationSettings &settings)
 {
     gouda::WindowConfig window_config{};
     window_config.size = settings.size;
-    window_config.title = "Gouda Renderer";
+    window_config.title = "Gouda renderer";
     window_config.resizable = true;
     window_config.fullscreen = settings.fullscreen;
     window_config.vsync = settings.vsync;
@@ -132,7 +132,7 @@ void Application::SetupWindow(const ApplicationSettings &settings)
 
     p_window = std::make_unique<gouda::glfw::Window>(window_config);
 
-    p_window->SetIcon("assets/textures/gouda_icon.png");
+    p_window->SetIcon(filepath::application_icon);
 }
 
 void Application::SetupRenderer()
@@ -142,9 +142,9 @@ void Application::SetupRenderer()
 
     m_renderer.CreateUniformBuffers(sizeof(gouda::UniformData));
 
-    m_renderer.SetupPipelines(quad_vertex_shader_path, quad_frag_shader_path, text_vertex_shader_path,
-                              text_frag_shader_path, particle_vertex_shader_path, particle_frag_shader_path,
-                              particle_compute_shader_path);
+    m_renderer.SetupPipelines(filepath::quad_vertex_shader, filepath::quad_frag_shader, filepath::text_vertex_shader,
+                              filepath::text_frag_shader, filepath::particle_vertex_shader,
+                              filepath::particle_frag_shader, filepath::particle_compute_shader);
 }
 
 void Application::SetupAudio(const ApplicationSettings &settings)
@@ -198,16 +198,14 @@ void Application::LoadTextures() const
 
 void Application::LoadFonts()
 {
-    // TODO: Consider storing these filepaths as constant strings for easier change and locating
-    m_main_font_id = m_renderer.LoadMSDFFont("assets/fonts/firacode_atlas.png", "assets/fonts/firacode_atlas.json");
-
-    APP_LOG_DEBUG("font texture id: {}", m_main_font_id);
+    m_main_font_id = m_renderer.LoadMSDFFont(filepath::primary_font_atlas, filepath::primary_font_metadata);
+    m_secondary_font_id = m_renderer.LoadMSDFFont(filepath::secondary_font_atlas, filepath::secondary_font_metadata);
 }
 
 void Application::SetupInputSystem()
 {
-    auto backend = std::make_unique<gouda::glfw::GLFWBackend>([this](gouda::Event e) {
-        p_input_handler->QueueEvent(std::move(e)); // Queue raw events directly
+    auto backend = std::make_unique<gouda::glfw::GLFWBackend>([this](gouda::Event event) {
+        p_input_handler->QueueEvent(std::move(event)); // Queue raw events directly
     });
 
     p_input_handler = std::make_unique<gouda::InputHandler>(std::move(backend), p_window->GetWindow());
@@ -216,29 +214,29 @@ void Application::SetupInputSystem()
         {gouda::Key::Escape, gouda::ActionState::Pressed,
          [this] { glfwSetWindowShouldClose(p_window->GetWindow(), GLFW_TRUE); }},
         {gouda::Key::A, gouda::ActionState::Pressed,
-         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_LEFT); }},
+         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MoveLeft); }},
         {gouda::Key::A, gouda::ActionState::Released,
-         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_LEFT); }},
+         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MoveLeft); }},
         {gouda::Key::D, gouda::ActionState::Pressed,
-         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_RIGHT); }},
+         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MoveRight); }},
         {gouda::Key::D, gouda::ActionState::Released,
-         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_RIGHT); }},
+         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MoveRight); }},
         {gouda::Key::W, gouda::ActionState::Pressed,
-         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_UP); }},
+         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MoveUp); }},
         {gouda::Key::W, gouda::ActionState::Released,
-         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_UP); }},
+         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MoveUp); }},
         {gouda::Key::S, gouda::ActionState::Pressed,
-         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MOVE_DOWN); }},
+         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MoveDown); }},
         {gouda::Key::S, gouda::ActionState::Released,
-         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MOVE_DOWN); }},
+         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MoveDown); }},
         {gouda::Key::Q, gouda::ActionState::Pressed,
-         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZOOM_IN); }},
+         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZoomIn); }},
         {gouda::Key::Q, gouda::ActionState::Released,
-         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZOOM_IN); }},
+         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZoomIn); }},
         {gouda::Key::E, gouda::ActionState::Pressed,
-         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZOOM_OUT); }},
+         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZoomOut); }},
         {gouda::Key::E, gouda::ActionState::Released,
-         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZOOM_OUT); }},
+         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZoomOut); }},
         {gouda::Key::Left, gouda::ActionState::Pressed,
          [this] { p_current_scene->GetPlayer().velocity.x = -p_current_scene->GetPlayer().speed; }},
         {gouda::Key::Left, gouda::ActionState::Released,
@@ -281,11 +279,17 @@ void Application::SetupInputSystem()
 
         {gouda::MouseButton::Right, gouda::ActionState::Pressed,
          [this] {
-             p_current_scene->SpawnParticle({static_cast<float>(this->m_framebuffer_size.width), 0, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
-             p_current_scene->SpawnParticle({static_cast<float>(this->m_framebuffer_size.width), 100, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
-             p_current_scene->SpawnParticle({static_cast<float>(this->m_framebuffer_size.width), 200, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
-             p_current_scene->SpawnParticle({static_cast<float>(this->m_framebuffer_size.width), 350, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
-             p_current_scene->SpawnParticle({static_cast<float>(this->m_framebuffer_size.width), 500, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             f32 framebuffer_width{static_cast<f32>(this->m_framebuffer_size.width)};
+             p_current_scene->SpawnParticle({framebuffer_width, 0, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
+                                            {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({framebuffer_width, 100, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
+                                            {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({framebuffer_width, 200, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
+                                            {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({framebuffer_width, 350, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
+                                            {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({framebuffer_width, 500, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
+                                            {1, 0, 0, 1.0f});
              m_audio_manager.PlaySoundEffect(m_laser_2);
          }},
     };
@@ -294,7 +298,7 @@ void Application::SetupInputSystem()
     p_input_handler->SetActiveState("Game");
 
     // Scroll callback
-    p_input_handler->SetScrollCallback([this]([[maybe_unused]] double xOffset, const double yOffset) {
+    p_input_handler->SetScrollCallback([this]([[maybe_unused]] const f64 xOffset, const f64 yOffset) {
         const f32 zoom_delta{static_cast<f32>(yOffset) * 0.1f};
         p_ortho_camera->AdjustZoom(zoom_delta);
     });

@@ -46,16 +46,16 @@ TextData::TextData()
       colour{1.0f, 0.0f, 0.0f, 1.0f}, // Default to red
       sdf_params{0.0f, 0.0f, 0.0f, 0.0f},
       texture_index{0},
+      atlas_size{0.0f, 0.0f},
+      px_range{0.0f},
       _pad2{}
 {
 }
 
 SimulationParams::SimulationParams() : gravity{0.0f}, delta_time{0.0f} {}
-SimulationParams::SimulationParams(const Vec3 &gravity_, const f32 delta_time_)  : gravity{gravity_}, delta_time{delta_time_}
-{}
-
-
-
-
+SimulationParams::SimulationParams(const Vec3 &gravity_, const f32 delta_time_)
+    : gravity{gravity_}, delta_time{delta_time_}
+{
+}
 
 } // namespace gouda

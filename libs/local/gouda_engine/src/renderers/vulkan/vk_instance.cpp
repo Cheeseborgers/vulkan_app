@@ -75,7 +75,7 @@ VkBool32 VKAPI_CALL vk_debug_callback(
 }
 } // namespace internal
 
-Instance::Instance(std::string_view app_name, const SemVer vulkan_api_version, GLFWwindow *window)
+Instance::Instance(StringView app_name, const SemVer vulkan_api_version, GLFWwindow *window)
     : p_instance{VK_NULL_HANDLE}, p_debug_messenger{VK_NULL_HANDLE}, p_surface{VK_NULL_HANDLE}, p_window(window)
 {
     CreateInstance(app_name, vulkan_api_version);
@@ -98,7 +98,7 @@ Instance::~Instance()
     }
 }
 
-void Instance::CreateInstance(std::string_view app_name, const SemVer vulkan_api_version)
+void Instance::CreateInstance(StringView app_name, const SemVer vulkan_api_version)
 {
     Vector<const char *> layers{"VK_LAYER_KHRONOS_validation"};
     Vector<const char *> extensions{
@@ -143,18 +143,15 @@ void Instance::CreateDebugCallback() {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         .pNext = nullptr,
         .flags = 0,
-        .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                       VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+        .messageSeverity =
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
         .pfnUserCallback = &internal::vk_debug_callback,
-        .pUserData = nullptr
-    };
+        .pUserData = nullptr};
 
-    auto vkCreateDebugUtilsMessenger = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+    const auto vkCreateDebugUtilsMessenger = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
         vkGetInstanceProcAddr(p_instance, "vkCreateDebugUtilsMessengerEXT"));
     if (!vkCreateDebugUtilsMessenger) {
         ENGINE_THROW("Failed to find vkCreateDebugUtilsMessengerEXT");

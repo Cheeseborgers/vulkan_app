@@ -30,7 +30,7 @@ struct ApplicationSettings {
     bool vsync;
     ApplicationAudioSettings audio_settings;
 
-    ApplicationSettings() : size{800, 800}, refresh_rate{60}, fullscreen{false}, vsync{false}, audio_settings{} {}
+    ApplicationSettings() : size{800, 800}, refresh_rate{60}, fullscreen{false}, vsync{false} {}
 };
 
 void to_json(nlohmann::json &json_data, const WindowSize &window_size);
@@ -50,9 +50,9 @@ public:
     void Load();
     void Save() const;
 
-    ApplicationSettings GetSettings() const;
+    [[nodiscard]] ApplicationSettings GetSettings() const;
 
-    void SetAutoSave(bool enabled) { m_auto_save = enabled; }
+    void SetAutoSave(const bool enabled) { m_auto_save = enabled; }
     void SetSettings(const ApplicationSettings &new_settings);
     void SetWindowSize(WindowSize new_size);
     void SetFullScreen(bool enabled);

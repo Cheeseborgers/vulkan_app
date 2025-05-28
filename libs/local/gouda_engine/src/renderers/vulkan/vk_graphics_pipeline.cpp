@@ -82,6 +82,10 @@ u32 get_struct_offset(StringView name, const VkFormat format, bool &success)
             return offsetof(TextData, sdf_params);
         if (name == "instance_texture_index" && format == VK_FORMAT_R32_UINT)
             return offsetof(TextData, texture_index);
+        if (name == "instance_atlas_size" && format == VK_FORMAT_R32G32_SFLOAT)
+            return offsetof(TextData, atlas_size);
+        if (name == "instance_px_range" && format == VK_FORMAT_R32_SFLOAT)
+            return offsetof(TextData, px_range);
     }
     success = false;
     return 0;

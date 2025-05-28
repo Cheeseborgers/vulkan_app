@@ -10,13 +10,10 @@
 
 namespace gouda {
 
-Camera::Camera(f32 speed, f32 sensitivity)
-    : m_position{},
-      m_offset{},
-      m_rotation{},
-      m_speed{speed},
+Camera::Camera(const f32 speed, const f32 sensitivity)
+    : m_speed{speed},
       m_sensitivity{sensitivity},
-      m_movement_flags(CameraMovement::NONE),
+      m_movement_flags(CameraMovement::None),
       m_is_dirty{true},
       m_shake_intensity{0.0f},
       m_shake_duration{0.0f},
@@ -52,26 +49,26 @@ void Camera::SetRotation(const Vec2 &rotation)
     // m_is_dirty = true;
 }
 
-void Camera::Shake(f32 intensity, f32 duration)
+void Camera::Shake(const f32 intensity, const f32 duration)
 {
     m_shake_intensity = intensity;
     m_shake_duration = duration;
 }
 
-void Camera::SetSway(f32 amplitude, f32 frequency)
+void Camera::SetSway(const f32 amplitude, const f32 frequency)
 {
     m_sway_amplitude = amplitude;
     m_sway_frequency = frequency;
 }
 
-void Camera::Follow(const Vec3 *target, f32 speed)
+void Camera::Follow(const Vec3 *target, const f32 speed)
 {
     p_follow_target = target;
     m_follow_speed = speed;
 }
 
 // Protected functions -------------------------------------------------------------------------------
-Vec3 Camera::ApplyEffects(f32 delta_time)
+Vec3 Camera::ApplyEffects(const f32 delta_time)
 {
     Vec3 offset{};
 
@@ -85,13 +82,13 @@ Vec3 Camera::ApplyEffects(f32 delta_time)
     // Apply sway if active
     if (m_sway_amplitude > 0.0f) {
         m_sway_time += delta_time * m_sway_frequency;
-        offset.y += sin(m_sway_time) * m_sway_amplitude;
+        offset.y += static_cast<f32>(sin(m_sway_time) * m_sway_amplitude);
     }
 
     return offset;
 }
 
-void Camera::ApplyFollow(f32 delta_time)
+void Camera::ApplyFollow(const f32 delta_time)
 {
     if (p_follow_target && m_follow_speed > 0.0f) {
         m_position += (*p_follow_target - m_position) * m_follow_speed * delta_time;

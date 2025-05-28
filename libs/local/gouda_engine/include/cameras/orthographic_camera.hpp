@@ -31,7 +31,7 @@ namespace gouda {
  * of their distance from the camera. This class includes functionality for adjusting the zoom level
  * and generating the corresponding view-projection matrix.
  */
-class OrthographicCamera : public Camera {
+class OrthographicCamera final : public Camera {
 public:
     /**
      * @brief Constructs an OrthographicCamera object.
@@ -97,9 +97,9 @@ public:
     f32 GetNear() const { return m_near; }
     f32 GetFar() const { return m_far; }
     f32 GetZoom() const { return m_zoom; }
-    Vec3 GetPosition() const { return m_position; }
+    Vec3 GetPosition() const override { return m_position; }
 
-    void SetProjection(f32 left, f32 right, f32 bottom, f32 top)
+    void SetProjection(const f32 left, const f32 right, const f32 bottom, const f32 top)
     {
         m_left = left;
         m_right = right;
@@ -109,7 +109,7 @@ public:
         m_is_dirty = true;
     }
 
-    struct FrustrumData {
+    struct FrustumData {
         Vec3 position; ///< Camera position in world space
         f32 left;      ///< The left boundary of the orthographic view, adjusted for zoom
         f32 right;     ///< The right boundary of the orthographic view, adjusted for zoom
@@ -117,9 +117,9 @@ public:
         f32 top;       ///< The top boundary of the orthographic view, adjusted for zoom
     };
 
-    FrustrumData GetFrustrumData() const
+    FrustumData GetFrustumData() const
     {
-        FrustrumData data{};
+        FrustumData data{};
         data.position = m_position;
         data.left = m_left / m_zoom;
         data.right = m_right / m_zoom;

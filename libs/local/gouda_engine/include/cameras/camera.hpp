@@ -32,15 +32,15 @@ namespace gouda {
  * right, up, down, zooming in or out, and rotating along the X or Y axis for 3D cameras.
  */
 enum class CameraMovement : u32 {
-    NONE = 0,            ///< No movement
-    MOVE_LEFT = 1 << 0,  ///< Move the camera left
-    MOVE_RIGHT = 1 << 1, ///< Move the camera right
-    MOVE_UP = 1 << 2,    ///< Move the camera up
-    MOVE_DOWN = 1 << 3,  ///< Move the camera down
-    ZOOM_IN = 1 << 4,    ///< Zoom the camera in
-    ZOOM_OUT = 1 << 5,   ///< Zoom the camera out
-    ROTATE_X = 1 << 6,   ///< Rotate the camera along the X axis (for 3D)
-    ROTATE_Y = 1 << 7,   ///< Rotate the camera along the Y axis (for 3D)
+    None = 0,            ///< No movement
+    MoveLeft = 1 << 0,  ///< Move the camera left
+    MoveRight = 1 << 1, ///< Move the camera right
+    MoveUp = 1 << 2,    ///< Move the camera up
+    MoveDown = 1 << 3,  ///< Move the camera down
+    ZoomIn = 1 << 4,    ///< Zoom the camera in
+    ZoomOut = 1 << 5,   ///< Zoom the camera out
+    RotateX = 1 << 6,   ///< Rotate the camera along the X axis (for 3D)
+    RotateY = 1 << 7,   ///< Rotate the camera along the Y axis (for 3D)
 };
 
 /**
@@ -62,7 +62,7 @@ inline CameraMovement operator|(CameraMovement lhs, CameraMovement rhs)
  * @param rhs The right-hand side camera movement flag.
  * @return The updated left-hand side camera movement flag.
  */
-inline CameraMovement &operator|=(CameraMovement &lhs, CameraMovement rhs)
+inline CameraMovement &operator|=(CameraMovement &lhs, const CameraMovement &rhs)
 {
     lhs = lhs | rhs;
     return lhs;
@@ -92,7 +92,7 @@ public:
      * @param speed The speed of camera movement.
      * @param sensitivity The sensitivity of camera rotations.
      */
-    Camera(f32 speed = 1.0f, f32 sensitivity = 1.0f);
+    explicit Camera(f32 speed = 1.0f, f32 sensitivity = 1.0f);
 
     /// Virtual destructor
     virtual ~Camera() = default;
@@ -135,21 +135,21 @@ public:
     /**
      * @brief Clears all movement flags, resetting the camera's movement state.
      */
-    void ClearAllFlags() { m_movement_flags = CameraMovement::NONE; }
+    void ClearAllFlags() { m_movement_flags = CameraMovement::None; }
 
     /**
      * @brief Sets the position of the camera.
      *
-     * @param pos The new position of the camera.
+     * @param position The new position of the camera.
      */
-    void SetPosition(const Vec3 &pos);
+    void SetPosition(const Vec3 &position);
 
     /**
      * @brief Sets the rotation of the camera.
      *
-     * @param rot The new rotation of the camera in 2D (pitch, yaw).
+     * @param rotation The new rotation of the camera in 2D (pitch, yaw).
      */
-    void SetRotation(const Vec2 &rot);
+    void SetRotation(const Vec2 &rotation);
 
     /**
      * @brief Applies shake effects to the camera.
@@ -180,7 +180,7 @@ public:
      *
      * @return The camera's position.
      */
-    Vec3 GetPosition() const { return m_position; }
+    virtual Vec3 GetPosition() const { return m_position; }
 
     bool IsDirty() const { return m_is_dirty; }
 

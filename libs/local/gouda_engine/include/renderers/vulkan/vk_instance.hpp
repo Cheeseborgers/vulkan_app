@@ -1,5 +1,4 @@
 #pragma once
-
 /**
  * @file vk_instance.hpp
  * @author GoudaCheeseburgers

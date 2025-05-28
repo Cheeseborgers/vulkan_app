@@ -26,7 +26,7 @@ GridRange GetGridRange(const Rect<f32> &bounds, const f32 cell_size)
 }
 
 bool IsInFrustum(const gouda::Vec3 &position, const gouda::Vec2 &size,
-                 const gouda::OrthographicCamera::FrustrumData &frustum)
+                 const gouda::OrthographicCamera::FrustumData &frustum)
 {
     const gouda::math::AABB2D frustum_bounds{{frustum.left + frustum.position.x, frustum.top + frustum.position.y},
                                              {frustum.right + frustum.position.x, frustum.bottom + frustum.position.y}};
@@ -42,7 +42,7 @@ Scene::Scene(gouda::OrthographicCamera *camera, gouda::vk::TextureManager *textu
       m_instances_dirty{true},
       m_font_id{1}
 {
-
+    /*
     const gouda::Vector<gouda::InstanceData> instances = {
         {{2945.3f, 3048.8f, -0.3f}, {81.9f, 453.95f}, 0.0f, 4},
         {{200.3f, 200.8f, -0.3f}, {281.9f, 453.95f}, 0.0f, 4},
@@ -65,7 +65,7 @@ Scene::Scene(gouda::OrthographicCamera *camera, gouda::vk::TextureManager *textu
         {{955.42f, 821.25f, -0.5f}, {276.74f, 197.19f}, 0.0f, 1},
         {{-477.7f, -189.79f, -0.1f}, {261.06f, 299.23f}, 0.0f, 2},
         {{-527.9f, 332.5f, -0.6f}, {221.28f, 176.09f}, 0.0f, 4},
-        {{393.4f, 76.7f, -0.9f}, {264.59f, 417.81f}, 0.0f, 3},
+        {{393.4f, 76.7f, -0.88f}, {264.59f, 417.81f}, 0.0f, 3},
         {{-345.7f, 83.45f, -0.7f}, {116.81f, 109.75f}, 0.0f, 1},
         {{-133.66f, 235.38f, -0.6f}, {267.79f, 363.2f}, 0.0f, 2},
         {{149.24f, 692.7f, -0.1f}, {229.17f, 114.26f}, 0.0f, 1},
@@ -75,18 +75,18 @@ Scene::Scene(gouda::OrthographicCamera *camera, gouda::vk::TextureManager *textu
         {{221.67f, -547.5f, -0.2f}, {154.59f, 326.03f}, 0.0f, 4},
         {{655.83f, -687.51f, -0.4f}, {94.62f, 227.87f}, 0.0f, 4},
         {{524.87f, 697.39f, -0.4f}, {227.79f, 404.37f}, 0.0f, 3},
-        {{-791.78f, -253.62f, -0.9f}, {242.24f, 382.73f}, 0.0f, 1},
+        {{-791.78f, -253.62f, -0.65f}, {242.24f, 382.73f}, 0.0f, 1},
         {{607.72f, 137.36f, -0.5f}, {119.1f, 460.24f}, 0.0f, 3},
-        {{-687.95f, 179.47f, -0.9f}, {176.91f, 149.15f}, 0.0f, 1},
+        {{-687.95f, 179.47f, -0.54f}, {176.91f, 149.15f}, 0.0f, 1},
         {{1059.01f, 499.87f, -0.1f}, {182.49f, 467.9f}, 0.0f, 4},
-        {{-221.81f, -451.19f, -1.0f}, {63.57f, 330.27f}, 0.0f, 4},
+        {{-221.81f, -451.19f, -0.76f}, {63.57f, 330.27f}, 0.0f, 4},
         {{851.02f, -114.47f, -0.3f}, {156.75f, 302.73f}, 0.0f, 0},
         {{155.89f, 1095.48f, -0.8f}, {153.22f, 242.06f}, 0.0f, 4},
         {{-491.75f, 684.49f, -0.4f}, {76.05f, 115.27f}, 0.0f, 4},
         {{-334.72f, 985.35f, -0.5f}, {57.97f, 190.37f}, 0.0f, 4},
         {{-45.29f, 888.62f, -0.3f}, {203.9f, 229.43f}, 0.0f, 2},
-        {{403.64f, -736.12f, -1.0f}, {255.69f, 431.18f}, 0.0f, 3},
-        {{-796.82f, 1008.09f, -0.9f}, {218.18f, 311.46f}, 0.0f, 1},
+        {{403.64f, -736.12f, -0.76f}, {255.69f, 431.18f}, 0.0f, 3},
+        {{-796.82f, 1008.09f, -0.65f}, {218.18f, 311.46f}, 0.0f, 1},
         {{-458.31f, -401.66f, -0.7f}, {51.26f, 153.7f}, 0.0f, 0},
         {{-53.42f, -759.58f, -0.2f}, {228.56f, 340.13f}, 0.0f, 4},
         {{921.27f, -436.21f, -0.5f}, {278.43f, 334.79f}, 0.0f, 3},
@@ -103,14 +103,16 @@ Scene::Scene(gouda::OrthographicCamera *camera, gouda::vk::TextureManager *textu
         m_entities.emplace_back(instance, EntityType::Quad);
     }
 
-    // const gouda::Vector<gouda::InstanceData> instances;
+    */
+
+    const gouda::Vector<gouda::InstanceData> instances;
 
     SetupPlayer();
 
     m_visible_quad_instances.reserve(instances.size() + 1);
     BuildSpatialGrid();
 
-    m_particles_instances.reserve(1000); // Reserve space for particles
+    m_particles_instances.reserve(1024); // Reserve space for particles
 }
 
 void Scene::Update(const f32 delta_time)
@@ -233,8 +235,12 @@ void Scene::DrawUI(gouda::vk::Renderer &renderer)
 {
     m_text_instances.clear();
 
-    renderer.DrawText("GOUDA RENDERER", {100.0f, 100.0f, -0.6}, {0.0f, 1.0f, 0.0f, 1.0f}, 20.0f, m_font_id,
+    renderer.DrawText("GOUDA RENDERER", {100.0f, 100.0f, -0.8}, {0.0f, 1.0f, 0.0f, 1.0f}, 20.0f, m_font_id,
                       m_text_instances, gouda::TextAlign::Center);
+
+
+    renderer.DrawText("GOUDA RENDERER", {200.0f, 200.0f, -0.8}, {0.0f, 1.0f, 0.0f, 1.0f}, 50.0f, 2,
+                  m_text_instances);
 }
 
 void Scene::LoadFromJSON(std::string_view filepath)
@@ -309,7 +315,7 @@ void Scene::BuildSpatialGrid()
 void Scene::UpdateVisibleInstances()
 {
     m_visible_quad_instances.clear();
-    const auto &frustum = p_camera->GetFrustrumData();
+    const auto &frustum = p_camera->GetFrustumData();
     for (const auto &entity : m_entities) {
         if (IsInFrustum(entity.render_data.position, entity.render_data.size, frustum)) {
             m_visible_quad_instances.push_back(entity.render_data);

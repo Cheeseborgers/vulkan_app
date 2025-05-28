@@ -68,9 +68,7 @@ private:
 
     gouda::UniformData m_uniform_data;
 
-    // Audio
     gouda::audio::AudioManager m_audio_manager;
-    // TODO: Think about storing these objects somewhere in the audio manager
     gouda::audio::SoundEffect m_laser_1;
     gouda::audio::SoundEffect m_laser_2;
     gouda::audio::MusicTrack m_music;
@@ -81,6 +79,7 @@ private:
     gouda::audio::MusicTrack m_music6;
 
     u8 m_main_font_id;
+    u8 m_secondary_font_id;
 
     std::unique_ptr<Scene> p_current_scene;
 };

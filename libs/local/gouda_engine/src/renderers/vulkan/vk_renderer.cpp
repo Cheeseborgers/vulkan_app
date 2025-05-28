@@ -280,7 +280,7 @@ void Renderer::Render(const f32 delta_time, const UniformData &uniform_data,
     }
 
     // Render ImGui
-    ImDrawData *draw_data{nullptr};
+    ImDrawData *imgui_draw_data{nullptr};
 #ifdef USE_IMGUI
     const RenderStatistics stats{
         .delta_time = delta_time,
@@ -292,13 +292,13 @@ void Renderer::Render(const f32 delta_time, const UniformData &uniform_data,
         .texture_count = p_texture_manager->GetTextureCount(),
         .font_count = static_cast<u32>(m_fonts.size()),
     };
-    draw_data = RenderImGUI(stats);
+    imgui_draw_data = RenderImGUI(stats);
 #endif
 
     vkResetCommandBuffer(m_command_buffers[image_index], 0);
     RecordCommandBuffer(m_command_buffers[image_index], image_index, static_cast<u32>(quad_instances.size()),
                         static_cast<u32>(text_instances.size()), static_cast<u32>(m_particles_instances.size()),
-                        draw_data);
+                        imgui_draw_data);
 
     m_queue.Submit(m_command_buffers[image_index], m_current_frame, &m_frame_fences[m_current_frame]);
     m_queue.Present(image_index, m_current_frame);
@@ -337,7 +337,7 @@ void Renderer::ClearParticleBuffers(const u32 image_index) const
 void Renderer::ToggleComputeParticles()
 {
     m_use_compute_particles = !m_use_compute_particles;
-    ENGINE_LOG_DEBUG("Compute particles {}", m_use_compute_particles ? "enabled" : "disabled");
+    ENGINE_LOG_DEBUG("Compute particles {}.", m_use_compute_particles ? "enabled" : "disabled");
 
     // Sync storage buffers with current particle instances
     for (size_t i = 0; i < p_swapchain->GetImageCount(); ++i) {
@@ -363,11 +363,11 @@ void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32>
     f32 overall_width{0.0f};
 
     // First pass: Calculate overall width
-    for (char c : text) {
-        u32 unicode_char = static_cast<unsigned char>(c);
-        auto it = glyphs.find(unicode_char);
+    for (char current_character : text) {
+        u32 unicode_char = static_cast<unsigned char>(current_character);
+        auto it = glyphs.find(current_character);
         if (it == glyphs.end()) {
-            ENGINE_LOG_WARNING("MSDFGlyph '{}' (unicode={}) not found in font {}", c, unicode_char, font_id);
+            ENGINE_LOG_WARNING("MSDFGlyph '{}' (unicode={}) not found in font {}.", current_character, unicode_char, font_id);
             // Fallback to space glyph's advance
             if (auto space_it = glyphs.find(32); space_it != glyphs.end()) {
                 overall_width += space_it->second.advance * scale;
@@ -389,12 +389,12 @@ void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32>
     // Left alignment: no adjustment needed
 
     // Second pass: Generate TextData instances
-    for (char c : text) {
-        auto unicode_char = static_cast<unsigned char>(c);
-        auto it = glyphs.find(c);
+    for (char current_character : text) {
+        auto unicode_char = static_cast<unsigned char>(current_character);
+        auto it = glyphs.find(current_character);
         if (it == glyphs.end()) {
             // Handle missing glyph (e.g., use space or skip)
-            ENGINE_LOG_WARNING("MSDFGlyph '{}' (unicode={}) not found in font {}", c, unicode_char, font_id);
+            ENGINE_LOG_WARNING("MSDFGlyph '{}' (unicode={}) not found in font {}.", current_character, unicode_char, font_id);
             continue;
         }
 
@@ -406,8 +406,8 @@ void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32>
             continue;
         }
 
-        const Rect plane_bounds = glyph.plane_bounds;
-        const Rect atlas_bounds = glyph.atlas_bounds;
+        const Rect plane_bounds{glyph.plane_bounds};
+        const Rect atlas_bounds{glyph.atlas_bounds};
         const Vec3 glyph_position{current_position.x + plane_bounds.left * scale,
                                   current_position.y + plane_bounds.bottom * scale, position.z};
         const Vec2 size{(plane_bounds.right - plane_bounds.left) * scale,
@@ -420,6 +420,8 @@ void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32>
         instance.glyph_index = static_cast<u32>(unicode_char);
         instance.sdf_params = UVRect{atlas_bounds.left, atlas_bounds.bottom, atlas_bounds.right, atlas_bounds.top};
         instance.texture_index = font_id;
+        instance.atlas_size = atlas_params.atlas_size;
+        instance.px_range = atlas_params.distance_range;
 
         text_instances.push_back(instance);
         current_position.x += glyph.advance * scale;

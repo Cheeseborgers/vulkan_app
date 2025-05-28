@@ -23,7 +23,7 @@ struct Vertex {
     Vec2 uv;
 };
 
-struct UniformData {
+struct alignas(16) UniformData {
     UniformData() : WVP{Mat4::identity()} {}
 
     Mat4 WVP;
@@ -32,8 +32,8 @@ struct UniformData {
 struct InstanceData {
     InstanceData();
     InstanceData(const Vec3 &position, const Vec2 &size, f32 rotation, u32 texture_index,
-                 const Colour<f32> &colour = Colour(1.0f), const UVRect<f32> &sprite_rect = UVRect{0.0f, 0.0f, 0.0f, 0.0f},
-                 u32 is_atlas = 0);
+                 const Colour<f32> &colour = Colour(1.0f),
+                 const UVRect<f32> &sprite_rect = UVRect{0.0f, 0.0f, 0.0f, 0.0f}, u32 is_atlas = 0);
 
     Vec3 position; // 12 bytes, VK_FORMAT_R32G32B32_SFLOAT
     f32 _pad0;     // 4 bytes padding for alignment
@@ -47,7 +47,6 @@ struct InstanceData {
 
     u32 is_atlas; // 4 bytes, VK_FORMAT_R32_UINT
     u32 _pad1[3]; // 12 bytes padding to align to 16-byte boundary
-    // Total: 96 bytes
 };
 
 struct alignas(16) TextData {
@@ -64,7 +63,10 @@ struct alignas(16) TextData {
     UVRect<f32> sdf_params; // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
 
     u32 texture_index; // 4 bytes, VK_FORMAT_R32_UINT
-    u32 _pad2[3];      // 12 bytes padding to align to 16-byte boundary
+    Vec2 atlas_size;   // 8 bytes, VK_FORMAT_R32G32_SFLOAT
+    f32 px_range;      // 4 bytes, VK_FORMAT_R32_SFLOAT
+
+    u32 _pad2[3]; // 12 bytes padding to align to 16-byte boundary
 };
 
 struct SimulationParams {
@@ -77,8 +79,9 @@ struct SimulationParams {
 };
 
 struct alignas(16) ParticleData {
-    ParticleData(Vec3 position_, Vec2 size_, f32 lifetime_, Vec3 velocity_, Vec4 colour_, u32 texture_index_,
-                 UVRect<f32> sprite_rect_ = UVRect<f32>{0.0f, 0.0f, 0.0f, 0.0f}, u32 is_atlas_ = 0)
+    ParticleData(const Vec3 &position_, const Vec2 &size_, const f32 lifetime_, const Vec3 &velocity_,
+                 const Vec4 &colour_, const u32 texture_index_,
+                 const UVRect<f32> &sprite_rect_ = UVRect<f32>{0.0f, 0.0f, 0.0f, 0.0f}, const u32 is_atlas_ = 0)
         : position{position_},
           size{size_},
           lifetime{lifetime_},
