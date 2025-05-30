@@ -64,7 +64,8 @@ private:
 
     TimeSettings m_time_settings;
 
-    std::unique_ptr<gouda::OrthographicCamera> p_ortho_camera;
+    std::unique_ptr<gouda::OrthographicCamera> p_scene_camera;
+    std::unique_ptr<gouda::OrthographicCamera> p_ui_camera;
 
     gouda::UniformData m_uniform_data;
 

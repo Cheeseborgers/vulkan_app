@@ -24,16 +24,18 @@ struct Vertex {
 };
 
 struct alignas(16) UniformData {
-    UniformData() : WVP{Mat4::identity()} {}
+    UniformData() : wvp{Mat4::identity()}, wvp_static{Mat4::identity()} {}
 
-    Mat4 WVP;
+    Mat4 wvp; // World view matrix with camera effects applied.
+    Mat4 wvp_static; // World view matrix without camera effects applied.
 };
 
 struct InstanceData {
     InstanceData();
     InstanceData(const Vec3 &position, const Vec2 &size, f32 rotation, u32 texture_index,
                  const Colour<f32> &colour = Colour(1.0f),
-                 const UVRect<f32> &sprite_rect = UVRect{0.0f, 0.0f, 0.0f, 0.0f}, u32 is_atlas = 0);
+                 const UVRect<f32> &sprite_rect = UVRect{0.0f, 0.0f, 0.0f, 0.0f}, u32 is_atlas = 0,
+                 u32 apply_camera_effects_ = 1); // Default to true for camera effects
 
     Vec3 position; // 12 bytes, VK_FORMAT_R32G32B32_SFLOAT
     f32 _pad0;     // 4 bytes padding for alignment
@@ -45,8 +47,9 @@ struct InstanceData {
     Colour<f32> colour;      // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
     UVRect<f32> sprite_rect; // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
 
-    u32 is_atlas; // 4 bytes, VK_FORMAT_R32_UINT
-    u32 _pad1[3]; // 12 bytes padding to align to 16-byte boundary
+    u32 is_atlas;             // 4 bytes, VK_FORMAT_R32_UINT
+    u32 apply_camera_effects; // offset 100, total = 112
+    u32 _pad1[4];             // 12 bytes padding to align to 16-byte boundary
 };
 
 struct alignas(16) TextData {
@@ -62,11 +65,10 @@ struct alignas(16) TextData {
     Colour<f32> colour;     // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
     UVRect<f32> sdf_params; // 16 bytes, VK_FORMAT_R32G32B32A32_SFLOAT
 
-    u32 texture_index; // 4 bytes, VK_FORMAT_R32_UINT
-    Vec2 atlas_size;   // 8 bytes, VK_FORMAT_R32G32_SFLOAT
-    f32 px_range;      // 4 bytes, VK_FORMAT_R32_SFLOAT
-
-    u32 _pad2[3]; // 12 bytes padding to align to 16-byte boundary
+    u32 texture_index;        // 4 bytes, VK_FORMAT_R32_UINT
+    Vec2 atlas_size;          // 8 bytes, VK_FORMAT_R32G32_SFLOAT
+    f32 px_range;             // 4 bytes, VK_FORMAT_R32_SFLOAT
+    u32 apply_camera_effects; // offset 100, total = 112
 };
 
 struct SimulationParams {
@@ -80,18 +82,9 @@ struct SimulationParams {
 
 struct alignas(16) ParticleData {
     ParticleData(const Vec3 &position_, const Vec2 &size_, const f32 lifetime_, const Vec3 &velocity_,
-                 const Vec4 &colour_, const u32 texture_index_,
-                 const UVRect<f32> &sprite_rect_ = UVRect<f32>{0.0f, 0.0f, 0.0f, 0.0f}, const u32 is_atlas_ = 0)
-        : position{position_},
-          size{size_},
-          lifetime{lifetime_},
-          velocity{velocity_},
-          colour{colour_},
-          texture_index{texture_index_},
-          sprite_rect{sprite_rect_},
-          is_atlas{is_atlas_}
-    {
-    }
+                 const Vec4 &colour_, u32 texture_index_,
+                 const UVRect<f32> &sprite_rect_ = UVRect{0.0f, 0.0f, 0.0f, 0.0f}, u32 is_atlas_ = 0,
+                 u32 apply_camera_effects_ = 1); // Default to true for camera effects
 
     Vec3 position; // offset 0
     f32 _pad0{};   // offset 12 → pad vec3 to vec4
@@ -103,15 +96,16 @@ struct alignas(16) ParticleData {
     Vec3 velocity; // offset 32
     f32 _pad2{};   // offset 44 → pad to 48
 
-    Vec4 colour; // offset 48
+    Vec4 colour; // offset 48 // TODO: Change this to Colour<f32>
 
     u32 texture_index{}; // offset 64
     f32 _pad3[3]{};      // offset 68 → pad to 80
 
     UVRect<f32> sprite_rect; // offset 80
 
-    u32 is_atlas{}; // offset 96
-    f32 _pad4[3]{}; // offset 100 → pad to 112
+    u32 is_atlas{};             // offset 96
+    u32 apply_camera_effects{}; // offset 100, total = 112
+    f32 _pad4[4]{};
 };
 
 } // namespace gouda

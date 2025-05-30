@@ -192,12 +192,12 @@ template <FloatingPointT T>
 {
     Matrix4x4<T> m = Matrix4x4<T>::identity();
 
-    if (std::is_same_v<T, float> && simdLevel >= SIMDLevel::AVX) {
+    if (std::is_same_v<T, float> && s_simd_level >= SIMDLevel::AVX) {
         // Load translation components into last column
         const __m128 trans = _mm_set_ps(1.f, t[2], t[1], t[0]);
         _mm_storeu_ps(&m.data[12], trans); // Store directly into last column (12-15)
     }
-    else if (std::is_same_v<T, float> && simdLevel >= SIMDLevel::SSE2) {
+    else if (std::is_same_v<T, float> && s_simd_level >= SIMDLevel::SSE2) {
         const __m128 trans = _mm_set_ps(1.f, t[2], t[1], t[0]);
         _mm_storeu_ps(&m.data[12], trans);
     }
@@ -216,7 +216,7 @@ template <FloatingPointT T>
 {
     Matrix4x4<T> m = Matrix4x4<T>::identity();
 
-    if (std::is_same_v<T, float> && simdLevel >= SIMDLevel::AVX) {
+    if (std::is_same_v<T, float> && s_simd_level >= SIMDLevel::AVX) {
         // Set diagonal elements using SIMD
         const __m128 diag0 = _mm_set_ps(0.f, 0.f, 0.f, s[0]); // m[0][0]
         const __m128 diag1 = _mm_set_ps(0.f, 0.f, s[1], 0.f); // m[1][1]
@@ -228,7 +228,7 @@ template <FloatingPointT T>
         _mm_storeu_ps(&m.data[8], diag2);
         _mm_storeu_ps(&m.data[12], diag3);
     }
-    else if (std::is_same_v<T, float> && simdLevel >= SIMDLevel::SSE2) {
+    else if (std::is_same_v<T, float> && s_simd_level >= SIMDLevel::SSE2) {
         // Same as AVX but with SSE
         const __m128 diag0 = _mm_set_ps(0.f, 0.f, 0.f, s[0]);
         const __m128 diag1 = _mm_set_ps(0.f, 0.f, s[1], 0.f);
@@ -295,7 +295,7 @@ template <FloatingPointT T>
 
     Matrix4x4<T> m = Matrix4x4<T>::identity();
 
-    if (std::is_same_v<T, float> && simdLevel >= SIMDLevel::AVX) {
+    if (std::is_same_v<T, float> && s_simd_level >= SIMDLevel::AVX) {
         // Column-major storage: each __m128 is one column
         const __m128 col0 = _mm_set_ps(0.f, 0.f, 0.f, right[0]);
         const __m128 col1 = _mm_set_ps(0.f, 0.f, 0.f, right[1]);
@@ -307,7 +307,7 @@ template <FloatingPointT T>
         _mm_storeu_ps(&m.data[8], col2);
         _mm_storeu_ps(&m.data[12], col3);
     }
-    else if (std::is_same_v<T, float> && simdLevel >= SIMDLevel::SSE2) {
+    else if (std::is_same_v<T, float> && s_simd_level >= SIMDLevel::SSE2) {
         const __m128 col0 = _mm_set_ps(0.f, 0.f, 0.f, right[0]);
         const __m128 col1 = _mm_set_ps(0.f, 0.f, 0.f, right[1]);
         const __m128 col2 = _mm_set_ps(0.f, -forward[2], up_adjusted[2], right[2]);
@@ -365,7 +365,7 @@ template <NumericT T>
 {
     Matrix4x4<T> result{};
 
-    if constexpr (std::is_same_v<T, float> && simdLevel >= SIMDLevel::AVX) {
+    if constexpr (std::is_same_v<T, float> && s_simd_level >= SIMDLevel::AVX) {
         // Load 4 columns into AVX registers
         __m128 row0 = _mm_loadu_ps(&m.data[0]);
         __m128 row1 = _mm_loadu_ps(&m.data[4]);
@@ -381,7 +381,7 @@ template <NumericT T>
         _mm_storeu_ps(&result.data[8], row2);
         _mm_storeu_ps(&result.data[12], row3);
     }
-    else if constexpr (std::is_same_v<T, float> && simdLevel >= SIMDLevel::SSE2) {
+    else if constexpr (std::is_same_v<T, float> && s_simd_level >= SIMDLevel::SSE2) {
         // Same as AVX but with SSE
         __m128 row0 = _mm_loadu_ps(&m.data[0]);
         __m128 row1 = _mm_loadu_ps(&m.data[4]);
@@ -417,7 +417,7 @@ constexpr int floor(T x)
 // SIMD floor for Vec4
 inline Vec4 floor(const Vec4 &v)
 {
-    if (simdLevel >= SIMDLevel::SSE2) {
+    if (s_simd_level >= SIMDLevel::SSE2) {
         __m128 val = _mm_loadu_ps(v.components.data());
         __m128 floored = _mm_floor_ps(val); // SSE4.1
         Vec4 result;

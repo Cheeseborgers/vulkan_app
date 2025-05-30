@@ -22,6 +22,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 #include "core/types.hpp"
+#include "debug/logger.hpp"
 #include "math/math.hpp"
 
 #include <vulkan/vulkan.h>

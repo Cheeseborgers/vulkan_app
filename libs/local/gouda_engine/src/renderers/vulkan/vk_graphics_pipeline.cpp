@@ -50,6 +50,8 @@ u32 get_struct_offset(StringView name, const VkFormat format, bool &success)
             return offsetof(InstanceData, sprite_rect);
         if (name == "instance_is_atlas" && format == VK_FORMAT_R32_UINT)
             return offsetof(InstanceData, is_atlas);
+        if (name == "instance_apply_camera_effects" && format == VK_FORMAT_R32_UINT)
+            return offsetof(InstanceData, apply_camera_effects);
     }
     else if constexpr (std::is_same_v<T, ParticleData>) {
         if (name == "instance_position" && format == VK_FORMAT_R32G32B32_SFLOAT)
@@ -68,6 +70,8 @@ u32 get_struct_offset(StringView name, const VkFormat format, bool &success)
             return offsetof(ParticleData, velocity);
         if (name == "instance_is_atlas" && format == VK_FORMAT_R32_UINT)
             return offsetof(ParticleData, is_atlas);
+        if (name == "instance_apply_camera_effects" && format == VK_FORMAT_R32_UINT)
+            return offsetof(ParticleData, apply_camera_effects);
     }
     else if constexpr (std::is_same_v<T, TextData>) {
         if (name == "instance_position" && format == VK_FORMAT_R32G32B32_SFLOAT)
@@ -86,6 +90,8 @@ u32 get_struct_offset(StringView name, const VkFormat format, bool &success)
             return offsetof(TextData, atlas_size);
         if (name == "instance_px_range" && format == VK_FORMAT_R32_SFLOAT)
             return offsetof(TextData, px_range);
+        if (name == "instance_apply_camera_effects" && format == VK_FORMAT_R32_UINT)
+            return offsetof(TextData, apply_camera_effects);
     }
     success = false;
     return 0;

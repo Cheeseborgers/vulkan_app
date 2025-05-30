@@ -36,6 +36,19 @@ class GraphicsPipeline;
 class ComputePipeline;
 class CommandBufferManager;
 
+struct RenderStatistics {
+    RenderStatistics();
+
+    f32 delta_time;
+    u32 instance_count;
+    u32 vertex_count;
+    u32 index_count;
+    u32 particle_count;
+    u32 glyph_count;
+    u32 texture_count;
+    u32 font_count;
+};
+
 class Renderer {
 public:
     Renderer();
@@ -58,7 +71,7 @@ public:
     bool UseComputeParticles() const { return m_use_compute_particles; }
 
     void DrawText(StringView text, const Vec3 &position, const Colour<f32> &colour, f32 scale, u32 font_id,
-                  std::vector<TextData> &text_instances, TextAlign alignment = TextAlign::Left);
+                  std::vector<TextData> &text_instances, TextAlign alignment = TextAlign::Left, bool apply_camera_effects = false);
 
     void SetupPipelines(StringView quad_vertex_shader_path, StringView quad_fragment_shader_path,
                         StringView text_vertex_shader_path, StringView text_fragment_shader_path,
@@ -85,6 +98,7 @@ public:
     u32 GetTextureCount() const;
     const Vector<std::unique_ptr<Texture>> &GetTextures() const { return p_texture_manager->GetTextures(); }
     TextureManager *GetTextureManager() const { return p_texture_manager.get(); }
+    RenderStatistics GetRenderStatistics() const { return m_render_statistics; }
 
     // Text functions
     u32 LoadMSDFFont(StringView image_filepath, StringView json_filepath);
@@ -94,17 +108,6 @@ public:
     void ReCreateSwapchain();
     void DeviceWait() const { p_device->Wait(); }
 
-private:
-    struct RenderStatistics {
-        f32 delta_time;
-        u32 instance_count;
-        u32 vertex_count;
-        u32 index_count;
-        u32 particle_count;
-        u32 glyph_count;
-        u32 texture_count;
-        u32 font_count;
-    };
 
 private:
     void InitializeCore(GLFWwindow *window_ptr, StringView app_name, SemVer vulkan_api_version);
@@ -116,7 +119,7 @@ private:
     void CacheFrameBufferSize();
     void CreateInstanceBuffers();
     void InitializeImGUIIfEnabled();
-    ImDrawData *RenderImGUI(const RenderStatistics &stats) const;
+    ImDrawData *RenderImGUI() const;
     void UpdateTextureDescriptors();
     void DestroyImGUI() const;
     void DestroyBuffers();
@@ -176,6 +179,7 @@ private:
     u32 m_current_frame;
 
     SimulationParams m_simulation_params;
+    RenderStatistics m_render_statistics;
 
     VkClearColorValue m_clear_colour;
     size_t m_max_quad_instances;

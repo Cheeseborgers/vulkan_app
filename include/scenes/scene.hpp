@@ -17,6 +17,18 @@
 
 #include "entities/player.hpp"
 
+struct UIElement {
+    gouda::InstanceData instances_data;
+    bool dirty{true};
+};
+
+struct Button : UIElement {
+    String text;
+    u16 font_id;
+
+    CallbackFunction<> callback;
+};
+
 struct GridPos {
     s32 x;
     s32 y;
@@ -29,12 +41,13 @@ struct GridPos {
 
 class Scene {
 public:
-    explicit Scene(gouda::OrthographicCamera *camera, gouda::vk::TextureManager *texture_manager);
+    explicit Scene(gouda::OrthographicCamera *scene_camera, gouda::OrthographicCamera *ui_camera, gouda::vk::TextureManager *texture_manager);
     ~Scene() = default;
 
     void Update(f32 delta_time);
     void Render(f32 delta_time, gouda::vk::Renderer &renderer, gouda::UniformData &uniform_data);
 
+    void UpdateUI(f32 delta_time);
     void DrawUI(gouda::vk::Renderer &renderer);
 
     void LoadFromJSON(StringView filepath);
@@ -57,7 +70,8 @@ private:
     void UpdateParticles(f32 delta_time);
 
 private:
-    gouda::OrthographicCamera *p_camera;
+    gouda::OrthographicCamera *p_scene_camera;
+    gouda::OrthographicCamera *p_ui_camera;
     gouda::vk::TextureManager *p_texture_manager;
 
     Player m_player;
@@ -71,4 +85,6 @@ private:
     u32 m_font_id;
 
     std::unordered_map<GridPos, gouda::Vector<size_t>, GridPos::Hash> m_spatial_grid;
+
+    std::vector<gouda::InstanceData> m_ui_elements;
 };

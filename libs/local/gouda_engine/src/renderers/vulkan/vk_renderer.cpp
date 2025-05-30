@@ -30,6 +30,20 @@
 
 namespace gouda::vk {
 
+RenderStatistics::RenderStatistics() :
+    delta_time{0.0f},
+    instance_count{0},
+    vertex_count{0},
+    index_count{0},
+    particle_count{0},
+    glyph_count{0},
+    texture_count{0},
+    font_count{0}
+{
+}
+
+// Renderer implentation --------------------------------
+
 Renderer::Renderer()
     : p_instance{nullptr},
       p_device{nullptr},
@@ -279,20 +293,20 @@ void Renderer::Render(const f32 delta_time, const UniformData &uniform_data,
         memcpy(m_mapped_text_instance_data[image_index], text_instances.data(), text_instance_size);
     }
 
+    // TODO: Only update this in debug mode
+    m_render_statistics.delta_time = delta_time;
+    m_render_statistics.instance_count = static_cast<u32>(quad_instances.size());
+    m_render_statistics.vertex_count = m_vertex_count;
+    m_render_statistics.index_count = m_index_count;
+    m_render_statistics.particle_count = static_cast<u32>(m_particles_instances.size());
+    m_render_statistics.glyph_count = static_cast<u32>(text_instances.size());
+    m_render_statistics.texture_count = p_texture_manager->GetTextureCount();
+    m_render_statistics.font_count = static_cast<u32>(m_fonts.size());
+
     // Render ImGui
     ImDrawData *imgui_draw_data{nullptr};
 #ifdef USE_IMGUI
-    const RenderStatistics stats{
-        .delta_time = delta_time,
-        .instance_count = static_cast<u32>(quad_instances.size()),
-        .vertex_count = m_vertex_count,
-        .index_count = m_index_count,
-        .particle_count = static_cast<u32>(m_particles_instances.size()),
-        .glyph_count = static_cast<u32>(text_instances.size()),
-        .texture_count = p_texture_manager->GetTextureCount(),
-        .font_count = static_cast<u32>(m_fonts.size()),
-    };
-    imgui_draw_data = RenderImGUI(stats);
+    imgui_draw_data = RenderImGUI();
 #endif
 
     vkResetCommandBuffer(m_command_buffers[image_index], 0);
@@ -346,7 +360,8 @@ void Renderer::ToggleComputeParticles()
 }
 
 void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32> &colour, const f32 scale,
-                        const u32 font_id, std::vector<TextData> &text_instances, const TextAlign alignment)
+                        const u32 font_id, std::vector<TextData> &text_instances, const TextAlign alignment,
+                        bool apply_camera_effects)
 {
     if (m_font_textures.empty()) {
         ENGINE_LOG_ERROR("No Fonts loaded when trying to render: {}, with font_id: {}.", text, font_id);
@@ -367,7 +382,8 @@ void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32>
         u32 unicode_char = static_cast<unsigned char>(current_character);
         auto it = glyphs.find(current_character);
         if (it == glyphs.end()) {
-            ENGINE_LOG_WARNING("MSDFGlyph '{}' (unicode={}) not found in font {}.", current_character, unicode_char, font_id);
+            ENGINE_LOG_WARNING("MSDFGlyph '{}' (unicode={}) not found in font {}.", current_character, unicode_char,
+                               font_id);
             // Fallback to space glyph's advance
             if (auto space_it = glyphs.find(32); space_it != glyphs.end()) {
                 overall_width += space_it->second.advance * scale;
@@ -383,7 +399,8 @@ void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32>
     Vec3 current_position = position;
     if (alignment == TextAlign::Center) {
         current_position.x -= overall_width * 0.5f;
-    } else if (alignment == TextAlign::Right) {
+    }
+    else if (alignment == TextAlign::Right) {
         current_position.x -= overall_width;
     }
     // Left alignment: no adjustment needed
@@ -394,7 +411,8 @@ void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32>
         auto it = glyphs.find(current_character);
         if (it == glyphs.end()) {
             // Handle missing glyph (e.g., use space or skip)
-            ENGINE_LOG_WARNING("MSDFGlyph '{}' (unicode={}) not found in font {}.", current_character, unicode_char, font_id);
+            ENGINE_LOG_WARNING("MSDFGlyph '{}' (unicode={}) not found in font {}.", current_character, unicode_char,
+                               font_id);
             continue;
         }
 
@@ -422,6 +440,7 @@ void Renderer::DrawText(StringView text, const Vec3 &position, const Colour<f32>
         instance.texture_index = font_id;
         instance.atlas_size = atlas_params.atlas_size;
         instance.px_range = atlas_params.distance_range;
+        instance.apply_camera_effects = apply_camera_effects;
 
         text_instances.push_back(instance);
         current_position.x += glyph.advance * scale;
@@ -571,7 +590,7 @@ u32 Renderer::LoadMSDFFont(StringView image_filepath, StringView json_filepath)
     m_fonts[font_id] = load_msdf_glyphs(json_filepath);
     m_font_atlas_params[font_id] = load_msdf_atlas_params(json_filepath);
 
-    //ENGINE_LOG_DEBUG("Atlas params: {}", m_font_atlas_params[font_id].ToString());
+    // ENGINE_LOG_DEBUG("Atlas params: {}", m_font_atlas_params[font_id].ToString());
 
     m_font_textures_dirty = true;
 
@@ -858,7 +877,7 @@ void Renderer::InitializeImGUIIfEnabled()
 #endif
 }
 
-ImDrawData *Renderer::RenderImGUI(const RenderStatistics &stats) const
+ImDrawData *Renderer::RenderImGUI() const
 {
 #ifdef USE_IMGUI
     ImGui_ImplVulkan_NewFrame();
@@ -894,16 +913,16 @@ ImDrawData *Renderer::RenderImGUI(const RenderStatistics &stats) const
 
         ImGui::Text("Stats for nerds.");
         ImGui::Separator();
-        ImGui::Text("Delta-time: %f", stats.delta_time);
-        ImGui::Text("FPS: %f", stats.delta_time > 0.0f ? 1.0f / stats.delta_time : 0.0f);
+        ImGui::Text("Delta-time: %f", m_render_statistics.delta_time);
+        ImGui::Text("FPS: %f", m_render_statistics.delta_time > 0.0f ? 1.0f / m_render_statistics.delta_time : 0.0f);
         ImGui::Separator();
-        ImGui::Text("Quads: %u / %u", stats.instance_count, m_max_quad_instances);
-        ImGui::Text("Vertices: %u (per instance: %u)", stats.vertex_count * stats.instance_count, stats.vertex_count);
-        ImGui::Text("Indices: %u (per instance: %u)", stats.index_count * stats.instance_count, stats.index_count);
-        ImGui::Text("Particles: %u", stats.particle_count);
-        ImGui::Text("Glyphs: %u", stats.glyph_count);
-        ImGui::Text("Textures: %u", stats.texture_count);
-        ImGui::Text("Fonts: %u", stats.font_count);
+        ImGui::Text("Quads: %u / %u", m_render_statistics.instance_count, m_max_quad_instances);
+        ImGui::Text("Vertices: %u (per instance: %u)", m_render_statistics.vertex_count * m_render_statistics.instance_count, m_render_statistics.vertex_count);
+        ImGui::Text("Indices: %u (per instance: %u)", m_render_statistics.index_count * m_render_statistics.instance_count, m_render_statistics.index_count);
+        ImGui::Text("Particles: %u", m_render_statistics.particle_count);
+        ImGui::Text("Glyphs: %u", m_render_statistics.glyph_count);
+        ImGui::Text("Textures: %u", m_render_statistics.texture_count);
+        ImGui::Text("Fonts: %u", m_render_statistics.font_count);
         ImGui::Text("Compute: %u", m_use_compute_particles);
         ImGui::Separator();
 

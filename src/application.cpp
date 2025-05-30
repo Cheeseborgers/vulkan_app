@@ -16,7 +16,7 @@ Application::Application()
       m_settings_manager{"config/settings.json", true, true},
       m_is_iconified{false},
       m_framebuffer_size{0, 0},
-      p_ortho_camera{nullptr},
+      p_scene_camera{nullptr},
       m_main_font_id{0},
       m_secondary_font_id{0},
       p_current_scene{nullptr}
@@ -47,7 +47,7 @@ void Application::Initialize()
     LoadTextures();
     LoadFonts();
 
-    p_current_scene = std::make_unique<Scene>(p_ortho_camera.get(), m_renderer.GetTextureManager());
+    p_current_scene = std::make_unique<Scene>(p_scene_camera.get(), p_ui_camera.get(), m_renderer.GetTextureManager());
 
     APP_LOG_DEBUG("Application initialization success");
 }
@@ -174,10 +174,18 @@ void Application::SetupAudio(const ApplicationSettings &settings)
 void Application::SetupCamera()
 {
     const FrameBufferSize framebuffer_size{m_renderer.GetFramebufferSize()};
-    p_ortho_camera = std::make_unique<gouda::OrthographicCamera>(
-        0.0f, static_cast<f32>(framebuffer_size.width),  // left = 0, right = width
-        static_cast<f32>(framebuffer_size.height), 0.0f, // bottom = height, top = 0
-        -1.0f, 1.0f, 1.0f, 100.0f, 1.0f                  // near, far, zoom, speed, sensitivity
+    const f32 width = static_cast<f32>(framebuffer_size.width);
+    const f32 height = static_cast<f32>(framebuffer_size.height);
+    p_scene_camera = std::make_unique<gouda::OrthographicCamera>(
+        0.0f, width,  // left = 0, right = width
+        height, 0.0f, // bottom = height, top = 0
+        -1.0f, 1.0f, 1.0f, 100.0f, 1.0f // near, far, zoom, speed, sensitivity
+    );
+
+    p_ui_camera = std::make_unique<gouda::OrthographicCamera>(
+        0.0f, width,  // left = 0, right = width
+        height, 0.0f, // bottom = height, top = 0
+        -1.0f, 1.0f, 1.0f, 0.0f, 0.0f // near, far, zoom, speed, sensitivity
     );
 }
 
@@ -214,29 +222,29 @@ void Application::SetupInputSystem()
         {gouda::Key::Escape, gouda::ActionState::Pressed,
          [this] { glfwSetWindowShouldClose(p_window->GetWindow(), GLFW_TRUE); }},
         {gouda::Key::A, gouda::ActionState::Pressed,
-         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MoveLeft); }},
+         [this] { p_scene_camera->SetMovementFlag(gouda::CameraMovement::MoveLeft); }},
         {gouda::Key::A, gouda::ActionState::Released,
-         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MoveLeft); }},
+         [this] { p_scene_camera->ClearMovementFlag(gouda::CameraMovement::MoveLeft); }},
         {gouda::Key::D, gouda::ActionState::Pressed,
-         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MoveRight); }},
+         [this] { p_scene_camera->SetMovementFlag(gouda::CameraMovement::MoveRight); }},
         {gouda::Key::D, gouda::ActionState::Released,
-         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MoveRight); }},
+         [this] { p_scene_camera->ClearMovementFlag(gouda::CameraMovement::MoveRight); }},
         {gouda::Key::W, gouda::ActionState::Pressed,
-         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MoveUp); }},
+         [this] { p_scene_camera->SetMovementFlag(gouda::CameraMovement::MoveUp); }},
         {gouda::Key::W, gouda::ActionState::Released,
-         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MoveUp); }},
+         [this] { p_scene_camera->ClearMovementFlag(gouda::CameraMovement::MoveUp); }},
         {gouda::Key::S, gouda::ActionState::Pressed,
-         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::MoveDown); }},
+         [this] { p_scene_camera->SetMovementFlag(gouda::CameraMovement::MoveDown); }},
         {gouda::Key::S, gouda::ActionState::Released,
-         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::MoveDown); }},
+         [this] { p_scene_camera->ClearMovementFlag(gouda::CameraMovement::MoveDown); }},
         {gouda::Key::Q, gouda::ActionState::Pressed,
-         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZoomIn); }},
+         [this] { p_scene_camera->SetMovementFlag(gouda::CameraMovement::ZoomIn); }},
         {gouda::Key::Q, gouda::ActionState::Released,
-         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZoomIn); }},
+         [this] { p_scene_camera->ClearMovementFlag(gouda::CameraMovement::ZoomIn); }},
         {gouda::Key::E, gouda::ActionState::Pressed,
-         [this] { p_ortho_camera->SetMovementFlag(gouda::CameraMovement::ZoomOut); }},
+         [this] { p_scene_camera->SetMovementFlag(gouda::CameraMovement::ZoomOut); }},
         {gouda::Key::E, gouda::ActionState::Released,
-         [this] { p_ortho_camera->ClearMovementFlag(gouda::CameraMovement::ZoomOut); }},
+         [this] { p_scene_camera->ClearMovementFlag(gouda::CameraMovement::ZoomOut); }},
         {gouda::Key::Left, gouda::ActionState::Pressed,
          [this] { p_current_scene->GetPlayer().velocity.x = -p_current_scene->GetPlayer().speed; }},
         {gouda::Key::Left, gouda::ActionState::Released,
@@ -265,7 +273,7 @@ void Application::SetupInputSystem()
              if (p_current_scene->GetPlayer().velocity.y < 0)
                  p_current_scene->GetPlayer().velocity.y = 0;
          }},
-        {gouda::Key::Space, gouda::ActionState::Pressed, [this] { p_ortho_camera->Shake(10.0f, 0.5f); }},
+        {gouda::Key::Space, gouda::ActionState::Pressed, [this] { p_scene_camera->Shake(10.0f, 0.5f); }},
         {gouda::Key::C, gouda::ActionState::Pressed, [this] { m_renderer.ToggleComputeParticles(); }},
         {gouda::MouseButton::Left, gouda::ActionState::Pressed,
          [this] {
@@ -300,7 +308,7 @@ void Application::SetupInputSystem()
     // Scroll callback
     p_input_handler->SetScrollCallback([this]([[maybe_unused]] const f64 xOffset, const f64 yOffset) {
         const f32 zoom_delta{static_cast<f32>(yOffset) * 0.1f};
-        p_ortho_camera->AdjustZoom(zoom_delta);
+        p_scene_camera->AdjustZoom(zoom_delta);
     });
 
     // Character input callback
@@ -352,7 +360,7 @@ void Application::OnFramebufferResize([[maybe_unused]] GLFWwindow *window, Frame
     // Cleanup and Recreate swapchain, swapchain image views, and depth resources.
     m_renderer.ReCreateSwapchain();
 
-    p_ortho_camera->SetProjection(0.0f, static_cast<f32>(new_size.width), // left = 0, right = width
+    p_scene_camera->SetProjection(0.0f, static_cast<f32>(new_size.width), // left = 0, right = width
                                   static_cast<f32>(new_size.height), 0.0f);
 
     APP_LOG_DEBUG("Swapchain and framebuffers recreated successfully.");
