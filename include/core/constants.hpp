@@ -17,6 +17,8 @@ namespace filepath {
 constexpr StringView application_icon{"assets/textures/gouda_icon.png"};
 
 // Textures
+constexpr StringView texture_atlas{"assets/textures/sprite_sheet.png"};
+constexpr StringView texture_atlas_metadata{"assets/textures/sprite_sheet.json"};
 
 // Shaders
 constexpr StringView quad_vertex_shader{"assets/shaders/compiled/quad_shader.vert.spv"};

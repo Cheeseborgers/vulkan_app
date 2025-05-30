@@ -30,6 +30,11 @@ OrthographicCamera::OrthographicCamera(f32 left, f32 right, f32 bottom, f32 top,
 
 void OrthographicCamera::Update(const f32 delta_time)
 {
+    if (m_speed == 0.0f && m_sensitivity == 0.0f) {
+        m_is_dirty = false;
+        return;
+    }
+
     // Apply smooth follow if active
     ApplyFollow(delta_time);
 
@@ -80,6 +85,19 @@ Mat4 OrthographicCamera::GetViewProjectionMatrix() const
     }
 
     return m_view_projection_matrix;
+}
+
+Mat4 OrthographicCamera::GetViewMatrixNoEffects() const
+{
+    //if (m_speed == 0.0f && m_sensitivity == 0.0f) {
+        //return Mat4::identity();
+    //}
+    return math::translate(-m_position);
+}
+
+Mat4 OrthographicCamera::GetBaseProjection() const
+{
+    return m_base_projection;
 }
 
 // Private functions ---------------------------------------------------------------------

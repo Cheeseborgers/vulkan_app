@@ -200,7 +200,7 @@ void Application::LoadTextures() const
     APP_LOG_DEBUG("Loaded textures: {},{},{},{}", checkerboard_id, checkerboard_2_id, checkerboard_3_id,
                   checkerboard_4_id);
 
-    u32 atlas_id = m_renderer.LoadAtlasTexture("assets/textures/sprite_sheet.png", "assets/textures/sprite_sheet.json");
+    u32 atlas_id = m_renderer.LoadAtlasTexture(filepath::texture_atlas, filepath::texture_atlas_metadata);
     APP_LOG_DEBUG("Atlas ID: {}", atlas_id);
 }
 
@@ -277,26 +277,26 @@ void Application::SetupInputSystem()
         {gouda::Key::C, gouda::ActionState::Pressed, [this] { m_renderer.ToggleComputeParticles(); }},
         {gouda::MouseButton::Left, gouda::ActionState::Pressed,
          [this] {
-             p_current_scene->SpawnParticle({0, 0, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
-             p_current_scene->SpawnParticle({0, 100, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
-             p_current_scene->SpawnParticle({0, 200, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
-             p_current_scene->SpawnParticle({0, 350, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
-             p_current_scene->SpawnParticle({0, 500, -0.8f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({0, 0, -0.4f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({0, 100, -0.4f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({0, 200, -0.4f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({0, 350, -0.4f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
+             p_current_scene->SpawnParticle({0, 500, -0.4f}, {10, 10}, {100, 100, 0}, 5.0f, 0, {1, 0, 0, 1.0f});
              m_audio_manager.PlaySoundEffect(m_laser_1);
          }},
 
         {gouda::MouseButton::Right, gouda::ActionState::Pressed,
          [this] {
              f32 framebuffer_width{static_cast<f32>(this->m_framebuffer_size.width)};
-             p_current_scene->SpawnParticle({framebuffer_width, 0, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
+             p_current_scene->SpawnParticle({framebuffer_width, 0, -0.4f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
                                             {1, 0, 0, 1.0f});
-             p_current_scene->SpawnParticle({framebuffer_width, 100, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
+             p_current_scene->SpawnParticle({framebuffer_width, 100, -0.4f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
                                             {1, 0, 0, 1.0f});
-             p_current_scene->SpawnParticle({framebuffer_width, 200, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
+             p_current_scene->SpawnParticle({framebuffer_width, 200, -0.4f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
                                             {1, 0, 0, 1.0f});
-             p_current_scene->SpawnParticle({framebuffer_width, 350, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
+             p_current_scene->SpawnParticle({framebuffer_width, 350, -0.4f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
                                             {1, 0, 0, 1.0f});
-             p_current_scene->SpawnParticle({framebuffer_width, 500, -0.8f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
+             p_current_scene->SpawnParticle({framebuffer_width, 500, -0.4f}, {10, 10}, {-100, 100, 0}, 5.0f, 0,
                                             {1, 0, 0, 1.0f});
              m_audio_manager.PlaySoundEffect(m_laser_2);
          }},

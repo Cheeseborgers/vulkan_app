@@ -90,6 +90,10 @@ public:
      */
     Mat4 GetViewProjectionMatrix() const override;
 
+    Mat4 GetViewMatrixNoEffects() const;
+
+    Mat4 GetBaseProjection() const;
+
     f32 GetLeft() const { return m_left / m_zoom; }
     f32 GetRight() const { return m_right / m_zoom; }
     f32 GetBottom() const { return m_bottom / m_zoom; }

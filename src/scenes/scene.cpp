@@ -247,11 +247,11 @@ void Scene::DrawUI(gouda::vk::Renderer &renderer)
 {
     m_text_instances.clear();
 
-    renderer.DrawText("GOUDA RENDERER", {100.0f, 100.0f, -0.8}, {0.0f, 1.0f, 0.0f, 1.0f}, 20.0f, m_font_id,
+    renderer.DrawText("GOUDA RENDERER", {100.0f, 100.0f, -0.5}, {0.0f, 1.0f, 0.0f, 1.0f}, 20.0f, m_font_id,
                       m_text_instances, gouda::TextAlign::Center, true);
 
 
-    renderer.DrawText("GOUDA RENDERER", {200.0f, 200.0f, -0.8}, {0.0f, 1.0f, 0.0f, 1.0f}, 50.0f, 2,
+    renderer.DrawText("GOUDA RENDERER", {200.0f, 200.0f, -0.1}, {0.0f, 1.0f, 0.0f, 1.0f}, 50.0f, 2,
                   m_text_instances);
 }
 
@@ -281,7 +281,7 @@ void Scene::SetupPlayer()
 {
     // TODO: Fix the player position in regards to the camera viewport and check collision is not affected by the z axis
     // yet?????
-    m_player.render_data.position = {500.0f, 500.0f, -0.9f};
+    m_player.render_data.position = {500.0f, 500.0f, -0.4f};
     m_player.render_data.size = {32.0f, 32.0f};
     m_player.render_data.texture_index = 5;
     m_player.render_data.colour = {1.0f, 1.0f, 1.0f, 0.0f};
@@ -303,15 +303,15 @@ void Scene::SetupPlayer()
 void Scene::SetupUI()
 {
     gouda::InstanceData debug{};
-    debug.position = {10.f, 800.f, -1.0f};
+    debug.position = {10.f, 800.f, -0.19f};
     debug.size = {100.0f, 100.0f};
     debug.texture_index = 0;
-    debug.colour = {0.3f, 0.6f, 0.4f, 1.0f};
+    debug.colour = {0.3f, 0.6f, 0.4f, 0.1f};
     debug.apply_camera_effects = 0;
     m_ui_elements.emplace_back(debug);
 
     gouda::InstanceData menu{};
-    menu.position = {100.f, 100.f, -1.0f};
+    menu.position = {100.f, 100.f, -0.19f};
     menu.size = {500.0f, 500.0f};
     menu.texture_index = 0;
     menu.colour = {0.3f, 0.3f, 0.3f, 1.0f};
