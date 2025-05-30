@@ -22,6 +22,7 @@
  */
 #include <array>
 #include <cmath>
+#include <immintrin.h>
 
 #include "core/types.hpp"
 #include "debug/assert.hpp"
@@ -59,7 +60,7 @@ public:
     {
         Derived result;
         if constexpr (N == 4) {
-            if (simdLevel >= SIMDLevel::AVX) {
+            if (s_simd_level >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<const Derived *>(this)->components.data());
                 __m128 b = _mm_loadu_ps(other.components.data());
                 __m128 r = _mm_add_ps(a, b);
@@ -76,7 +77,7 @@ public:
     {
         Derived result;
         if constexpr (N == 4) {
-            if (simdLevel >= SIMDLevel::AVX) {
+            if (s_simd_level >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<const Derived *>(this)->components.data());
                 __m128 b = _mm_loadu_ps(other.components.data());
                 __m128 r = _mm_sub_ps(a, b);
@@ -93,7 +94,7 @@ public:
     {
         Derived result;
         if constexpr (N == 4) {
-            if (simdLevel >= SIMDLevel::AVX) {
+            if (s_simd_level >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<const Derived *>(this)->components.data());
                 __m128 s = _mm_set1_ps(scalar);
                 __m128 r = _mm_mul_ps(a, s);
@@ -111,7 +112,7 @@ public:
         ASSERT(scalar != T(0), "Division by zero in Vector");
         Derived result;
         if constexpr (N == 4) {
-            if (simdLevel >= SIMDLevel::AVX) {
+            if (s_simd_level >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<const Derived *>(this)->components.data());
                 __m128 s = _mm_set1_ps(scalar);
                 __m128 r = _mm_div_ps(a, s);
@@ -127,7 +128,7 @@ public:
     Derived &operator+=(const Derived &other)
     {
         if constexpr (N == 4) {
-            if (simdLevel >= SIMDLevel::AVX) {
+            if (s_simd_level >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<Derived *>(this)->components.data());
                 __m128 b = _mm_loadu_ps(other.components.data());
                 a = _mm_add_ps(a, b);
@@ -143,7 +144,7 @@ public:
     Derived &operator-=(const Derived &other)
     {
         if constexpr (N == 4) {
-            if (simdLevel >= SIMDLevel::AVX) {
+            if (s_simd_level >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<Derived *>(this)->components.data());
                 __m128 b = _mm_loadu_ps(other.components.data());
                 a = _mm_sub_ps(a, b);
@@ -159,7 +160,7 @@ public:
     Derived &operator*=(T scalar)
     {
         if constexpr (N == 4) {
-            if (simdLevel >= SIMDLevel::AVX) {
+            if (s_simd_level >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<Derived *>(this)->components.data());
                 __m128 s = _mm_set1_ps(scalar);
                 a = _mm_mul_ps(a, s);
@@ -176,7 +177,7 @@ public:
     {
         ASSERT(scalar != T(0), "Division by zero in Vector");
         if constexpr (N == 4) {
-            if (simdLevel >= SIMDLevel::AVX) {
+            if (s_simd_level >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<Derived *>(this)->components.data());
                 const __m128 s = _mm_set1_ps(scalar);
                 a = _mm_div_ps(a, s);
@@ -193,7 +194,7 @@ public:
     {
         Derived result;
         if constexpr (N == 4) {
-            if (simdLevel >= SIMDLevel::AVX) {
+            if (s_simd_level >= SIMDLevel::AVX) {
                 __m128 a = _mm_loadu_ps(static_cast<const Derived *>(this)->components.data());
                 const __m128 zero = _mm_setzero_ps();
                 a = _mm_sub_ps(zero, a);
@@ -220,7 +221,7 @@ public:
     {
         T result = T(0);
         if constexpr (N == 4) {
-            if (simdLevel >= SIMDLevel::SSE2) {
+            if (s_simd_level >= SIMDLevel::SSE2) {
                 const __m128 a = _mm_loadu_ps(static_cast<const Derived *>(this)->components.data());
                 const __m128 b = _mm_loadu_ps(other.components.data());
                 __m128 mul = _mm_mul_ps(a, b);

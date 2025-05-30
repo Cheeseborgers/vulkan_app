@@ -39,19 +39,19 @@ using f64 = double;
 
 namespace constants {
 // Unsigned int numerical limits
-inline constexpr uint8_t u8_max = std::numeric_limits<uint8_t>::max();
-inline constexpr uint16_t u16_max = std::numeric_limits<uint16_t>::max();
-inline constexpr uint32_t u32_max = std::numeric_limits<uint32_t>::max();
-inline constexpr uint64_t u64_max = std::numeric_limits<uint64_t>::max();
+inline constexpr u8 u8_max = std::numeric_limits<uint8_t>::max();
+inline constexpr u16 u16_max = std::numeric_limits<uint16_t>::max();
+inline constexpr u32 u32_max = std::numeric_limits<uint32_t>::max();
+inline constexpr u64 u64_max = std::numeric_limits<uint64_t>::max();
 
 // Signed int numerical limits
-inline constexpr int8_t s8_max = std::numeric_limits<int8_t>::max();
-inline constexpr int16_t s16_max = std::numeric_limits<int16_t>::max();
-inline constexpr int32_t s32_max = std::numeric_limits<int32_t>::max();
-inline constexpr int64_t s64_max = std::numeric_limits<int64_t>::max();
+inline constexpr s8 s8_max = std::numeric_limits<int8_t>::max();
+inline constexpr s16 s16_max = std::numeric_limits<int16_t>::max();
+inline constexpr s32 s32_max = std::numeric_limits<int32_t>::max();
+inline constexpr s64 s64_max = std::numeric_limits<int64_t>::max();
 
-inline constexpr float f32_max = std::numeric_limits<float>::max();
-inline constexpr double f64_max = std::numeric_limits<double>::max();
+inline constexpr f32 f32_max = std::numeric_limits<float>::max();
+inline constexpr f64 f64_max = std::numeric_limits<double>::max();
 
 inline constexpr size_t size_t_max = std::numeric_limits<size_t>::max();
 
@@ -59,13 +59,14 @@ inline constexpr size_t kb = 1024;
 inline constexpr size_t mb = kb * 1024;
 inline constexpr size_t gb = mb * 1024;
 
-inline constexpr float gravity = -9.81f;
-inline constexpr float epsilon = 1e-6f;
-inline constexpr float infinity = std::numeric_limits<float>::infinity();
-inline constexpr float pi = 3.14159265359f;
+inline constexpr f32 gravity = -9.81f;
+inline constexpr f32 epsilon = 1e-6f;
+inline constexpr f32 infinity = std::numeric_limits<float>::infinity();
+inline constexpr f32 pi = 3.14159265359f;
+inline constexpr f32 double_pi = 2 * pi;
 
-inline  constexpr float z_max = 0.0f;
-inline  constexpr float z_min = -0.9f;
+inline constexpr f32 z_max = 0.0f;
+inline constexpr f32 z_min = -0.9f;
 
 } // namespace constants
 
