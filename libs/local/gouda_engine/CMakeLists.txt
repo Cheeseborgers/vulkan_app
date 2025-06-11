@@ -94,6 +94,7 @@ set(PROJECT_SOURCES
 
         src/utils/filesystem.cpp
         src/utils/image.cpp
+        include/math/easing.hpp
 
 )
 

@@ -1,3 +1,9 @@
+/**
+* @file application.cpp
+ * @author GoudaCheeseburgers
+ * @date 2025-25-03
+ * @brief Application module implementation
+ */
 #include "application.hpp"
 
 #include <utility>
@@ -9,27 +15,19 @@
 #include "utils/timer.hpp"
 
 #include "core/constants.hpp"
+#include "core/state_stack.hpp"
+#include "states/intro_state.hpp"
 
 Application::Application()
     : p_window{nullptr},
       p_input_handler{nullptr},
       m_settings_manager{"config/settings.json", true, true},
+      p_context{nullptr},
+      p_state_stack{nullptr},
       m_is_iconified{false},
       m_framebuffer_size{0, 0},
       p_scene_camera{nullptr},
-      m_main_font_id{0},
-      m_secondary_font_id{0},
       p_current_scene{nullptr}
-{
-}
-
-Application::~Application()
-{
-    APP_LOG_INFO("Cleaning up application");
-    m_renderer.DeviceWait(); // Ensure GPU is idle before cleanup
-}
-
-void Application::Initialize()
 {
     APP_LOG_INFO("Initializing");
 
@@ -46,17 +44,29 @@ void Application::Initialize()
 
     LoadTextures();
     LoadFonts();
+    LoadInitialState();
 
     p_current_scene = std::make_unique<Scene>(p_scene_camera.get(), p_ui_camera.get(), m_renderer.GetTextureManager());
 
     APP_LOG_DEBUG("Application initialization success");
 }
 
-void Application::Update(const f32 delta_time) const { p_current_scene->Update(delta_time); }
+Application::~Application()
+{
+    APP_LOG_INFO("Cleaning up application");
+    m_renderer.DeviceWait(); // Ensure GPU is idle before cleanup
+}
 
-void Application::RenderScene(const f32 delta_time) { p_current_scene->Render(delta_time, m_renderer, m_uniform_data); }
+void Application::Update(const f32 delta_time)
+{
+    p_scene_camera->Update(delta_time);
+    p_ui_camera->Update(delta_time);
 
-void Application::Execute()
+    m_uniform_data.wvp = p_scene_camera->GetViewProjectionMatrix();
+    m_uniform_data.wvp_static = p_ui_camera->GetViewProjectionMatrix();
+}
+
+void Application::Run()
 {
     APP_LOG_INFO("Running...");
 
@@ -91,14 +101,19 @@ void Application::Execute()
         delta_time = frame_timer.GetDeltaTime();
         delta_time = game_clock.ApplyTimeScale(delta_time); // Apply time scaling
 
+        p_state_stack->HandleInput(); // Handle state input
+
         // Update physics at a fixed timestep
         physics_timer.UpdateAccumulator(delta_time);
         while (physics_timer.ShouldUpdate()) {
-            Update(physics_timer.GetFixedTimeStep());
+            p_state_stack->Update(physics_timer.GetFixedTimeStep());
             physics_timer.Advance();
         }
 
-        RenderScene(delta_time); // Render at variable FPS
+        Update(delta_time);
+        p_state_stack->Render(delta_time);
+
+        p_state_stack->ApplyPendingChanges(); // Apply any changes to the state stack
 
         // Apply FPS limiter only if V-Sync is off
         if (fps_limiter) {
@@ -109,8 +124,7 @@ void Application::Execute()
     m_renderer.DeviceWait();
 }
 
-// Private
-// -------------------------------------------------------------------------------------------------------------
+// Private ---------------------------------------------------------------------------------------------
 void Application::SetupTimerSettings(const ApplicationSettings &settings)
 {
     m_time_settings.target_fps = settings.refresh_rate;
@@ -165,7 +179,6 @@ void Application::SetupAudio(const ApplicationSettings &settings)
     m_audio_manager.QueueMusic(m_music3);
     m_audio_manager.QueueMusic(m_music2);
     m_audio_manager.QueueMusic(m_music);
-
     m_audio_manager.QueueMusic(m_music4);
     m_audio_manager.QueueMusic(m_music5);
     m_audio_manager.QueueMusic(m_music6);
@@ -174,19 +187,28 @@ void Application::SetupAudio(const ApplicationSettings &settings)
 void Application::SetupCamera()
 {
     const FrameBufferSize framebuffer_size{m_renderer.GetFramebufferSize()};
-    const f32 width = static_cast<f32>(framebuffer_size.width);
-    const f32 height = static_cast<f32>(framebuffer_size.height);
-    p_scene_camera = std::make_unique<gouda::OrthographicCamera>(
-        0.0f, width,  // left = 0, right = width
-        height, 0.0f, // bottom = height, top = 0
-        -1.0f, 1.0f, 1.0f, 100.0f, 1.0f // near, far, zoom, speed, sensitivity
+    const f32 width{static_cast<f32>(framebuffer_size.width)};
+    const f32 height{static_cast<f32>(framebuffer_size.height)};
+
+    p_scene_camera = std::make_unique<gouda::OrthographicCamera>(0.0f, width,  // left = 0, right = width
+                                                                 height, 0.0f, // bottom = height, top = 0
+                                                                 -1.0f, 1.0f, 1.0f, 100.0f,
+                                                                 1.0f // near, far, zoom, speed, sensitivity
     );
 
-    p_ui_camera = std::make_unique<gouda::OrthographicCamera>(
-        0.0f, width,  // left = 0, right = width
-        height, 0.0f, // bottom = height, top = 0
-        -1.0f, 1.0f, 1.0f, 0.0f, 0.0f // near, far, zoom, speed, sensitivity
-    );
+    p_ui_camera =
+        std::make_unique<gouda::OrthographicCamera>(0.0f, width,                  // left = 0, right = width
+                                                    height, 0.0f,                 // bottom = height, top = 0
+                                                    -1.0f, 1.0f, 1.0f, 0.0f, 0.0f // near, far, zoom, speed, sensitivity
+        );
+}
+void Application::SetCameraProjections(const gouda::Vec2 &framebuffer_size)
+{
+    p_scene_camera->SetProjection(0.0f, framebuffer_size.x, // left = 0, right = width
+                                  framebuffer_size.y, 0.0f);
+
+    p_ui_camera->SetProjection(0.0f, framebuffer_size.x, // left = 0, right = width
+                                  framebuffer_size.y, 0.0f);
 }
 
 void Application::LoadTextures() const
@@ -200,14 +222,30 @@ void Application::LoadTextures() const
     APP_LOG_DEBUG("Loaded textures: {},{},{},{}", checkerboard_id, checkerboard_2_id, checkerboard_3_id,
                   checkerboard_4_id);
 
-    u32 atlas_id = m_renderer.LoadAtlasTexture(filepath::texture_atlas, filepath::texture_atlas_metadata);
+    u32 atlas_id{m_renderer.LoadAtlasTexture(filepath::texture_atlas, filepath::texture_atlas_metadata)};
     APP_LOG_DEBUG("Atlas ID: {}", atlas_id);
 }
 
 void Application::LoadFonts()
 {
-    m_main_font_id = m_renderer.LoadMSDFFont(filepath::primary_font_atlas, filepath::primary_font_metadata);
-    m_secondary_font_id = m_renderer.LoadMSDFFont(filepath::secondary_font_atlas, filepath::secondary_font_metadata);
+    m_renderer.LoadMSDFFont(filepath::primary_font_atlas, filepath::primary_font_metadata);
+    m_renderer.LoadMSDFFont(filepath::secondary_font_atlas, filepath::secondary_font_metadata);
+}
+
+void Application::LoadInitialState()
+{
+    p_context = std::make_unique<SharedContext>();
+    p_context->renderer = &m_renderer;
+    p_context->window = p_window.get();
+    p_context->input_handler = p_input_handler.get();
+    p_context->texture_manager = m_renderer.GetTextureManager();
+    p_context->scene_camera = p_scene_camera.get();
+    p_context->ui_camera = p_ui_camera.get();
+    p_context->uniform_data = &m_uniform_data;
+
+    p_state_stack = std::make_unique<StateStack>();
+    p_state_stack->Push(std::make_unique<IntroState>(*p_context, *p_state_stack));
+    p_state_stack->ApplyPendingChanges();
 }
 
 void Application::SetupInputSystem()
@@ -360,10 +398,12 @@ void Application::OnFramebufferResize([[maybe_unused]] GLFWwindow *window, Frame
     // Cleanup and Recreate swapchain, swapchain image views, and depth resources.
     m_renderer.ReCreateSwapchain();
 
-    p_scene_camera->SetProjection(0.0f, static_cast<f32>(new_size.width), // left = 0, right = width
-                                  static_cast<f32>(new_size.height), 0.0f);
+    const gouda::Vec2 float_size{static_cast<f32>(new_size.width), static_cast<f32>(new_size.height)};
+    SetCameraProjections(float_size);
 
-    APP_LOG_DEBUG("Swapchain and framebuffers recreated successfully.");
+    p_state_stack->OnFrameBufferResize(float_size); // Resize the current states
+
+    APP_LOG_DEBUG("Swapchain and framebuffers recreated successfully. States updated.");
 }
 
 void Application::OnWindowResize([[maybe_unused]] GLFWwindow *window, WindowSize new_size)

@@ -83,7 +83,7 @@ public:
      * @param alloc The allocator to use (default: Allocator()).
      * @throws Any exception thrown by T's default constructor or allocator.
      */
-    explicit SmallVector(size_t count) : m_data(stack_data()), m_size(0), m_capacity(N)
+    explicit SmallVector(size_t count) : m_size(0), m_capacity(N), m_data(stack_data())
     {
         if (count > N) {
             reserve(count);
@@ -105,7 +105,7 @@ public:
      * @param count The number of elements.
      * @param value The value to copy into each element.
      */
-    SmallVector(size_t count, const T &value) : m_data(stack_data()), m_size(0), m_capacity(N)
+    SmallVector(const size_t count, const T &value) : m_size(0), m_capacity(N), m_data(stack_data())
     {
         if (count > N) {
             reserve(count);
@@ -188,7 +188,7 @@ public:
      * @brief Copy constructor duplicates the contents of another SmallVector.
      * @param other The SmallVector to copy from.
      */
-    SmallVector(const SmallVector &other) : m_data(stack_data()), m_size(0), m_capacity(N)
+    SmallVector(const SmallVector &other) : m_size(0), m_capacity(N), m_data(stack_data())
     {
         reserve(other.m_size);
         try {
@@ -288,7 +288,7 @@ public:
      * @brief Ensures that the vector has at least the specified capacity.
      * @param new_cap New minimum capacity.
      */
-    void reserve(size_t new_cap)
+    void reserve(const size_t new_cap)
     {
         if (new_cap <= m_capacity) {
             return;
@@ -455,7 +455,6 @@ public:
      * @note This function is noexcept.
      */
     constexpr T &front() noexcept
-        requires std::is_trivially_copyable_v<T>
     {
         ASSERT(m_size > 0, "front on empty SmallVector");
         return *std::launder(m_data);
@@ -469,7 +468,6 @@ public:
      * @note This function is noexcept.
      */
     constexpr const T &front() const noexcept
-        requires std::is_trivially_copyable_v<T>
     {
         ASSERT(m_size > 0, "front on empty SmallVector");
         return *std::launder(m_data);
@@ -483,7 +481,6 @@ public:
      * @note This function is noexcept.
      */
     constexpr T &back() noexcept
-        requires std::is_trivially_copyable_v<T>
     {
         ASSERT(m_size > 0, "back on empty SmallVector");
         return *std::launder(m_data + m_size - 1);
@@ -497,7 +494,6 @@ public:
      * @note This function is noexcept.
      */
     constexpr const T &back() const noexcept
-        requires std::is_trivially_copyable_v<T>
     {
         ASSERT(m_size > 0, "back on empty SmallVector");
         return *std::launder(m_data + m_size - 1);

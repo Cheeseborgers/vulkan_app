@@ -11,6 +11,8 @@
 #include "scenes/scene.hpp"
 #include "utils/timer.hpp"
 
+#include "core/state_stack.hpp"
+
 // TODO: Figure how this will work with settings and the present mode settings
 struct TimeSettings {
     f32 time_scale;                  // Game speed modifier
@@ -34,19 +36,19 @@ public:
     Application();
     ~Application();
 
-    void Initialize();
-    void Update(f32 delta_time) const;
-    void RenderScene(f32 delta_time);
-    void Execute();
+    void Run();
 
 private:
+    void Update(f32 delta_time);
     void SetupTimerSettings(const ApplicationSettings &settings);
     void SetupWindow(const ApplicationSettings &settings);
     void SetupRenderer();
     void SetupAudio(const ApplicationSettings &settings);
     void SetupCamera();
+    void SetCameraProjections(const gouda::Vec2 &framebuffer_size);
     void LoadTextures() const;
     void LoadFonts();
+    void LoadInitialState();
     void SetupInputSystem();
 
     void OnFramebufferResize(GLFWwindow *window, FrameBufferSize new_size);
@@ -58,6 +60,9 @@ private:
     std::unique_ptr<gouda::InputHandler> p_input_handler;
     SettingsManager m_settings_manager;
     gouda::vk::Renderer m_renderer;
+
+    std::unique_ptr<SharedContext> p_context;
+    std::unique_ptr<StateStack> p_state_stack;
 
     bool m_is_iconified;
     FrameBufferSize m_framebuffer_size;
@@ -78,9 +83,6 @@ private:
     gouda::audio::MusicTrack m_music4;
     gouda::audio::MusicTrack m_music5;
     gouda::audio::MusicTrack m_music6;
-
-    u8 m_main_font_id;
-    u8 m_secondary_font_id;
 
     std::unique_ptr<Scene> p_current_scene;
 };

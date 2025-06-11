@@ -81,7 +81,7 @@ struct SimulationParams {
 };
 
 struct alignas(16) ParticleData {
-    ParticleData(const Vec3 &position_, const Vec2 &size_, const f32 lifetime_, const Vec3 &velocity_,
+    ParticleData(const Vec3 &position_, const Vec2 &size_, f32 lifetime_, const Vec3 &velocity_,
                  const Vec4 &colour_, u32 texture_index_,
                  const UVRect<f32> &sprite_rect_ = UVRect{0.0f, 0.0f, 0.0f, 0.0f}, u32 is_atlas_ = 0,
                  u32 apply_camera_effects_ = 1); // Default to true for camera effects

@@ -62,18 +62,37 @@ set(JSON_Install OFF CACHE INTERNAL "")
 set(CMAKE_BINARY_DIR "${CMAKE_SOURCE_DIR}/build")
 
 add_executable(${PROJECT_NAME}
-        include/components/health_component.hpp)
+        include/ui/side_panel.hpp
+        src/states/state.cpp
+        src/ui/side_panel.cpp
+)
 
 target_sources(${PROJECT_NAME}
     PRIVATE
-    src/application.cpp
-    src/main.cpp
-    src/components/animation_component.cpp
+        src/main.cpp
+        src/application.cpp
+
+        src/core/state_stack.cpp
+        src/core/settings_manager.cpp
+
+        src/components/animation_component.cpp
         src/components/health_component.cpp
-    src/core/settings_manager.cpp
-    src/entities/entity.cpp
-    src/entities/player.cpp
-    src/scenes/scene.cpp
+
+        src/entities/entity.cpp
+        src/entities/player.cpp
+
+        src/scenes/scene.cpp
+
+        src/ui/button.cpp
+        src/ui/ui_element.cpp
+        src/ui/ui_manager.cpp
+        src/ui/side_panel.cpp
+
+        src/states/game_state.cpp
+        src/states/editor_state.cpp
+        src/states/main_menu_state.cpp
+        src/states/settings_state.cpp
+        src/states/intro_state.cpp
 )
 
 # Include directories

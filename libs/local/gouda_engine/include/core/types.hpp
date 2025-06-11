@@ -243,7 +243,7 @@ struct Rect {
     }
 };
 
-
+namespace gouda {
 template <NumericT T>
 struct Colour {
     union {
@@ -266,6 +266,7 @@ struct Colour {
         return std::format("r: {}, g: {}, b: {}, a: {}", r, g, b, a);
     }
 };
+} // namespace gouda
 
 using FrameBufferSize = Dimensions<int>;
 using WindowSize = Dimensions<int>;

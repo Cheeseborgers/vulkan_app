@@ -23,7 +23,9 @@ InputHandler::InputHandler(std::unique_ptr<InputBackend> backend, GLFWwindow *wi
       m_window_focus_callback(nullptr),
       m_frame_buffer_size_callback(nullptr),
       m_window_size_callback(nullptr),
-      m_window_iconify_callback(nullptr)
+      m_window_iconify_callback(nullptr),
+      m_mouse_x(0),
+      m_mouse_y(0)
 {
     p_backend->RegisterCallbacks(p_window);
 }
@@ -179,15 +181,15 @@ void InputHandler::ClearWindowIconifyCallback()
     ENGINE_LOG_DEBUG("Window iconify callback cleared");
 }
 
-bool InputHandler::IsKeyPressed(Key key) const
+bool InputHandler::IsKeyPressed(const Key key) const
 {
-    auto it = m_key_states.find(key);
+    const auto it = m_key_states.find(key);
     return it != m_key_states.end() ? it->second : false;
 }
 
-bool InputHandler::IsMouseButtonPressed(MouseButton button) const
+bool InputHandler::IsMouseButtonPressed(const MouseButton button) const
 {
-    auto it = m_mouse_states.find(button);
+    const auto it = m_mouse_states.find(button);
     return it != m_mouse_states.end() ? it->second : false;
 }
 

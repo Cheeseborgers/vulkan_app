@@ -3,6 +3,5 @@
 int main()
 {
     Application app;
-    app.Initialize();
-    app.Execute();
+    app.Run();
 }

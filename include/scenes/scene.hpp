@@ -17,18 +17,6 @@
 
 #include "entities/player.hpp"
 
-struct UIElement {
-    gouda::InstanceData instances_data;
-    bool dirty{true};
-};
-
-struct Button : UIElement {
-    String text;
-    u16 font_id;
-
-    CallbackFunction<> callback;
-};
-
 struct GridPos {
     s32 x;
     s32 y;

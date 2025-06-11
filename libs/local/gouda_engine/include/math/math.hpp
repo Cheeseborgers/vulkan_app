@@ -160,6 +160,22 @@ constexpr T min(std::initializer_list<T> values)
     return min_value;
 }
 
+template <NumericT T>
+constexpr T lerp(T a, T b, T t)
+{
+    return a + (b - a) * t;
+}
+
+constexpr f32 pow(const f32 base, const int exp)
+{
+    f32 result{1.0f};
+    for (int i = 0; i < exp; ++i) {
+        result *= base;
+    }
+
+    return result;
+}
+
 template <typename T>
 [[nodiscard]] f32 aspect_ratio(const T &size) noexcept
 {

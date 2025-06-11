@@ -14,7 +14,7 @@ InstanceData::InstanceData()
       size{1.0f, 1.0f},
       rotation{0.0f},
       texture_index{0},
-      colour{1.0f, 0.0f, 0.0f, 1.0f}, // Default to red
+      colour{1.0f, 1.0f, 1.0f, 1.0f},
       sprite_rect{0.0f, 0.0f, 0.0f, 0.0f},
       is_atlas{0},
       apply_camera_effects{1}, // Default to true
