@@ -1,0 +1,59 @@
+#version 450
+//#extension GL_EXT_debug_printf : enable
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+struct Particle {
+    vec3 position;       // offset 0, size 12
+    float _pad0;         // offset 12 → align to 16
+
+    vec2 size;           // offset 16
+    float lifetime;      // offset 24
+    float _pad1;         // offset 28 → align to 32
+
+    vec3 velocity;       // offset 32, size 12
+    float _pad2;         // offset 44 → align to 48
+
+    vec4 colour;         // offset 48
+
+    uint texture_index;  // offset 64
+    float _pad3[3];      // offset 68 → align to 80
+
+    vec4 sprite_rect;    // offset 80
+
+    uint is_atlas;       // offset 96
+    uint apply_camera_effects; // offset 100
+    float _pad4[4];      // offset 104 → align to 128
+};
+
+layout(std430, set = 0, binding = 0) buffer ParticleBuffer {
+    Particle particles[];
+};
+
+layout(set = 0, binding = 1) uniform SimulationParams {
+    vec3 gravity;
+    float delta_time;
+} params;
+
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+    //debugPrintfEXT("Particle buffer length: %u", particles.length());
+    if (index < particles.length()) {
+        Particle p = particles[index];
+        //debugPrintfEXT("Particle[%u]: pos = [%f, %f, %f], size = [%f, %f], lifetime = %f, vel = [%f, %f, %f], colour = [%f, %f, %f, %f], texture_index = %u, is_atlas = %u, delta_time = %f",
+        //index, p.position.x, p.position.y, p.position.z, p.size.x, p.size.y, p.lifetime,
+        //p.velocity.x, p.velocity.y, p.velocity.z, p.colour.x, p.colour.y, p.colour.z, p.colour.w,
+        //p.texture_index, p.is_atlas, params.delta_time);
+        if (p.lifetime > 0.0) {
+            p.position += p.velocity * params.delta_time;
+            p.velocity += params.gravity * params.delta_time;
+            p.lifetime -= params.delta_time;
+            p.colour.w = p.lifetime / 5.0;
+            p.colour.y = 0.5f;
+
+        } else {
+            p.colour.w = 0.0;
+        }
+        particles[index] = p;
+    }
+}
