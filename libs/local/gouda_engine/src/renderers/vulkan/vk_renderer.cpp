@@ -32,7 +32,7 @@ namespace gouda::vk {
 
 RenderStatistics::RenderStatistics() :
     delta_time{0.0f},
-    instance_count{0},
+    quad_count{0},
     vertex_count{0},
     index_count{0},
     particle_count{0},
@@ -214,7 +214,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer command_buffer, const u32 ima
 
     // Particle rendering
     if (p_particle_pipeline && particle_instance_count > 0) {
-        // ENGINE_LOG_DEBUG("Particle draw: instance_count = {}", particle_instance_count);
+        // ENGINE_LOG_DEBUG("Particle draw: quad_count = {}", particle_instance_count);
         p_particle_pipeline->Bind(command_buffer, image_index);
         const VkBuffer buffers[]{p_quad_vertex_buffer->p_buffer, m_particle_storage_buffers[image_index].p_buffer};
         constexpr VkDeviceSize offsets[]{0, 0};
@@ -295,13 +295,14 @@ void Renderer::Render(const f32 delta_time, const UniformData &uniform_data,
 
     // TODO: Only update this in debug mode
     m_render_statistics.delta_time = delta_time;
-    m_render_statistics.instance_count = static_cast<u32>(quad_instances.size());
+    m_render_statistics.quad_count = static_cast<u32>(quad_instances.size());
     m_render_statistics.vertex_count = m_vertex_count;
     m_render_statistics.index_count = m_index_count;
     m_render_statistics.particle_count = static_cast<u32>(m_particles_instances.size());
     m_render_statistics.glyph_count = static_cast<u32>(text_instances.size());
     m_render_statistics.texture_count = p_texture_manager->GetTextureCount();
     m_render_statistics.font_count = static_cast<u32>(m_fonts.size());
+    m_render_statistics.total_instances = m_render_statistics.quad_count + m_render_statistics.particle_count + m_render_statistics.glyph_count;
 
     // Render ImGui
     ImDrawData *imgui_draw_data{nullptr};
@@ -916,11 +917,12 @@ ImDrawData *Renderer::RenderImGUI() const
         ImGui::Text("Delta-time: %f", m_render_statistics.delta_time);
         ImGui::Text("FPS: %f", m_render_statistics.delta_time > 0.0f ? 1.0f / m_render_statistics.delta_time : 0.0f);
         ImGui::Separator();
-        ImGui::Text("Quads: %u / %u", m_render_statistics.instance_count, m_max_quad_instances);
-        ImGui::Text("Vertices: %u (per instance: %u)", m_render_statistics.vertex_count * m_render_statistics.instance_count, m_render_statistics.vertex_count);
-        ImGui::Text("Indices: %u (per instance: %u)", m_render_statistics.index_count * m_render_statistics.instance_count, m_render_statistics.index_count);
+        ImGui::Text("Quads: %u / %u", m_render_statistics.quad_count, m_max_quad_instances);
+        ImGui::Text("Vertices: %u (per instance: %u)", m_render_statistics.vertex_count * m_render_statistics.quad_count, m_render_statistics.vertex_count);
+        ImGui::Text("Indices: %u (per instance: %u)", m_render_statistics.index_count * m_render_statistics.quad_count, m_render_statistics.index_count);
         ImGui::Text("Particles: %u", m_render_statistics.particle_count);
         ImGui::Text("Glyphs: %u", m_render_statistics.glyph_count);
+        ImGui::Text("Total instances: %u", m_render_statistics.total_instances);
         ImGui::Text("Textures: %u", m_render_statistics.texture_count);
         ImGui::Text("Fonts: %u", m_render_statistics.font_count);
         ImGui::Text("Compute: %u", m_use_compute_particles);

@@ -40,11 +40,12 @@ struct RenderStatistics {
     RenderStatistics();
 
     f32 delta_time;
-    u32 instance_count;
+    u32 quad_count;
     u32 vertex_count;
     u32 index_count;
     u32 particle_count;
     u32 glyph_count;
+    u32 total_instances;
     u32 texture_count;
     u32 font_count;
 };
