@@ -13,6 +13,7 @@ EditorState::EditorState(SharedContext &context, StateStack &state_stack)
       m_show_entity_popups{true},
       m_side_panel{context, {0.2f, 1.0f}, {10.0f, 0.0f}, {0.2f, 0.2f, 0.2f, 1.0f}, "PANEL", 1, {0.3f, 0.3f, 0.3f, 1.0f},
                    50.0F},
+      m_debug_panel{context, {250.0f, 250.0f}, {0.1f, 0.8f, 0.6f, 1.0f}, 1, 20.0f},
       m_ui_manager{context}
 {
     m_quad_instances.reserve(app_constants::max_quads);
@@ -27,6 +28,9 @@ EditorState::EditorState(SharedContext &context, StateStack &state_stack)
     m_top_menu.instance.colour = {0.2f, 0.2f, 0.2f, 1.0f};
     m_top_menu.instance.texture_index = 0;
     m_top_menu.instance.apply_camera_effects = false;
+
+    // TODO: DO this better
+    m_debug_panel.instance.position.y -= m_top_menu.instance.size.y;
 }
 
 State::StateID EditorState::GetID() const { return "EditorState"; }
@@ -36,8 +40,8 @@ void EditorState::HandleInput()
     static std::unordered_map<gouda::Key, bool> key_was_pressed;
 
     auto handle_toggle = [&](const gouda::Key key, auto &&action) {
-        const bool is_pressed = m_context.input_handler->IsKeyPressed(key);
-        bool &was_pressed = key_was_pressed[key];
+        const bool is_pressed{m_context.input_handler->IsKeyPressed(key)};
+        bool &was_pressed{key_was_pressed[key]};
 
         if (is_pressed && !was_pressed) {
             action(); // Perform action on key press
@@ -48,6 +52,7 @@ void EditorState::HandleInput()
 
     handle_toggle(gouda::Key::P, [&] { m_side_panel.Toggle(); });
     handle_toggle(gouda::Key::L, [&] { ToggleSelectedEntityPopups(); });
+    handle_toggle(gouda::Key::F3, [&] { m_debug_panel.Toggle(); });
 }
 
 void EditorState::Update(const f32 delta_time)
@@ -57,13 +62,14 @@ void EditorState::Update(const f32 delta_time)
     // Check if entities are hovered
     const auto mouse_position = m_context.input_handler->GetMousePositionFloat();
     p_selected_entity = PickTopEntityAt(mouse_position);
+
+    // TODO: Handle multi-select
 }
 
 void EditorState::Render(const f32 delta_time)
 {
-    // Render the scene.
+    // Render the scene visible in the scene camera frustum.
     const auto &frustum = m_context.scene_camera->GetFrustumData();
-
     for (const auto &entity : m_editor_entities) {
         if (IsInFrustum(entity.render_data.position, entity.render_data.size, frustum)) {
             m_quad_instances.push_back(entity.render_data);
@@ -83,6 +89,8 @@ void EditorState::Render(const f32 delta_time)
     }
 
     // Render the ui.
+    m_debug_panel.Render(m_quad_instances, m_text_instances);
+
     // TODO: Figure out a document laying once and for all
     m_side_panel.Render(m_quad_instances, m_text_instances);
     m_quad_instances.emplace_back(m_top_menu.instance);
@@ -120,7 +128,6 @@ void EditorState::LoadScene()
 void EditorState::SaveScene() {}
 
 // Private functions ----------------------------------------------------
-
 Entity *EditorState::PickTopEntityAt(const gouda::Vec2 &mouse_position)
 {
     Entity *top_entity{nullptr};

@@ -66,6 +66,7 @@ add_executable(${PROJECT_NAME}
         src/states/state.cpp
         src/ui/side_panel.cpp
         include/states/states_common.hpp
+        include/ui/debug_panel.hpp
 )
 
 target_sources(${PROJECT_NAME}

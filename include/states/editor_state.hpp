@@ -20,9 +20,10 @@
 #include "core/constants.hpp"
 #include "entities/entity.hpp"
 #include "state.hpp"
+#include "states_common.hpp"
+#include "ui/debug_panel.hpp"
 #include "ui/side_panel.hpp"
 #include "ui/ui_manager.hpp"
-#include "states_common.hpp"
 
 struct SelectionOutline {
     explicit SelectionOutline(const gouda::InstanceData &selected_instance)
@@ -46,9 +47,10 @@ struct TopMenu {
 struct EntityPopup {
     EntityPopup(const SharedContext &shared_context, Entity *entity) : shared_context(shared_context), entity(entity)
     {
+        // TODO: Fix rendering z layering for good!!
         instance.position = {entity->render_data.position.x + 10.0f, entity->render_data.position.y + 10.0f,
                              -0.111111f};
-        instance.size = {300.0f, 600.0f};
+        instance.size = {300.0f, 300.0f};
         instance.texture_index = 0;
         instance.apply_camera_effects = false;
         instance.colour = colours::editor_panel_colour;
@@ -127,6 +129,7 @@ private:
 
     TopMenu m_top_menu;
     SidePanel m_side_panel;
+    DebugPanel m_debug_panel;
 
     UIManager m_ui_manager;
 };
