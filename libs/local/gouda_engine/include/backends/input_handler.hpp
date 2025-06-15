@@ -26,9 +26,10 @@
 #include <variant>
 #include <vector>
 
-#include "backends/input_backend.hpp"
 #include "backends/event_types.hpp"
+#include "backends/input_backend.hpp"
 #include "core/types.hpp"
+#include "math/math.hpp"
 
 struct GLFWwindow;
 
@@ -58,7 +59,7 @@ public:
     void UnloadStateBindings(const std::string &state);
     void SetActiveState(const std::string &state);
     void PushCustomEvent(const std::string &event);
-    void QueueEvent(Event event);
+    void QueueEvent(const Event& event);
 
     // Standard callback setters
     void SetScrollCallback(ScrollCallback callback);
@@ -90,6 +91,7 @@ public:
     bool IsKeyPressed(Key key) const;
     bool IsMouseButtonPressed(MouseButton button) const;
     std::pair<double, double> GetMousePosition() const;
+    Vec2 GetMousePositionFloat() const;
 
     void Update();
 
@@ -123,8 +125,9 @@ private:
     // Input state tracking
     std::unordered_map<Key, bool> m_key_states;           // True if key is pressed
     std::unordered_map<MouseButton, bool> m_mouse_states; // True if button is pressed
-    f64 m_mouse_x;                                        // Current mouse X position
-    f64 m_mouse_y;
+
+    Vec2D m_mouse_position;
+    Vec2 m_window_size;
 };
 
 } // namespace gouda

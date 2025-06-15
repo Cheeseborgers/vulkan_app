@@ -241,6 +241,12 @@ struct Rect {
     {
         return left == T() && right == T() && top == T() && bottom == T();
     }
+
+    [[nodiscard]] bool Contains(const f32 x, const f32 y) const
+    {
+        return x >= left && x <= right &&
+               y >= bottom && y <= top;
+    }
 };
 
 namespace gouda {
@@ -253,7 +259,7 @@ struct Colour {
         std::array<T, 4> data;
     };
 
-    Colour(T r_, T g_, T b_, T a_) : r{r_}, g{g_}, b{b_}, a{a_} {}
+    constexpr Colour(T r_, T g_, T b_, T a_) : r{r_}, g{g_}, b{b_}, a{a_} {}
     explicit constexpr Colour(T all = T{}) : r{all}, g{all}, b{all}, a{all} {}
 
     [[nodiscard]] constexpr T& operator[](std::size_t i) { return data[i]; }

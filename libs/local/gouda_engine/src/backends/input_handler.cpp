@@ -10,6 +10,8 @@
 #include "debug/logger.hpp"
 
 // TODO: Remove this!
+#include "math/math.hpp"
+
 #include <GLFW/glfw3.h>
 
 namespace gouda {
@@ -24,10 +26,15 @@ InputHandler::InputHandler(std::unique_ptr<InputBackend> backend, GLFWwindow *wi
       m_frame_buffer_size_callback(nullptr),
       m_window_size_callback(nullptr),
       m_window_iconify_callback(nullptr),
-      m_mouse_x(0),
-      m_mouse_y(0)
+      m_mouse_position{0.0, 0.0},
+      m_window_size{0.0f, 0.0f}
 {
     p_backend->RegisterCallbacks(p_window);
+
+    // Set window size for mouse positioning and such
+    WindowSize window_size{0, 0};
+    glfwGetWindowSize(p_window, &window_size.width, &window_size.height);
+    m_window_size = {static_cast<f32>(window_size.width), static_cast<f32>(window_size.height)};
 }
 
 void InputHandler::LoadStateBindings(const std::string &state, const std::vector<ActionBinding> &bindings)
@@ -50,9 +57,9 @@ void InputHandler::SetActiveState(const std::string &state)
     ENGINE_LOG_DEBUG("Set active state to '{}'", state);
 }
 
-void InputHandler::PushCustomEvent(const std::string &event) { m_events.push_back(event); }
+void InputHandler::PushCustomEvent(const std::string &event) { m_events.emplace_back(event); }
 
-void InputHandler::QueueEvent(Event event) { m_events.push_back(event); }
+void InputHandler::QueueEvent(const Event &event) { m_events.push_back(event); }
 
 // Standard callback setters
 void InputHandler::SetScrollCallback(ScrollCallback callback) { m_scroll_callback = std::move(callback); }
@@ -193,7 +200,12 @@ bool InputHandler::IsMouseButtonPressed(const MouseButton button) const
     return it != m_mouse_states.end() ? it->second : false;
 }
 
-std::pair<double, double> InputHandler::GetMousePosition() const { return {m_mouse_x, m_mouse_y}; }
+std::pair<double, double> InputHandler::GetMousePosition() const { return {m_mouse_position.x, m_mouse_position.y}; }
+
+Vec2 InputHandler::GetMousePositionFloat() const
+{
+    return {static_cast<f32>(m_mouse_position.x), static_cast<f32>(m_window_size.y - m_mouse_position.y)};
+}
 
 void InputHandler::Update()
 {
@@ -246,8 +258,8 @@ void InputHandler::ProcessEvents()
                     }
                 }
                 else if constexpr (std::is_same_v<T, MouseMoveEvent>) {
-                    m_mouse_x = arg.x; // Update mouse position
-                    m_mouse_y = arg.y;
+                    m_mouse_position.x = arg.x;
+                    m_mouse_position.y = arg.y;
                 }
                 else if constexpr (std::is_same_v<T, CharEvent>) {
                     // APP_LOG_DEBUG("Processing CharEvent: codepoint={}", arg.codepoint);
@@ -270,6 +282,9 @@ void InputHandler::ProcessEvents()
                 else if constexpr (std::is_same_v<T, WindowFramebufferSizeEvent>) {
                     // APP_LOG_DEBUG("Processing WindowFramebufferSizeEvent: width={}, height={}", arg.width,
                     // arg.height);
+                    m_window_size.x = arg.width;
+                    m_window_size.y = arg.height;
+
                     if (m_frame_buffer_size_callback) {
                         m_frame_buffer_size_callback(arg.width, arg.height);
                     }

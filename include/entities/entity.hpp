@@ -30,6 +30,8 @@ struct Entity {
     {
     }
 
+    Rect<f32> GetBounds() const; // TODO: Remove this and compute bounds else where. ie: collider component.
+
     EntityType type;                                       ///< Type of entity
     gouda::InstanceData render_data;                       ///< Rendering-specific data
     std::optional<AnimationComponent> animation_component; ///< Optional animation component

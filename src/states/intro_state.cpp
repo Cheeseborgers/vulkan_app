@@ -14,20 +14,18 @@
 IntroState::IntroState(SharedContext &context, StateStack &state_stack)
     : State(context, state_stack), m_current_time{0.0f}
 {
-    gouda::Vec2 framebuffer_size;
-    framebuffer_size.x = static_cast<f32>(m_context.renderer->GetFramebufferSize().width);
-    framebuffer_size.y = static_cast<f32>(m_context.renderer->GetFramebufferSize().height);
+    m_framebuffer_size = {static_cast<f32>(m_context.renderer->GetFramebufferSize().width), static_cast<f32>(m_context.renderer->GetFramebufferSize().height)};
 
-    gouda::InstanceData background{};
+    gouda::InstanceData background;
     background.position = {0.f, 0.f, -0.599f};
-    background.size = framebuffer_size;
+    background.size = m_framebuffer_size;
     background.apply_camera_effects = 0;
     background.texture_index = 1;
     m_quad_instances.push_back(background);
 
     gouda::Vec3 text_position;
-    text_position.x = framebuffer_size.x / 2;
-    text_position.y = framebuffer_size.y / 2;
+    text_position.x = m_framebuffer_size.x / 2;
+    text_position.y = m_framebuffer_size.y / 2;
     text_position.z = -0.1f;
 
     m_context.renderer->DrawText("GOUDA RENDERER", text_position, {0.0f, 1.0f, 0.0f, 1.0f}, 50.0f, 2, m_text_instances,
@@ -47,7 +45,7 @@ void IntroState::HandleInput()
 void IntroState::Update(const f32 delta_time)
 {
     m_current_time += delta_time;
-    if (m_current_time >= 3.0f) {
+    if (m_current_time >= 1.0f) { // TODO: Change to a decent time (Set for debug)
         TransitionToMainMenu();
     }
 }

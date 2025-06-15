@@ -37,3 +37,17 @@ constexpr StringView secondary_font_metadata{"assets/fonts/roboto_atlas.json"};
 
 // Sounds
 } // namespace filepath
+
+namespace colours {
+// Colours
+constexpr  gouda::Colour<f32> editor_panel_colour{0.2f, 0.2f, 0.2f, 0.5f};
+constexpr  gouda::Colour<f32> editor_panel_primary_font_colour{0.4f, 0.3f, 0.7f, 1.0f};
+} // namespace colour
+
+// TODO: Move all constants here
+namespace app_constants {
+constexpr u32 max_quads{1000};
+constexpr u32 max_particles{1000};
+constexpr u32 max_glyphs{1000};
+
+} // namespace app_constants
