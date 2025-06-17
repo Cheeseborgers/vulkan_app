@@ -40,8 +40,11 @@ constexpr StringView secondary_font_metadata{"assets/fonts/roboto_atlas.json"};
 
 namespace colours {
 // Colours
-constexpr  gouda::Colour<f32> editor_panel_colour{0.2f, 0.2f, 0.2f, 0.5f};
+constexpr  gouda::Colour<f32> debug_panel_colour{0.1f, 0.8f, 0.6f, 1.0f};
+constexpr  gouda::Colour<f32> editor_panel_colour{0.1f, 0.1f, 0.1f, 1.0f};
 constexpr  gouda::Colour<f32> editor_panel_primary_font_colour{0.4f, 0.3f, 0.7f, 1.0f};
+constexpr  gouda::Colour<f32> editor_panel_secondary_font_colour{0.4f, 0.3f, 0.7f, 1.0f};
+constexpr  gouda::Colour<f32> editor_entity_selection_colour{0.3f, 0.9f, 0.3f, 1.0f};
 } // namespace colour
 
 // TODO: Move all constants here
