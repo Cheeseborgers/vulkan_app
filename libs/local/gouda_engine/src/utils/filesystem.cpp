@@ -10,7 +10,7 @@ namespace gouda::fs {
 
 Expect<void, Error> EnsureDirectoryExists(const FilePath &path, const bool create_if_missing)
 {
-    std::filesystem::path directory_path = path;
+    FilePath directory_path = path;
 
     // Ensure we're working with a directory, trimming off the filename if necessary
     if (std::filesystem::exists(directory_path)) {
@@ -41,7 +41,7 @@ Expect<void, Error> EnsureDirectoryExists(const FilePath &path, const bool creat
 }
 
 // Read an entire file into a string
-Expect<std::string, Error> ReadFile(std::string_view file_name)
+Expect<std::string, Error> ReadFile(StringView file_name)
 {
     FilePath file_path(file_name);
     std::ifstream file(file_path, std::ios::in);
@@ -50,7 +50,7 @@ Expect<std::string, Error> ReadFile(std::string_view file_name)
         return std::unexpected(Error::FileNotFound);
     }
 
-    std::string out_file((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    String out_file((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
     if (!file.eof() && file.fail()) {
         return std::unexpected(Error::FileReadError);
@@ -59,7 +59,7 @@ Expect<std::string, Error> ReadFile(std::string_view file_name)
     return out_file;
 }
 
-Expect<void, Error> WriteFile(std::string_view file_name, const std::string &data)
+Expect<void, Error> WriteFile(StringView file_name, const String &data)
 {
     if (file_name.empty()) {
         return std::unexpected(Error::EmptyFileName);
@@ -74,7 +74,7 @@ Expect<void, Error> WriteFile(std::string_view file_name, const std::string &dat
     return {}; // Success
 }
 
-Expect<std::vector<std::byte>, Error> ReadBinaryFile(std::string_view file_name)
+Expect<std::vector<std::byte>, Error> ReadBinaryFile(StringView file_name)
 {
     FilePath file_path(file_name);
     std::ifstream file(file_path, std::ios::binary | std::ios::ate); // Open at end
@@ -99,7 +99,7 @@ Expect<std::vector<std::byte>, Error> ReadBinaryFile(std::string_view file_name)
     return buffer;
 }
 
-Expect<void, Error> WriteBinaryFile(std::string_view file_name, std::span<const std::byte> data)
+Expect<void, Error> WriteBinaryFile(StringView file_name, std::span<const std::byte> data)
 {
     if (file_name.empty()) {
         return std::unexpected(Error::EmptyFileName);
@@ -121,7 +121,7 @@ Expect<void, Error> WriteBinaryFile(std::string_view file_name, std::span<const 
     return {}; // Success
 }
 
-Expect<void, Error> WriteBinaryFile(std::string_view file_name, const std::vector<u32> &data)
+Expect<void, Error> WriteBinaryFile(StringView file_name, const std::vector<u32> &data)
 {
     if (data.empty()) {
         return {}; // Nothing to write, but not an error
@@ -132,18 +132,18 @@ Expect<void, Error> WriteBinaryFile(std::string_view file_name, const std::vecto
     return WriteBinaryFile(file_name, byte_span);
 }
 
-Expect<void, Error> WriteBinaryFile(std::string_view file_name, const std::vector<std::byte> &data)
+Expect<void, Error> WriteBinaryFile(StringView file_name, const std::vector<std::byte> &data)
 {
     return WriteBinaryFile(file_name, std::span<const std::byte>(data));
 }
 
-bool IsFileExists(std::string_view file_path) { return std::filesystem::exists(file_path); }
+bool IsFileExists(StringView file_path) { return std::filesystem::exists(file_path); }
 
-bool IsFileEmpty(std::string_view file_path) { return std::filesystem::file_size(file_path) == 0; }
+bool IsFileEmpty(StringView file_path) { return std::filesystem::file_size(file_path) == 0; }
 
-std::string GetCurrentWorkingDirectory() { return std::filesystem::current_path().string(); }
+String GetCurrentWorkingDirectory() { return std::filesystem::current_path().string(); }
 
-Expect<std::vector<FilePath>, Error> ListFilesInDirectory(std::string_view dir_path)
+Expect<std::vector<FilePath>, Error> ListFilesInDirectory(StringView dir_path)
 {
     std::vector<FilePath> file_list;
 
@@ -160,7 +160,7 @@ Expect<std::vector<FilePath>, Error> ListFilesInDirectory(std::string_view dir_p
     return file_list;
 }
 
-Expect<void, Error> DeleteFile(std::string_view file_path)
+Expect<void, Error> DeleteFile(StringView file_path)
 {
     if (std::filesystem::remove(file_path)) {
         return {};
@@ -168,7 +168,7 @@ Expect<void, Error> DeleteFile(std::string_view file_path)
     return std::unexpected(Error::FileDeleteFailed);
 }
 
-Expect<void, Error> DeleteDirectory(std::string_view dir_path)
+Expect<void, Error> DeleteDirectory(StringView dir_path)
 {
     if (const std::uintmax_t removed = std::filesystem::remove_all(dir_path); removed > 0) {
         return {};
@@ -176,15 +176,19 @@ Expect<void, Error> DeleteDirectory(std::string_view dir_path)
     return std::unexpected(Error::DirectoryDeleteFailed);
 }
 
-std::string GetFileExtension(std::string_view file_path)
+String GetFileExtension(StringView file_path)
 {
-    const FilePath path{file_path};
-    return path.extension().string();
+    return FilePath{file_path}.extension().string();
 }
 
-FileTimeType GetLastWriteTime(std::string_view filepath)
+String GetFileName(StringView file_path)
 {
-    return std::filesystem::last_write_time(filepath);
+    return FilePath{file_path}.stem().string();
+}
+
+FileTimeType GetLastWriteTime(StringView file_path)
+{
+    return std::filesystem::last_write_time(file_path);
 }
 
 } // namespace gouda::fs

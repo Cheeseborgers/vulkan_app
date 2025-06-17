@@ -25,10 +25,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-
-#include <string>
-#include <string_view>
-#include <vector>
+#include <vector> // TODO: Use small vector
 
 #include "core/types.hpp"
 
@@ -52,9 +49,9 @@ enum class Error : u8 {
     DirectoryDeleteFailed    ///< Failed to delete directory
 };
 
-constexpr std::string_view error_to_string(Error err) noexcept
+constexpr StringView error_to_string(Error error) noexcept
 {
-    constexpr std::array<std::string_view, 11> error_strings{
+    constexpr std::array<StringView, 11> error_strings{
         "No error occurred",           "Path exists but is not a directory",
         "Failed to create directory",  "File not found",
         "Error reading file",          "Error writing to file",
@@ -62,7 +59,7 @@ constexpr std::string_view error_to_string(Error err) noexcept
         "Invalid directory path",      "Failed to delete file",
         "Failed to delete directory"};
 
-    const auto index = static_cast<std::size_t>(err);
+    const auto index = static_cast<std::size_t>(error);
     return index < error_strings.size() ? error_strings[index] : "Unknown error";
 }
 
@@ -79,7 +76,7 @@ constexpr std::string_view error_to_string(Error err) noexcept
  * @param file_name Name of the file to read.
  * @return File content or an Error code.
  */
-[[nodiscard]] Expect<std::string, Error> ReadFile(std::string_view file_name);
+[[nodiscard]] Expect<std::string, Error> ReadFile(StringView file_name);
 
 /**
  * @brief Writes a string to a file.
@@ -87,14 +84,14 @@ constexpr std::string_view error_to_string(Error err) noexcept
  * @param data Data to write.
  * @return Success or an Error code.
  */
-[[nodiscard]] Expect<void, Error> WriteFile(std::string_view file_name, const std::string &data);
+[[nodiscard]] Expect<void, Error> WriteFile(StringView file_name, const String &data);
 
 /**
  * @brief Reads an entire binary file into a vector of bytes.
  * @param file_name Name of the file to read.
  * @return File content or an Error code.
  */
-[[nodiscard]] Expect<std::vector<std::byte>, Error> ReadBinaryFile(std::string_view file_name);
+[[nodiscard]] Expect<std::vector<std::byte>, Error> ReadBinaryFile(StringView file_name);
 
 /**
  * @brief Writes a binary file from a vector of bytes.
@@ -102,7 +99,7 @@ constexpr std::string_view error_to_string(Error err) noexcept
  * @param data Data to write.
  * @return Success or an Error code.
  */
-[[nodiscard]] Expect<void, Error> WriteBinaryFile(std::string_view file_name, std::span<const std::byte> data);
+[[nodiscard]] Expect<void, Error> WriteBinaryFile(StringView file_name, std::span<const std::byte> data);
 
 /**
  * @brief Writes a binary file from a vector of u32 values.
@@ -110,7 +107,7 @@ constexpr std::string_view error_to_string(Error err) noexcept
  * @param data Data to write.
  * @return Success or an Error code.
  */
-[[nodiscard]] Expect<void, Error> WriteBinaryFile(std::string_view file_name, const std::vector<u32> &data);
+[[nodiscard]] Expect<void, Error> WriteBinaryFile(StringView file_name, const std::vector<u32> &data);
 
 /**
  * @brief Writes a binary file from a vector of byte values.
@@ -118,62 +115,69 @@ constexpr std::string_view error_to_string(Error err) noexcept
  * @param data Data to write.
  * @return Success or an Error code.
  */
-[[nodiscard]] Expect<void, Error> WriteBinaryFile(std::string_view file_name, const std::vector<std::byte> &data);
+[[nodiscard]] Expect<void, Error> WriteBinaryFile(StringView file_name, const std::vector<std::byte> &data);
 
 /**
  * @brief Checks if a file exists.
  * @param filepath Path to the file.
  * @return True if the file exists, false otherwise.
  */
-[[nodiscard]] bool IsFileExists(std::string_view filepath);
+[[nodiscard]] bool IsFileExists(StringView filepath);
 
 /**
  * @brief Checks if a file is empty.
  * @param filepath Path to the file.
  * @return True if the file is empty, false otherwise.
  */
-[[nodiscard]] bool IsFileEmpty(std::string_view filepath);
+[[nodiscard]] bool IsFileEmpty(StringView filepath);
 
 /**
  * @brief Gets the current working directory.
  * @return The current working directory as a string.
  */
-[[nodiscard]] std::string GetCurrentWorkingDirectory();
+[[nodiscard]] String GetCurrentWorkingDirectory();
 
 /**
  * @brief Lists all files in a directory.
  * @param dir_path Path to the directory.
  * @return Vector of file paths or an Error code.
  */
-[[nodiscard]] Expect<std::vector<FilePath>, Error> ListFilesInDirectory(std::string_view dir_path);
+[[nodiscard]] Expect<std::vector<FilePath>, Error> ListFilesInDirectory(StringView dir_path);
 
 /**
  * @brief Deletes a file.
  * @param filepath Path to the file.
  * @return Success or an Error code.
  */
-[[nodiscard]] Expect<void, Error> DeleteFile(std::string_view filepath);
+[[nodiscard]] Expect<void, Error> DeleteFile(StringView filepath);
 
 /**
  * @brief Deletes a directory and all its contents.
  * @param dir_path Path to the directory.
  * @return Success or an Error code.
  */
-[[nodiscard]] Expect<void, Error> DeleteDirectory(std::string_view dir_path);
+[[nodiscard]] Expect<void, Error> DeleteDirectory(StringView dir_path);
 
 /**
  * @brief Gets the file extension from a file path.
  * @param filepath Path to the file.
  * @return The file extension as a string.
  */
-[[nodiscard]] std::string GetFileExtension(std::string_view filepath);
+[[nodiscard]] String GetFileExtension(StringView filepath);
+
+/**
+ * @brief Gets the file name excluding the file extension from a file path.
+ * @param filepath Path to the file.
+ * @return The file name as a string.
+ */
+[[nodiscard]] String GetFileName(StringView filepath);
 
 /**
  * @brief Gets the last time the file was writen.
  * @param filepath Path to the file.
  * @return The last write time as FileTimeType (std::chrono timepoint).
  */
-[[nodiscard]] FileTimeType GetLastWriteTime(std::string_view filepath);
+[[nodiscard]] FileTimeType GetLastWriteTime(StringView filepath);
 
 
 }
