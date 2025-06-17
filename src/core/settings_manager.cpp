@@ -81,7 +81,7 @@ SettingsManager::~SettingsManager()
 void SettingsManager::Load()
 {
     // Ensure the directory exists
-    std::filesystem::path settings_dir = m_filepath.parent_path();
+    FilePath settings_dir{m_filepath.parent_path()};
     std::error_code ec;
     if (!std::filesystem::exists(settings_dir, ec)) {
         if (!std::filesystem::create_directories(settings_dir, ec)) {
@@ -142,7 +142,8 @@ void SettingsManager::Save() const
         file << json_data.dump(4);             // Pretty print with indentation
     }
     catch (const std::exception &e) {
-        APP_LOG_ERROR("Failed to save settings file '{}' reason: {}.", m_filepath.string(), e.what());
+        APP_LOG_ERROR("Failed to save settings file '{}'. Reason: {}.", m_filepath.string(), e.what());
+        return;
     }
 
     APP_LOG_INFO("Settings saved to '{}", m_filepath.string());

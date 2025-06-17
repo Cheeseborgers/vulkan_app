@@ -22,7 +22,7 @@ struct UIElement {
     virtual ~UIElement() = default;
 
     virtual void Update(f32 delta_time) = 0;
-    virtual void Render(std::vector<gouda::InstanceData> &quad_instances,
+    virtual void Draw(std::vector<gouda::InstanceData> &quad_instances,
                         std::vector<gouda::TextData> &text_instances) = 0;
     virtual bool HandleInput(const gouda::InputHandler &input, std::function<void()> &callback) = 0;
 

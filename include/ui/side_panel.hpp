@@ -25,7 +25,7 @@ public:
               f32 title_scale, PanelSide side = PanelSide::Right,
               gouda::math::easing::EasingType easing_type = gouda::math::easing::EasingType::Linear);
 
-    void Toggle();
+    void ToggleVisibility();
     void SetSide(PanelSide side);
     void ToggleSide();
 
@@ -34,7 +34,7 @@ public:
     }
 
     void Update(f32 delta_time);
-    void Render(std::vector<gouda::InstanceData> &quad_instances, std::vector<gouda::TextData> &text_instances) const;
+    void Draw(std::vector<gouda::InstanceData> &quad_instances, std::vector<gouda::TextData> &text_instances) const;
 
     void OnFramebufferResize(const gouda::Vec2 &new_size);
 
@@ -47,6 +47,7 @@ private:
     PanelSide m_panel_side;
     gouda::math::easing::EasingType m_easing_type;
 
+    // TODO: Set this in the constructor
     f32 m_transition_time{0.5f}; // total time for open/close
     f32 m_animation_timer{0.0f}; // tracks time in animation
     bool m_is_open{false};       // target state

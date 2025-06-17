@@ -61,13 +61,7 @@ set(JSON_Install OFF CACHE INTERNAL "")
 
 set(CMAKE_BINARY_DIR "${CMAKE_SOURCE_DIR}/build")
 
-add_executable(${PROJECT_NAME}
-        include/ui/side_panel.hpp
-        src/states/state.cpp
-        src/ui/side_panel.cpp
-        include/states/states_common.hpp
-        include/ui/debug_panel.hpp
-)
+add_executable(${PROJECT_NAME})
 
 target_sources(${PROJECT_NAME}
     PRIVATE
@@ -85,13 +79,16 @@ target_sources(${PROJECT_NAME}
 
         src/scenes/scene.cpp
 
-        src/ui/button.cpp
+        #src/ui/button.cpp
+        src/ui/editor_popups.cpp
         src/ui/ui_element.cpp
         src/ui/ui_manager.cpp
         src/ui/side_panel.cpp
+        src/ui/selection_tool.cpp
 
+        src/states/state.cpp
         src/states/game_state.cpp
-        src/states/editor_state.cpp
+        src/states/editor/editor_state.cpp
         src/states/main_menu_state.cpp
         src/states/settings_state.cpp
         src/states/intro_state.cpp

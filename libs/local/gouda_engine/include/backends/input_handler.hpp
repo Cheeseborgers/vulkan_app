@@ -55,7 +55,7 @@ public:
         ActionCallback callback;
     };
 
-    void LoadStateBindings(const std::string &state, const std::vector<ActionBinding> &bindings);
+    void LoadStateBindings(StringView state, const std::vector<ActionBinding> &bindings);
     void UnloadStateBindings(const std::string &state);
     void SetActiveState(const std::string &state);
     void PushCustomEvent(const std::string &event);

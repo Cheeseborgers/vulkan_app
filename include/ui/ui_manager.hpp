@@ -24,7 +24,7 @@ public:
     void AddElement(std::unique_ptr<UIElement> element);
 
     void Update(f32 delta_time);
-    void Render(f32 delta_time, gouda::vk::Renderer &renderer, std::vector<gouda::InstanceData> &quad_instances,
+    void Draw(gouda::vk::Renderer &renderer, std::vector<gouda::InstanceData> &quad_instances,
                 std::vector<gouda::TextData> &text_instances);
     void HandleInput();
 

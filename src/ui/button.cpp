@@ -1,3 +1,7 @@
-//
-// Created by fason on 08/06/25.
-//
+/**
+* @file button.cpp
+ * @author GoudaCheeseburgers
+ * @date 2025-08-06
+ * @brief Application selection tool module implementation
+ */
+#include "ui/button.hpp"

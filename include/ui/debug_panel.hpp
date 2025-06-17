@@ -15,6 +15,7 @@
 #include "core/state_stack.hpp"
 #include "renderers/render_data.hpp"
 
+// TODO: Add padding to constructor
 struct DebugPanel {
     DebugPanel(SharedContext &shared_context, const gouda::Vec2 &size,
                const gouda::Colour<f32> &colour, const u32 font_id, const f32 font_scale)
@@ -31,7 +32,7 @@ struct DebugPanel {
         instance.apply_camera_effects = false;
     }
 
-    void Render(std::vector<gouda::InstanceData> &quad_instances,
+    void Draw(std::vector<gouda::InstanceData> &quad_instances,
                         std::vector<gouda::TextData> &text_instances)
     {
         if (!display) {
@@ -55,8 +56,7 @@ struct DebugPanel {
         }
     }
 
-
-    void Toggle() { display = !display; }
+    void ToggleVisibility() { display = !display; }
 
     SharedContext &context;
     gouda::InstanceData instance;

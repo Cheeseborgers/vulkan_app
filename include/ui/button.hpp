@@ -22,7 +22,7 @@ struct Button final : UIElement {
     {
     }
 
-    void Render(std::vector<gouda::InstanceData>& quad_instances, std::vector<gouda::TextData>& text_instances) const override {
+    void Draw(std::vector<gouda::InstanceData>& quad_instances, std::vector<gouda::TextData>& text_instances) const override {
 
         if (!text.empty()) {
             gouda::Vec3 text_position{

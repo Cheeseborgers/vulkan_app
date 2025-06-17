@@ -1,2 +1,4 @@
-Add assets to git
+Add assets to git - done
+
 Add asset filepath strings to constants for easier lookup
+Use Vector and allocator implentation from testing

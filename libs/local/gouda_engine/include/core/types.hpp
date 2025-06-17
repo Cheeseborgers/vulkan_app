@@ -250,6 +250,43 @@ struct Rect {
 };
 
 namespace gouda {
+
+/*
+template <NumericT T>
+struct Rect {
+    T min_x;
+    T max_x;
+    T min_y;
+    T max_y;
+
+    constexpr Rect() : min_x{0}, max_x{0}, min_y{0}, max_y{0} {}
+
+    explicit constexpr Rect(T min_x = T(), T max_x = T(), T min_y = T(), T max_y = T())
+        : min_x{min_x}, max_x{max_x}, min_y{min_y}, max_y{max_y}
+    {
+    }
+
+    [[nodiscard]] bool operator==(const Rect &other) const
+    {
+        return min_x == other.min_x && max_x == other.max_x && max_y == other.min_y && max_y == other.max_x;
+    }
+
+    [[nodiscard]] bool operator!=(const Rect &other) const { return !(*this == other); }
+
+    [[nodiscard]] std::string ToString() const
+    {
+        return std::string(std::format("min_x: {}, max_x: {}, min_y: {}, max_y: {}", min_x, max_x, min_y, max_y));
+    }
+
+    [[nodiscard]] bool IsZero() const { return min_x == T() && max_x == T() && max_y == T() && min_y == T(); }
+
+    [[nodiscard]] bool Contains(const f32 x, const f32 y) const
+    {
+        return x >= min_x && x <= max_x && y >= min_y && y <= max_y;
+    }
+};
+ */
+
 template <NumericT T>
 struct Colour {
     union {

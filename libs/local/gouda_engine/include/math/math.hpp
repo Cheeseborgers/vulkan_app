@@ -162,6 +162,22 @@ constexpr T min(std::initializer_list<T> values)
     return min_value;
 }
 
+
+template<std::signed_integral T>
+constexpr T abs(T value) {
+    return value < 0 ? -value : value;
+}
+
+template<std::unsigned_integral T>
+constexpr T abs(T value) {
+    return value; // Unsigned values are always positive
+}
+
+template<FloatingPointT T>
+constexpr T abs(T value) {
+    return value < 0 ? -value : value;
+}
+
 template <NumericT T>
 constexpr T lerp(T a, T b, T t)
 {

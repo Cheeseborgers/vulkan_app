@@ -37,6 +37,7 @@ RenderStatistics::RenderStatistics() :
     index_count{0},
     particle_count{0},
     glyph_count{0},
+    total_instances{0},
     texture_count{0},
     font_count{0}
 {

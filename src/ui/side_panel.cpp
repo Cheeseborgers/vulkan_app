@@ -40,7 +40,7 @@ SidePanel::SidePanel(SharedContext &shared_context, const gouda::Vec2 &size, con
     m_title_position.z = m_instance_data.position.z - -0.01f;
 }
 
-void SidePanel::Toggle()
+void SidePanel::ToggleVisibility()
 {
     m_is_open = !m_is_open;
     m_is_animating = true;
@@ -80,7 +80,7 @@ void SidePanel::Update(const f32 delta_time)
     }
 }
 
-void SidePanel::Render(std::vector<gouda::InstanceData> &quad_instances,
+void SidePanel::Draw(std::vector<gouda::InstanceData> &quad_instances,
                        std::vector<gouda::TextData> &text_instances) const
 {
     if (m_is_open || m_is_animating) {
