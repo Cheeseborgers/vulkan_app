@@ -53,6 +53,12 @@ public:
     bool ShouldClose() const override { return glfwWindowShouldClose(p_window); }
 
     /**
+     * @brief Closes the current window, closing the application.
+     *
+     */
+    void Close() const override { glfwSetWindowShouldClose(p_window, GLFW_TRUE); }
+
+    /**
      * @brief Sets the vsync (vertical synchronization) for the window.
      *
      * @param enabled A boolean flag to enable (true) or disable (false) vsync.

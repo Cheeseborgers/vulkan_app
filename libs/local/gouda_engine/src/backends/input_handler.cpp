@@ -37,9 +37,9 @@ InputHandler::InputHandler(std::unique_ptr<InputBackend> backend, GLFWwindow *wi
     m_window_size = {static_cast<f32>(window_size.width), static_cast<f32>(window_size.height)};
 }
 
-void InputHandler::LoadStateBindings(const std::string &state, const std::vector<ActionBinding> &bindings)
+void InputHandler::LoadStateBindings(StringView state, const std::vector<ActionBinding> &bindings)
 {
-    m_bindings.erase(state);
+    m_bindings.erase(state.data());
     m_bindings.emplace(state, bindings);
     ENGINE_LOG_DEBUG("Loaded {} bindings for state '{}'", bindings.size(), state);
 }

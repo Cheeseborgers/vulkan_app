@@ -41,6 +41,13 @@ public:
     [[nodiscard]] virtual bool ShouldClose() const = 0;
 
     /**
+     * @brief Checks if the window should close (e.g., due to user interaction).
+     *
+     * @return True if the window should close, false otherwise.
+     */
+    virtual void Close() const = 0;
+
+    /**
      * @brief Sets the vertical synchronization (vsync) for the window.
      *
      * @param enabled A boolean flag indicating whether to enable (true) or disable (false) vsync.
