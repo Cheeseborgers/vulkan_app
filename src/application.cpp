@@ -1,7 +1,7 @@
 /**
-* @file application.cpp
+ * @file application.cpp
  * @author GoudaCheeseburgers
- * @date 2025-25-03
+ * @date 2025-22-02
  * @brief Application module implementation
  */
 #include "application.hpp"
@@ -26,8 +26,7 @@ Application::Application()
       p_state_stack{nullptr},
       m_is_iconified{false},
       m_framebuffer_size{0, 0},
-      p_scene_camera{nullptr},
-      p_current_scene{nullptr}
+      p_scene_camera{nullptr}
 {
     APP_LOG_INFO("Initializing");
 
@@ -44,9 +43,9 @@ Application::Application()
 
     LoadTextures();
     LoadFonts();
-    LoadInitialState();
 
-    p_current_scene = std::make_unique<Scene>(p_scene_camera.get(), p_ui_camera.get(), m_renderer.GetTextureManager());
+    CreateSharedContext();
+    LoadInitialState();
 
     APP_LOG_DEBUG("Application initialization success");
 }
@@ -202,13 +201,13 @@ void Application::SetupCamera()
                                                     -1.0f, 1.0f, 1.0f, 0.0f, 0.0f // near, far, zoom, speed, sensitivity
         );
 }
-void Application::SetCameraProjections(const gouda::Vec2 &framebuffer_size)
+void Application::SetCameraProjections(const gouda::Vec2 &framebuffer_size) const
 {
     p_scene_camera->SetProjection(0.0f, framebuffer_size.x, // left = 0, right = width
                                   framebuffer_size.y, 0.0f);
 
     p_ui_camera->SetProjection(0.0f, framebuffer_size.x, // left = 0, right = width
-                                  framebuffer_size.y, 0.0f);
+                               framebuffer_size.y, 0.0f);
 }
 
 void Application::LoadTextures() const
@@ -231,8 +230,7 @@ void Application::LoadFonts()
     m_renderer.LoadMSDFFont(filepath::primary_font_atlas, filepath::primary_font_metadata);
     m_renderer.LoadMSDFFont(filepath::secondary_font_atlas, filepath::secondary_font_metadata);
 }
-
-void Application::LoadInitialState()
+void Application::CreateSharedContext()
 {
     p_context = std::make_unique<SharedContext>();
     p_context->renderer = &m_renderer;
@@ -242,6 +240,15 @@ void Application::LoadInitialState()
     p_context->scene_camera = p_scene_camera.get();
     p_context->ui_camera = p_ui_camera.get();
     p_context->uniform_data = &m_uniform_data;
+}
+
+void Application::LoadInitialState()
+{
+    if (!p_context) {
+        APP_LOG_ERROR("Failed to load initial state as shared context is nullptr.");
+        // TODO: Throw here.
+        return;
+    }
 
     p_state_stack = std::make_unique<StateStack>();
     p_state_stack->Push(std::make_unique<IntroState>(*p_context, *p_state_stack));
@@ -250,73 +257,11 @@ void Application::LoadInitialState()
 
 void Application::SetupInputSystem()
 {
-    auto backend = std::make_unique<gouda::glfw::GLFWBackend>([this](gouda::Event event) {
-        p_input_handler->QueueEvent(std::move(event)); // Queue raw events directly
+    auto backend = std::make_unique<gouda::glfw::GLFWBackend>([this](const gouda::Event &event) {
+        p_input_handler->QueueEvent(event); // Queue raw events directly
     });
 
     p_input_handler = std::make_unique<gouda::InputHandler>(std::move(backend), p_window->GetWindow());
-
-    const std::vector<gouda::InputHandler::ActionBinding> game_bindings = {
-        {gouda::Key::Escape, gouda::ActionState::Pressed,
-         [this] { glfwSetWindowShouldClose(p_window->GetWindow(), GLFW_TRUE); }},
-        {gouda::Key::A, gouda::ActionState::Pressed,
-         [this] { p_scene_camera->SetMovementFlag(gouda::CameraMovement::MoveLeft); }},
-        {gouda::Key::A, gouda::ActionState::Released,
-         [this] { p_scene_camera->ClearMovementFlag(gouda::CameraMovement::MoveLeft); }},
-        {gouda::Key::D, gouda::ActionState::Pressed,
-         [this] { p_scene_camera->SetMovementFlag(gouda::CameraMovement::MoveRight); }},
-        {gouda::Key::D, gouda::ActionState::Released,
-         [this] { p_scene_camera->ClearMovementFlag(gouda::CameraMovement::MoveRight); }},
-        {gouda::Key::W, gouda::ActionState::Pressed,
-         [this] { p_scene_camera->SetMovementFlag(gouda::CameraMovement::MoveUp); }},
-        {gouda::Key::W, gouda::ActionState::Released,
-         [this] { p_scene_camera->ClearMovementFlag(gouda::CameraMovement::MoveUp); }},
-        {gouda::Key::S, gouda::ActionState::Pressed,
-         [this] { p_scene_camera->SetMovementFlag(gouda::CameraMovement::MoveDown); }},
-        {gouda::Key::S, gouda::ActionState::Released,
-         [this] { p_scene_camera->ClearMovementFlag(gouda::CameraMovement::MoveDown); }},
-        {gouda::Key::Q, gouda::ActionState::Pressed,
-         [this] { p_scene_camera->SetMovementFlag(gouda::CameraMovement::ZoomIn); }},
-        {gouda::Key::Q, gouda::ActionState::Released,
-         [this] { p_scene_camera->ClearMovementFlag(gouda::CameraMovement::ZoomIn); }},
-        {gouda::Key::E, gouda::ActionState::Pressed,
-         [this] { p_scene_camera->SetMovementFlag(gouda::CameraMovement::ZoomOut); }},
-        {gouda::Key::E, gouda::ActionState::Released,
-         [this] { p_scene_camera->ClearMovementFlag(gouda::CameraMovement::ZoomOut); }},
-        {gouda::Key::Left, gouda::ActionState::Pressed,
-         [this] { p_current_scene->GetPlayer().velocity.x = -p_current_scene->GetPlayer().speed; }},
-        {gouda::Key::Left, gouda::ActionState::Released,
-         [this] {
-             if (p_current_scene->GetPlayer().velocity.x < 0)
-                 p_current_scene->GetPlayer().velocity.x = 0;
-         }},
-        {gouda::Key::Right, gouda::ActionState::Pressed,
-         [this] { p_current_scene->GetPlayer().velocity.x = p_current_scene->GetPlayer().speed; }},
-        {gouda::Key::Right, gouda::ActionState::Released,
-         [this] {
-             if (p_current_scene->GetPlayer().velocity.x > 0)
-                 p_current_scene->GetPlayer().velocity.x = 0;
-         }},
-        {gouda::Key::Up, gouda::ActionState::Pressed,
-         [this] { p_current_scene->GetPlayer().velocity.y = p_current_scene->GetPlayer().speed; }},
-        {gouda::Key::Up, gouda::ActionState::Released,
-         [this] {
-             if (p_current_scene->GetPlayer().velocity.y > 0)
-                 p_current_scene->GetPlayer().velocity.y = 0;
-         }},
-        {gouda::Key::Down, gouda::ActionState::Pressed,
-         [this] { p_current_scene->GetPlayer().velocity.y = -p_current_scene->GetPlayer().speed; }},
-        {gouda::Key::Down, gouda::ActionState::Released,
-         [this] {
-             if (p_current_scene->GetPlayer().velocity.y < 0)
-                 p_current_scene->GetPlayer().velocity.y = 0;
-         }},
-        {gouda::Key::Space, gouda::ActionState::Pressed, [this] { p_scene_camera->Shake(10.0f, 0.5f); }},
-        {gouda::Key::C, gouda::ActionState::Pressed, [this] { m_renderer.ToggleComputeParticles(); }},
-    };
-
-    p_input_handler->LoadStateBindings("Game", game_bindings);
-    p_input_handler->SetActiveState("Game");
 
     // Scroll callback
     p_input_handler->SetScrollCallback([this]([[maybe_unused]] const f64 xOffset, const f64 yOffset) {
