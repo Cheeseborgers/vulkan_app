@@ -21,10 +21,8 @@ class State {
 public:
     using StateID = StringView;
 
-    explicit State(SharedContext& context, StateStack &state_stack);
+    explicit State(SharedContext& context, StateStack &state_stack, StringView identifier);
     virtual ~State() = default;
-
-    [[nodiscard]] virtual StringView GetID() const = 0;
 
     virtual void HandleInput() = 0;
     virtual void Update(f32 delta_time) = 0;
@@ -32,7 +30,7 @@ public:
     virtual void OnFrameBufferResize(const gouda::Vec2 &new_framebuffer_size) = 0;
 
     [[nodiscard]] virtual bool IsOpaque() const { return true; }
-
+    [[nodiscard]] virtual StringView GetID() const { return m_state_id; }
 
     virtual void OnEnter() {} // TODO: Implement debug logging here
     virtual void OnExit() {}
@@ -41,5 +39,6 @@ protected:
     SharedContext& m_context;
     StateStack &m_state_stack;
     gouda::Vec2 m_framebuffer_size;
+    String m_state_id;
 };
 

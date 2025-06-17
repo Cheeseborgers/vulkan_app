@@ -8,7 +8,7 @@
 
 #include "debug/logger.hpp"
 
-MainMenuState::MainMenuState(SharedContext &context, StateStack &state_stack) : State(context, state_stack)
+MainMenuState::MainMenuState(SharedContext &context, StateStack &state_stack) : State(context, state_stack, "MainMenuState")
 {
     // Get framebuffer size
     gouda::Vec2 screen_size;
@@ -81,8 +81,6 @@ MainMenuState::MainMenuState(SharedContext &context, StateStack &state_stack) : 
     m_context.renderer->DrawText("GOUDA RENDERER MENU", title_position, text_colour, 50.0f, 2, m_text_instances,
                                  gouda::TextAlign::Center, false);
 }
-
-State::StateID MainMenuState::GetID() const { return "MainMenuState"; }
 
 void MainMenuState::HandleInput() {}
 

@@ -1,10 +1,8 @@
 #include "states/settings_state.hpp"
 
 SettingsState::SettingsState(SharedContext &context, StateStack &state_stack)
-: State(context, state_stack)
+: State(context, state_stack, "SettingsState")
 {}
-
-State::StateID SettingsState::GetID() const { return "Game state"; }
 
 void SettingsState::HandleInput() {}
 

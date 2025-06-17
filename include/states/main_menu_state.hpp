@@ -19,8 +19,6 @@ public:
     explicit MainMenuState(SharedContext &context, StateStack &state_stack);
     ~MainMenuState() override = default;
 
-    [[nodiscard]] StateID GetID() const override;
-
     void HandleInput() override;
     void Update(f32 delta_time) override;
     void Render(f32 delta_time) override;

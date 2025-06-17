@@ -7,10 +7,8 @@
 #include "states/game_state.hpp"
 
 GameState::GameState(SharedContext &context, StateStack &state_stack)
-: State(context, state_stack)
+: State(context, state_stack, "GameState")
 {}
-
-State::StateID GameState::GetID() const { return "Game state"; }
 
 void GameState::HandleInput() {}
 

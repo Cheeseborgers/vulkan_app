@@ -6,16 +6,14 @@
  */
 #include "states/intro_state.hpp"
 
+#include "../../include/states/editor_state.hpp"
 #include "debug/logger.hpp"
-#include "states/editor_state.hpp"
 
 #include "states/main_menu_state.hpp"
 
 IntroState::IntroState(SharedContext &context, StateStack &state_stack)
-    : State(context, state_stack), m_current_time{0.0f}
+    : State(context, state_stack, "IntroState"), m_current_time{0.0f}
 {
-    m_framebuffer_size = {static_cast<f32>(m_context.renderer->GetFramebufferSize().width), static_cast<f32>(m_context.renderer->GetFramebufferSize().height)};
-
     gouda::InstanceData background;
     background.position = {0.f, 0.f, -0.599f};
     background.size = m_framebuffer_size;
@@ -32,20 +30,15 @@ IntroState::IntroState(SharedContext &context, StateStack &state_stack)
                                  gouda::TextAlign::Center, false);
 }
 
-State::StateID IntroState::GetID() const { return "IntroState"; }
-
 void IntroState::HandleInput()
 {
-    // Allow skipping the intro with a key press
-    if (m_context.input_handler->IsKeyPressed(gouda::Key::Enter)) {
-        TransitionToMainMenu();
-    }
+    // All Input is handled by input handler for intro state
 }
 
 void IntroState::Update(const f32 delta_time)
 {
     m_current_time += delta_time;
-    if (m_current_time >= 1.0f) { // TODO: Change to a decent time (Set for debug)
+    if (m_current_time >= 3.0f) { // TODO: Change to a decent time (Set for debug)
         TransitionToMainMenu();
     }
 }
@@ -62,23 +55,22 @@ void IntroState::OnFrameBufferResize(const gouda::Vec2 &new_framebuffer_size)
 
 void IntroState::OnEnter()
 {
-    APP_LOG_INFO("Entered IntroState");
-    State::OnEnter();
+    const std::vector<gouda::InputHandler::ActionBinding> intro_bindings{
+        {gouda::Key::Escape, gouda::ActionState::Pressed, [this] { m_context.window->Close(); }},
+        {gouda::Key::Enter, gouda::ActionState::Pressed, [this] { TransitionToMainMenu(); }}};
 
-    // TODO: Set up keybinds/input
+    m_context.input_handler->LoadStateBindings(m_state_id, intro_bindings);
+    m_context.input_handler->SetActiveState(m_state_id);
 }
 
 void IntroState::OnExit()
 {
-    APP_LOG_INFO("Exiting IntroState");
-    State::OnExit();
-
-    // TODO: Unset keybinds/input
+    m_context.input_handler->UnloadStateBindings(m_state_id);
 }
 
 void IntroState::TransitionToMainMenu() const
 {
     m_context.renderer->DeviceWait();
-    //m_state_stack.Replace(std::make_unique<MainMenuState>(m_context, m_state_stack));
+    // m_state_stack.Replace(std::make_unique<MainMenuState>(m_context, m_state_stack));
     m_state_stack.Replace(std::make_unique<EditorState>(m_context, m_state_stack));
 }
